@@ -513,8 +513,7 @@ class So100RobotConfig(ManipulatorRobotConfig):
                     "shoulder_lift": [2, "sts3215"],
                     "elbow_flex": [3, "sts3215"],
                     "wrist_flex": [4, "sts3215"],
-                    "wrist_roll": [5, "sts3215"],
-                    "gripper": [6, "sts3215"],
+                    "wrist_roll": [5, "sts3215"]
                 },
             ),
         }
@@ -530,8 +529,7 @@ class So100RobotConfig(ManipulatorRobotConfig):
                     "shoulder_lift": [2, "sts3215"],
                     "elbow_flex": [3, "sts3215"],
                     "wrist_flex": [4, "sts3215"],
-                    "wrist_roll": [5, "sts3215"],
-                    "gripper": [6, "sts3215"],
+                    "wrist_roll": [5, "sts3215"]
                 },
             ),
         }
