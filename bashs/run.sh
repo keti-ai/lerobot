@@ -17,7 +17,7 @@
 ## record / for configs, check config list on lerobot.common.robot_devices.control_configs.RecordControlConfig
 recorder=syhlab
 exp_name=test_record
-exp_num=2
+exp_num=3
 #cd ..
 #python lerobot/scripts/control_robot.py \
 #--robot.type=so100 \
@@ -41,6 +41,6 @@ python lerobot/scripts/control_robot.py \
 --control.type=replay \
 --control.fps=30 \
 --control.repo_id=${recorder}/${exp_name}_${exp_num}  \
---control.episode=2 \
+--control.episode=0 \
 --control.local_files_only=true
 cd bashs
