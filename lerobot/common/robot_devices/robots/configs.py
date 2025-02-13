@@ -474,6 +474,13 @@ class So100RobotConfig(ManipulatorRobotConfig):
                 width=640,
                 height=480,
             ),
+            "head": IntelRealSenseCameraConfig(
+                name="Intel RealSense D435I",
+                fps=30,
+                width=1280,
+                height=720,
+                rotation=90,
+            )
         }
     )
 
