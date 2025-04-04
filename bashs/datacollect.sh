@@ -23,7 +23,8 @@ python lerobot/scripts/control_robot.py \
 --control.push_to_hub=false \
 --control.warmup_time_s=2 \
 --control.episode_time_s=5 \
---control.reset_time_s=5
+--control.reset_time_s=5 \
+--control.local_files_only=true
 cd bashs
 
 ## replay
