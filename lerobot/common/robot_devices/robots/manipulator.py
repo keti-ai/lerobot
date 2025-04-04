@@ -493,13 +493,22 @@ class ManipulatorRobot:
 
         # Capture images from cameras
         images = {}
+        depth_images = {}  # optional, only if depth is used
+
         for name in self.cameras:
             before_camread_t = time.perf_counter()
-            images[name] = self.cameras[name].async_read()
-            images[name] = torch.from_numpy(images[name])
+            result = self.cameras[name].async_read()
+
+            # Handle color and depth cases
+            if isinstance(result, tuple):
+                color_np, depth_np = result
+                images[name] = torch.from_numpy(color_np.copy())
+                depth_images[name] = torch.from_numpy(depth_np.copy())  # Add this only if depth is needed
+            else:
+                images[name] = torch.from_numpy(result.copy())
+
             self.logs[f"read_camera_{name}_dt_s"] = self.cameras[name].logs["delta_timestamp_s"]
             self.logs[f"async_read_camera_{name}_dt_s"] = time.perf_counter() - before_camread_t
-
         # Populate output dictionnaries
         obs_dict, action_dict = {}, {}
         obs_dict["observation.state"] = state

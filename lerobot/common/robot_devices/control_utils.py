@@ -163,14 +163,21 @@ def warmup_record(
     display_cameras,
     fps,
 ):
-    control_loop(
-        robot=robot,
-        control_time_s=warmup_time_s,
-        display_cameras=display_cameras,
-        events=events,
-        fps=fps,
-        teleoperate=enable_teleoperation,
-    )
+    logging.info("Starting warmup record...")
+    try:
+        control_loop(
+            robot=robot,
+            control_time_s=warmup_time_s,
+            display_cameras=display_cameras,
+            events=events,
+            fps=fps,
+            teleoperate=enable_teleoperation,
+        )
+        logging.info("Warmup record completed successfully")
+    except Exception as e:
+        logging.error(f"Error during warmup record: {e}")
+        logging.error(traceback.format_exc())
+        raise
 
 
 def record_episode(
@@ -232,42 +239,106 @@ def control_loop(
 
     timestamp = 0
     start_episode_t = time.perf_counter()
+    logging.info(f"Starting control loop with control_time_s={control_time_s}")
+    
     while timestamp < control_time_s:
         start_loop_t = time.perf_counter()
-        print("hi")
-        if teleoperate:
-            observation, action = robot.teleop_step(record_data=True)
-        else:
-            observation = robot.capture_observation()
+        
+        try:
+            if teleoperate:
+                logging.debug("Performing teleop step...")
+                observation, action = robot.teleop_step(record_data=True)
+            else:
+                logging.debug("Capturing observation...")
+                # Try to get observation with a timeout
+                max_retries = 3
+                retry_count = 0
+                while retry_count < max_retries:
+                    try:
+                        # For SO100 robot, we need to handle the camera reads separately
+                        if robot.robot_type == "so100":
+                            # First get the robot state
+                            follower_pos = {}
+                            for name in robot.follower_arms:
+                                follower_pos[name] = robot.follower_arms[name].read("Present_Position")
+                                follower_pos[name] = torch.from_numpy(follower_pos[name])
+                            
+                            # Create state by concatenating follower current position
+                            state = []
+                            for name in robot.follower_arms:
+                                if name in follower_pos:
+                                    state.append(follower_pos[name])
+                            state = torch.cat(state)
+                            
+                            # Then get camera images
+                            images = {}
+                            for name in robot.cameras:
+                                try:
+                                    images[name] = robot.cameras[name].async_read()
+                                    images[name] = torch.from_numpy(images[name])
+                                except Exception as e:
+                                    logging.error(f"Error reading camera {name}: {e}")
+                                    # If camera read fails, use a black image
+                                    images[name] = torch.zeros((robot.cameras[name].height, 
+                                                             robot.cameras[name].width, 
+                                                             robot.cameras[name].channels), 
+                                                            dtype=torch.uint8)
+                            
+                            # Create observation dictionary
+                            observation = {}
+                            observation["observation.state"] = state
+                            for name in robot.cameras:
+                                observation[f"observation.images.{name}"] = images[name]
+                        else:
+                            observation = robot.capture_observation()
+                        break
+                    except Exception as e:
+                        retry_count += 1
+                        if retry_count == max_retries:
+                            raise e
+                        logging.warning(f"Failed to capture observation, retrying ({retry_count}/{max_retries}): {e}")
+                        time.sleep(0.1)
 
-            if policy is not None:
-                pred_action = predict_action(observation, policy, device, use_amp)
-                # Action can eventually be clipped using `max_relative_target`,
-                # so action actually sent is saved in the dataset.
-                action = robot.send_action(pred_action)
-                action = {"action": action}
+                if policy is not None:
+                    logging.debug("Computing policy action...")
+                    pred_action = predict_action(observation, policy, device, use_amp)
+                    # Action can eventually be clipped using `max_relative_target`,
+                    # so action actually sent is saved in the dataset.
+                    action = robot.send_action(pred_action)
+                    action = {"action": action}
 
-        if dataset is not None:
-            frame = {**observation, **action}
-            dataset.add_frame(frame)
+            if dataset is not None:
+                logging.debug("Adding frame to dataset...")
+                frame = {**observation, **action}
+                dataset.add_frame(frame)
 
-        if display_cameras and not is_headless():
-            image_keys = [key for key in observation if "image" in key]
-            for key in image_keys:
-                cv2.imshow(key, cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR))
-            cv2.waitKey(1)
+            if display_cameras and not is_headless():
+                logging.debug("Displaying camera images...")
+                image_keys = [key for key in observation if "image" in key]
+                for key in image_keys:
+                    try:
+                        cv2.imshow(key, cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR))
+                    except Exception as e:
+                        logging.error(f"Error displaying camera {key}: {e}")
+                cv2.waitKey(1)
 
-        if fps is not None:
+            if fps is not None:
+                dt_s = time.perf_counter() - start_loop_t
+                busy_wait(1 / fps - dt_s)
+
             dt_s = time.perf_counter() - start_loop_t
-            busy_wait(1 / fps - dt_s)
+            log_control_info(robot, dt_s, fps=fps)
 
-        dt_s = time.perf_counter() - start_loop_t
-        log_control_info(robot, dt_s, fps=fps)
-
-        timestamp = time.perf_counter() - start_episode_t
-        if events["exit_early"]:
-            events["exit_early"] = False
-            break
+            timestamp = time.perf_counter() - start_episode_t
+            if events["exit_early"]:
+                events["exit_early"] = False
+                break
+                
+        except Exception as e:
+            logging.error(f"Error in control loop: {e}")
+            logging.error(traceback.format_exc())
+            # Add a small delay to prevent rapid error logging
+            time.sleep(0.1)
 
 
 def reset_environment(robot, events, reset_time_s):
