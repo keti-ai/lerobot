@@ -7,12 +7,12 @@ cd ..
 python lerobot/scripts/control_robot.py \
 --robot.type=so100 \
 --robot.cameras='{
-  "head": {
+  "top": {
     "type": "intelrealsense",
     "serial_number": 918512073045,
     "fps": 30,
-    "width": 1280,
-    "height": 720
+    "width": 640,
+    "height": 480
   }
 }' \
 --control.type=record \
@@ -23,8 +23,7 @@ python lerobot/scripts/control_robot.py \
 --control.push_to_hub=false \
 --control.warmup_time_s=2 \
 --control.episode_time_s=5 \
---control.reset_time_s=5 \
-
+--control.reset_time_s=5
 cd bashs
 
 ## replay
