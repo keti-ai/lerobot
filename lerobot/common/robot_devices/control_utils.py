@@ -245,7 +245,7 @@ def control_loop(
     start_episode_t = time.perf_counter()
     while timestamp < control_time_s:
         start_loop_t = time.perf_counter()
-
+        print("hi")
         if teleoperate:
             observation, action = robot.teleop_step(record_data=True)
         else:
