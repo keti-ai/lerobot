@@ -252,6 +252,8 @@ def control_loop(
     if policy is not None:
         policy.reset()
 
+    logging.info(f"Starting control loop with control_time_s={control_time_s}")
+
     while timestamp < control_time_s:
         start_loop_t = time.perf_counter()
         print("hi")
@@ -271,11 +273,87 @@ def control_loop(
                 action = robot.send_action(pred_action)
                 action = {"action": action}
 
+        try:
+            if teleoperate:
+                logging.debug("Performing teleop step...")
+                observation, action = robot.teleop_step(record_data=True)
+            else:
+                logging.debug("Capturing observation...")
+                # Try to get observation with a timeout
+                max_retries = 3
+                retry_count = 0
+                while retry_count < max_retries:
+                    try:
+                        # For SO100 robot, we need to handle the camera reads separately
+                        if robot.robot_type == "so100":
+                            # First get the robot state
+                            follower_pos = {}
+                            for name in robot.follower_arms:
+                                follower_pos[name] = robot.follower_arms[name].read("Present_Position")
+                                follower_pos[name] = torch.from_numpy(follower_pos[name])
+
+                            # Create state by concatenating follower current position
+                            state = []
+                            for name in robot.follower_arms:
+                                if name in follower_pos:
+                                    state.append(follower_pos[name])
+                            state = torch.cat(state)
+
+                            # Then get camera images
+                            images = {}
+                            for name in robot.cameras:
+                                try:
+                                    images[name] = robot.cameras[name].async_read()
+                                    images[name] = torch.from_numpy(images[name])
+                                except Exception as e:
+                                    logging.error(f"Error reading camera {name}: {e}")
+                                    # If camera read fails, use a black image
+                                    images[name] = torch.zeros((robot.cameras[name].height,
+                                                             robot.cameras[name].width,
+                                                             robot.cameras[name].channels),
+                                                            dtype=torch.uint8)
+
+                            # Create observation dictionary
+                            observation = {}
+                            observation["observation.state"] = state
+                            for name in robot.cameras:
+                                observation[f"observation.images.{name}"] = images[name]
+                        else:
+                            observation = robot.capture_observation()
+                        break
+                    except Exception as e:
+                        retry_count += 1
+                        if retry_count == max_retries:
+                            raise e
+                        logging.warning(f"Failed to capture observation, retrying ({retry_count}/{max_retries}): {e}")
+                        time.sleep(0.1)
+
+                if policy is not None:
+                    logging.debug("Computing policy action...")
+                    pred_action = predict_action(observation, policy, device, use_amp)
+                    # Action can eventually be clipped using `max_relative_target`,
+                    # so action actually sent is saved in the dataset.
+                    action = robot.send_action(pred_action)
+                    action = {"action": action}
+
+            if dataset is not None:
+                logging.debug("Adding frame to dataset...")
+                frame = {**observation, **action}
+                dataset.add_frame(frame)
         if dataset is not None:
             observation = {k: v for k, v in observation.items() if k not in ["task", "robot_type"]}
             frame = {**observation, **action, "task": single_task}
             dataset.add_frame(frame)
 
+            if display_cameras and not is_headless():
+                logging.debug("Displaying camera images...")
+                image_keys = [key for key in observation if "image" in key]
+                for key in image_keys:
+                    try:
+                        cv2.imshow(key, cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR))
+                    except Exception as e:
+                        logging.error(f"Error displaying camera {key}: {e}")
+                cv2.waitKey(1)
         # TODO(Steven): This should be more general (for RemoteRobot instead of checking the name, but anyways it will change soon)
         if (display_data and not is_headless()) or (display_data and robot.robot_type.startswith("lekiwi")):
             if action is not None:
@@ -299,6 +377,11 @@ def control_loop(
             events["exit_early"] = False
             break
 
+    except Exception as e:
+        logging.error(f"Error in control loop: {e}")
+        logging.error(traceback.format_exc())
+        # Add a small delay to prevent rapid error logging
+        time.sleep(0.1)
 
 def reset_environment(robot, events, reset_time_s, fps):
     # TODO(rcadene): refactor warmup_record and reset_environment
