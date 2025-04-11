@@ -11,8 +11,8 @@ python lerobot/scripts/control_robot.py \
     "type": "intelrealsense",
     "serial_number": 918512073045,
     "fps": 30,
-    "width": 640,
-    "height": 480
+    "width": 1280,
+    "height": 720
   }
 }' \
 --control.type=record \
