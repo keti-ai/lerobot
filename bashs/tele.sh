@@ -16,13 +16,7 @@ HAND_CAMERA_SERIAL=218622278274
 
 echo "🕹️ Starting teleoperation..."
 cd ..
-cd ..
-
 python lerobot/scripts/control_robot.py \
---robot.type=so100 \
---robot.cameras={} \
---control.type=teleoperate
-cd scripts
   --robot.type=${ROBOT_TYPE} \
   --robot.cameras="{
     \"head\": {\"type\": \"intelrealsense\", \"serial_number\": ${HEAD_CAMERA_SERIAL}, \"fps\": 30, \"width\": 1280, \"height\": 720},
