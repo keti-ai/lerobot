@@ -264,6 +264,7 @@ class IntelRealSenseCamera:
             self.rotation = cv2.ROTATE_90_CLOCKWISE
         elif config.rotation == 180:
             self.rotation = cv2.ROTATE_180
+        self.lock = threading.Lock()
 
     def find_serial_number_from_name(self, name):
         camera_infos = find_cameras()
@@ -380,9 +381,12 @@ class IntelRealSenseCamera:
             import cv2
 
         start_time = time.perf_counter()
+        # print(f"[DEBUG] Calling wait_for_frames() at {start_time:.3f}")
 
-        frame = self.camera.wait_for_frames(timeout_ms=5000)
+        frame = self.camera.wait_for_frames(timeout_ms=1000)
 
+        # print(f"[DEBUG] Frame received at {time.perf_counter():.3f} (Δ {(time.perf_counter() - start_time)*1000:.2f} ms)")
+        ...
         color_frame = frame.get_color_frame()
 
         if not color_frame:
@@ -436,14 +440,22 @@ class IntelRealSenseCamera:
             return color_image
 
     def read_loop(self):
-        while not self.stop_event.is_set():
-            if self.use_depth:
-                self.color_image, self.depth_map = self.read()
-            else:
-                self.color_image = self.read()
+        while not self.stop_event.wait(1 / self.fps):
+            try:
+                if self.use_depth:
+                    with self.lock:
+                        self.color_image, self.depth_map = self.read()
+                else:
+                    with self.lock:
+                        self.color_image = self.read()
+
+                # print("[read_loop] new frame stored in self.color_image")
+            except Exception as e:
+                print(f"[read_loop] exception caught: {e}")
+                traceback.print_exc()
+                time.sleep(0.1)  # 잠깐 대기해서 과도한 루프 방지
 
     def async_read(self):
-        """Access the latest color image"""
         if not self.is_connected:
             raise RobotDeviceNotConnectedError(
                 f"IntelRealSenseCamera({self.serial_number}) is not connected. Try running `camera.connect()` first."
@@ -456,19 +468,29 @@ class IntelRealSenseCamera:
             self.thread.start()
 
         num_tries = 0
-        while self.color_image is None:
-            # TODO(rcadene, aliberts): intelrealsense has diverged compared to opencv over here
-            num_tries += 1
-            time.sleep(1 / self.fps)
-            if num_tries > self.fps and (self.thread.ident is None or not self.thread.is_alive()):
-                raise Exception(
-                    "The thread responsible for `self.async_read()` took too much time to start. There might be an issue. Verify that `self.thread.start()` has been called."
-                )
+        while True:
+            try:
+                # Try to acquire the lock with a timeout
+                if self.lock.acquire(timeout=0.1):  # 100ms timeout
+                    try:
+                        if self.color_image is not None:
+                            # Ensure the image is a numpy array
+                            if not isinstance(self.color_image, np.ndarray):
+                                self.color_image = np.asarray(self.color_image)
+                            return self.color_image if not self.use_depth else (self.color_image, self.depth_map)
+                    finally:
+                        self.lock.release()
+            except Exception as e:
+                print(f"[DEBUG] Error in async_read: {e}")
+                if self.lock.locked():
+                    self.lock.release()
 
-        if self.use_depth:
-            return self.color_image, self.depth_map
-        else:
-            return self.color_image
+            time.sleep(1 / self.fps)
+            num_tries += 1
+            if num_tries % 10 == 0:
+                print(f"[DEBUG] Waiting for frame... tried {num_tries} times")
+            if num_tries > int(self.fps * 2):  # wait max ~2s
+                raise TimeoutError(f"Timeout: No frame received from RealSense camera {self.serial_number}")
 
     def disconnect(self):
         if not self.is_connected:
@@ -478,8 +500,10 @@ class IntelRealSenseCamera:
 
         if self.thread is not None and self.thread.is_alive():
             # wait for the thread to finish
+            print("[DEBUG] Joining read_loop thread")
             self.stop_event.set()
-            self.thread.join()
+            self.thread.join(timeout=2.0)  # hard timeout
+            print("[DEBUG] Thread joined")
             self.thread = None
             self.stop_event = None
 
