@@ -6,15 +6,7 @@ exp_num=$(date +"%Y%m%d_%H%M%S")  # 현재 시간 기반으로 설정됨
 cd ..
 python lerobot/scripts/control_robot.py \
 --robot.type=so100 \
---robot.cameras='{
-  "top": {
-    "type": "intelrealsense",
-    "serial_number": 918512073045,
-    "fps": 30,
-    "width": 1280,
-    "height": 720
-  }
-}' \
+--robot.cameras='{}' \
 --control.type=record \
 --control.fps=30 \
 --control.single_task='test_task' \
