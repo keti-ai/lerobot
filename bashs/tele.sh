@@ -12,7 +12,7 @@ python lerobot/scripts/control_robot.py \
 --robot.type=so100 \
 --robot.cameras={} \
 --control.type=teleoperate
-cd scripts
+#cd scripts
 
 ## record / for configs, check config list on lerobot.common.robot_devices.control_configs.RecordControlConfig
 #recorder=syhlab
