@@ -9,8 +9,6 @@ import traceback
 from contextlib import nullcontext
 from copy import copy
 from functools import cache
-import signal
-import threading
 
 import cv2
 import torch
@@ -25,31 +23,6 @@ from lerobot.common.robot_devices.robots.utils import Robot
 from lerobot.common.robot_devices.utils import busy_wait
 from lerobot.common.utils.utils import get_safe_torch_device, has_method
 
-# Global flag for keyboard interrupt
-should_stop = False
-
-def signal_handler(sig, frame):
-    """Handle keyboard interrupt signal."""
-    global should_stop
-    logging.info("=== Signal handler called ===")
-    logging.info(f"Signal: {sig}")
-    logging.info(f"Frame: {frame}")
-    logging.info(f"Current thread: {threading.current_thread().ident}")
-    logging.info(f"Main thread: {threading.main_thread().ident}")
-    logging.info("Setting should_stop to True")
-    should_stop = True
-    
-    # Force exit after a short delay to allow cleanup
-    logging.info("Waiting for 1 second before force exit")
-    time.sleep(1)
-    if should_stop:
-        logging.info("Forcing exit...")
-        import os
-        os._exit(1)
-
-# Register the signal handler for both SIGINT and SIGTERM
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
 
 def log_control_info(robot: Robot, dt_s, episode_index=None, frame_index=None, fps=None):
     log_items = []
@@ -245,168 +218,128 @@ def control_loop(
     use_amp: bool | None = None,
     fps: int | None = None,
 ):
-    global should_stop
-    should_stop = False
-
-    # Initialize keyboard listener
-    listener, keyboard_events = init_keyboard_listener()
-    if events is None:
-        events = {"exit_early": False, "rerecord_episode": False, "stop_recording": False}
-    events.update(keyboard_events)
+    # TODO(rcadene): Add option to record logs
     if not robot.is_connected:
         robot.connect()
-    # Initialize cameras first with timeout
-    if hasattr(robot, 'cameras'):
-        for name, camera in robot.cameras.items():
-            if should_stop:
-                break
-            try:
-                if not camera.is_connected:
-                    logging.info(f"Connecting camera {name}...")
-                    camera.connect()
-                    # Try to read a frame to ensure the camera is working
-                    try:
-                        camera.async_read()
-                        logging.info(f"Camera {name} connected successfully")
-                    except Exception as e:
-                        logging.error(f"Failed to read from camera {name}: {e}")
-                        # If we can't read from the camera, try to reconnect
-                        camera.disconnect()
-                        time.sleep(1)
-                        camera.connect()
-            except Exception as e:
-                logging.error(f"Error initializing camera {name}: {e}")
-                should_stop = True
-                break
 
+    if events is None:
+        events = {"exit_early": False}
 
+    if control_time_s is None:
+        control_time_s = float("inf")
+
+    if teleoperate and policy is not None:
+        raise ValueError("When `teleoperate` is True, `policy` should be None.")
+
+    if dataset is not None and fps is not None and dataset.fps != fps:
+        raise ValueError(f"The dataset fps should be equal to requested fps ({dataset['fps']} != {fps}).")
+
+    if isinstance(device, str):
+        device = get_safe_torch_device(device)
 
     timestamp = 0
     start_episode_t = time.perf_counter()
-    last_check_time = start_episode_t
-    check_interval = 1.0  # Check connection every second
-    
     logging.info(f"Starting control loop with control_time_s={control_time_s}")
-    try:
-        while timestamp < control_time_s and not should_stop:
-            start_loop_t = time.perf_counter()
-            
-            # Check connections periodically
-            current_time = time.perf_counter()
-            if current_time - last_check_time > check_interval:
-                if not robot.is_connected:
-                    logging.error("Robot connection lost")
-                    should_stop = True
-                    break
-                if hasattr(robot, 'cameras'):
-                    for name, camera in robot.cameras.items():
-                        if not camera.is_connected:
-                            logging.error(f"Camera {name} connection lost")
-                            should_stop = True
-                            break
-                last_check_time = current_time
-            
-            try:
-                if should_stop:
-                    break
 
-                if teleoperate:
-                    logging.debug("Performing teleop step...")
+    while timestamp < control_time_s:
+        start_loop_t = time.perf_counter()
+
+        try:
+            if teleoperate:
+                logging.debug("Performing teleop step...")
+                observation, action = robot.teleop_step(record_data=True)
+            else:
+                logging.debug("Capturing observation...")
+                # Try to get observation with a timeout
+                max_retries = 3
+                retry_count = 0
+                while retry_count < max_retries:
                     try:
-                        observation, action = robot.teleop_step(record_data=True)
-                        # Ensure action is a dictionary
-                        if isinstance(action, str):
-                            action = {"action": action}
-                    except Exception as e:
-                        logging.error(f"Error in teleop_step: {e}")
-                        should_stop = True
-                        break
-                else:
-                    logging.debug("Capturing observation...")
-                    # Try to get observation with a timeout
-                    max_retries = 3
-                    retry_count = 0
-                    while retry_count < max_retries and not should_stop:
-                        try:
+                        # For SO100 robot, we need to handle the camera reads separately
+                        if robot.robot_type == "so100":
+                            # First get the robot state
+                            follower_pos = {}
+                            for name in robot.follower_arms:
+                                follower_pos[name] = robot.follower_arms[name].read("Present_Position")
+                                follower_pos[name] = torch.from_numpy(follower_pos[name])
+
+                            # Create state by concatenating follower current position
+                            state = []
+                            for name in robot.follower_arms:
+                                if name in follower_pos:
+                                    state.append(follower_pos[name])
+                            state = torch.cat(state)
+
+                            # Then get camera images
+                            images = {}
+                            for name in robot.cameras:
+                                try:
+                                    images[name] = robot.cameras[name].async_read()
+                                    images[name] = torch.from_numpy(images[name])
+                                except Exception as e:
+                                    logging.error(f"Error reading camera {name}: {e}")
+                                    # If camera read fails, use a black image
+                                    images[name] = torch.zeros((robot.cameras[name].height,
+                                                             robot.cameras[name].width,
+                                                             robot.cameras[name].channels),
+                                                            dtype=torch.uint8)
+
+                            # Create observation dictionary
+                            observation = {}
+                            observation["observation.state"] = state
+                            for name in robot.cameras:
+                                observation[f"observation.images.{name}"] = images[name]
+                        else:
                             observation = robot.capture_observation()
-                            break
-                        except Exception as e:
-                            retry_count += 1
-                            if retry_count == max_retries:
-                                logging.error(f"Failed to capture observation after {max_retries} retries: {e}")
-                                should_stop = True
-                                break
-                            logging.warning(f"Failed to capture observation, retrying ({retry_count}/{max_retries}): {e}")
-                            time.sleep(0.1)
-
-                    if should_stop:
                         break
+                    except Exception as e:
+                        retry_count += 1
+                        if retry_count == max_retries:
+                            raise e
+                        logging.warning(f"Failed to capture observation, retrying ({retry_count}/{max_retries}): {e}")
+                        time.sleep(0.1)
 
-                    if policy is not None:
-                        logging.debug("Computing policy action...")
-                        try:
-                            pred_action = predict_action(observation, policy, device, use_amp)
-                            action = robot.send_action(pred_action)
-                            action = {"action": action}
-                        except Exception as e:
-                            logging.error(f"Error in policy action: {e}")
-                            should_stop = True
-                            break
-                    else:
-                        action = {"action": None}
+                if policy is not None:
+                    logging.debug("Computing policy action...")
+                    pred_action = predict_action(observation, policy, device, use_amp)
+                    # Action can eventually be clipped using `max_relative_target`,
+                    # so action actually sent is saved in the dataset.
+                    action = robot.send_action(pred_action)
+                    action = {"action": action}
 
-                if should_stop:
-                    break
+            if dataset is not None:
+                logging.debug("Adding frame to dataset...")
+                frame = {**observation, **action}
+                dataset.add_frame(frame)
 
-                if dataset is not None and not should_stop:
-                    logging.debug("Adding frame to dataset...")
-                    frame = {**observation, **action}
-                    dataset.add_frame(frame)
+            if display_cameras and not is_headless():
+                logging.debug("Displaying camera images...")
+                image_keys = [key for key in observation if "image" in key]
+                for key in image_keys:
+                    try:
+                        cv2.imshow(key, cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR))
+                    except Exception as e:
+                        logging.error(f"Error displaying camera {key}: {e}")
+                cv2.waitKey(1)
 
-                if display_cameras and not is_headless() and not should_stop:
-                    logging.debug("Displaying camera images...")
-                    image_keys = [key for key in observation if "image" in key]
-                    for key in image_keys:
-                        try:
-                            cv2.imshow(key, cv2.cvtColor(observation[key], cv2.COLOR_RGB2BGR))
-                        except Exception as e:
-                            logging.error(f"Error displaying camera {key}: {e}")
-                    cv2.waitKey(1)
-
-                if fps is not None and not should_stop:
-                    dt_s = time.perf_counter() - start_loop_t
-                    busy_wait(1 / fps - dt_s)
-
+            if fps is not None:
                 dt_s = time.perf_counter() - start_loop_t
-                log_control_info(robot, dt_s, fps=fps)
+                busy_wait(1 / fps - dt_s)
 
-                timestamp = time.perf_counter() - start_episode_t
-                if events["exit_early"] or should_stop:
-                    events["exit_early"] = False
-                    break
-                    
-            except Exception as e:
-                logging.error(f"Error in control loop: {e}")
-                logging.error(traceback.format_exc())
-                # Add a small delay to prevent rapid error logging
-                time.sleep(0.1)
-                if should_stop:
-                    break
-    finally:
-        # Clean up keyboard listener
-        if listener is not None:
-            listener.stop()
-        # Clean up camera displays
-        if display_cameras and not is_headless():
-            cv2.destroyAllWindows()
-        # Disconnect robot
-        if robot.is_connected:
-            robot.disconnect()
-    # Check robot connection
-    if not robot.is_connected:
-        logging.error("Robot is not connected")
-        should_stop = True
-        return
+            dt_s = time.perf_counter() - start_loop_t
+            log_control_info(robot, dt_s, fps=fps)
+
+            timestamp = time.perf_counter() - start_episode_t
+            if events["exit_early"]:
+                events["exit_early"] = False
+                break
+
+        except Exception as e:
+            logging.error(f"Error in control loop: {e}")
+            logging.error(traceback.format_exc())
+            # Add a small delay to prevent rapid error logging
+            time.sleep(0.1)
+
 
 def reset_environment(robot, events, reset_time_s):
     # TODO(rcadene): refactor warmup_record and reset_environment

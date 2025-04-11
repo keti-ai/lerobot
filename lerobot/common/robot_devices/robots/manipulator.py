@@ -9,7 +9,6 @@ import logging
 import time
 import warnings
 from pathlib import Path
-import threading
 
 import numpy as np
 import torch
@@ -429,66 +428,95 @@ class ManipulatorRobot:
             self.follower_arms[name].write("Maximum_Acceleration", 254)
             self.follower_arms[name].write("Acceleration", 254)
 
-    def teleop_step(self, record_data: bool = True):
-        """Perform one step of teleoperation."""
-        logging.info("=== Starting teleop_step ===")
-        logging.info(f"Thread ID: {threading.get_ident()}")
-        start_time = time.perf_counter()
+    def teleop_step(
+        self, record_data=False
+    ) -> None | tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
+        if not self.is_connected:
+            raise RobotDeviceNotConnectedError(
+                "ManipulatorRobot is not connected. You need to run `robot.connect()`."
+            )
 
-        # Read present position
-        logging.info("Reading present position...")
+        # Prepare to assign the position of the leader to the follower
+        leader_pos = {}
+        for name in self.leader_arms:
+            before_lread_t = time.perf_counter()
+            leader_pos[name] = self.leader_arms[name].read("Present_Position")
+            leader_pos[name] = torch.from_numpy(leader_pos[name])
+            self.logs[f"read_leader_{name}_pos_dt_s"] = time.perf_counter() - before_lread_t
+
+        # Send goal position to the follower
+        follower_goal_pos = {}
+        for name in self.follower_arms:
+            before_fwrite_t = time.perf_counter()
+            goal_pos = leader_pos[name]
+
+            # Cap goal position when too far away from present position.
+            # Slower fps expected due to reading from the follower.
+            if self.config.max_relative_target is not None:
+                present_pos = self.follower_arms[name].read("Present_Position")
+                present_pos = torch.from_numpy(present_pos)
+                goal_pos = ensure_safe_goal_position(goal_pos, present_pos, self.config.max_relative_target)
+
+            # Used when record_data=True
+            follower_goal_pos[name] = goal_pos
+
+            goal_pos = goal_pos.numpy().astype(np.int32)
+            self.follower_arms[name].write("Goal_Position", goal_pos)
+            self.logs[f"write_follower_{name}_goal_pos_dt_s"] = time.perf_counter() - before_fwrite_t
+
+        # Early exit when recording data is not requested
+        if not record_data:
+            return
+
+        # TODO(rcadene): Add velocity and other info
+        # Read follower position
         follower_pos = {}
         for name in self.follower_arms:
-            logging.info(f"Reading position for follower arm {name}")
-            try:
-                follower_pos[name] = self.follower_arms[name].read("Present_Position")
-                logging.info(f"Position for {name}: {follower_pos[name]}")
-            except Exception as e:
-                logging.error(f"Error reading position for {name}: {e}")
-                raise
-
-        # Convert to torch tensors
-        logging.info("Converting positions to torch tensors...")
-        for name in self.follower_arms:
-            if name in follower_pos:
-                follower_pos[name] = torch.from_numpy(follower_pos[name])
+            before_fread_t = time.perf_counter()
+            follower_pos[name] = self.follower_arms[name].read("Present_Position")
+            follower_pos[name] = torch.from_numpy(follower_pos[name])
+            self.logs[f"read_follower_{name}_pos_dt_s"] = time.perf_counter() - before_fread_t
 
         # Create state by concatenating follower current position
-        logging.info("Creating state...")
         state = []
         for name in self.follower_arms:
             if name in follower_pos:
                 state.append(follower_pos[name])
         state = torch.cat(state)
-        logging.info(f"State shape: {state.shape}")
 
-        # Get camera images
-        logging.info("Getting camera images...")
+        # Create action by concatenating follower goal position
+        action = []
+        for name in self.follower_arms:
+            if name in follower_goal_pos:
+                action.append(follower_goal_pos[name])
+        action = torch.cat(action)
+
+        # Capture images from cameras
         images = {}
-        for name in self.cameras:
-            logging.info(f"Reading image from camera {name}")
-            try:
-                images[name] = self.cameras[name].async_read()
-                logging.info(f"Image shape for {name}: {images[name].shape}")
-            except Exception as e:
-                logging.error(f"Error reading image from {name}: {e}")
-                # If camera read fails, use a black image
-                images[name] = torch.zeros(
-                    (self.cameras[name].height, self.cameras[name].width, self.cameras[name].channels),
-                    dtype=torch.uint8,
-                )
-                logging.info(f"Using black image for {name}")
+        depth_images = {}  # optional, only if depth is used
 
-        # Create observation dictionary
-        logging.info("Creating observation dictionary...")
-        observation = {}
-        observation["observation.state"] = state
         for name in self.cameras:
-            observation[f"observation.images.{name}"] = images[name]
+            before_camread_t = time.perf_counter()
+            result = self.cameras[name].async_read()
 
-        end_time = time.perf_counter()
-        logging.info(f"Teleop step completed in {end_time - start_time:.4f} seconds")
-        return observation, {"action": None}  # Return both observation and action
+            # Handle color and depth cases
+            if isinstance(result, tuple):
+                color_np, depth_np = result
+                images[name] = torch.from_numpy(color_np.copy())
+                depth_images[name] = torch.from_numpy(depth_np.copy())  # Add this only if depth is needed
+            else:
+                images[name] = torch.from_numpy(result.copy())
+
+            self.logs[f"read_camera_{name}_dt_s"] = self.cameras[name].logs["delta_timestamp_s"]
+            self.logs[f"async_read_camera_{name}_dt_s"] = time.perf_counter() - before_camread_t
+        # Populate output dictionnaries
+        obs_dict, action_dict = {}, {}
+        obs_dict["observation.state"] = state
+        action_dict["action"] = action
+        for name in self.cameras:
+            obs_dict[f"observation.images.{name}"] = images[name]
+
+        return obs_dict, action_dict
 
     def capture_observation(self):
         """The returned observations do not have a batch dimension."""
@@ -574,35 +602,20 @@ class ManipulatorRobot:
 
     def disconnect(self):
         if not self.is_connected:
-            return  # Return silently if already disconnected
+            raise RobotDeviceNotConnectedError(
+                "ManipulatorRobot is not connected. You need to run `robot.connect()` before disconnecting."
+            )
 
-        try:
-            # Disconnect cameras first
-            for name in self.cameras:
-                try:
-                    self.cameras[name].disconnect()
-                except Exception as e:
-                    logging.error(f"Error disconnecting camera {name}: {e}")
+        for name in self.follower_arms:
+            self.follower_arms[name].disconnect()
 
-            # Disconnect follower arms
-            for name in self.follower_arms:
-                try:
-                    self.follower_arms[name].disconnect()
-                except Exception as e:
-                    logging.error(f"Error disconnecting follower arm {name}: {e}")
+        for name in self.leader_arms:
+            self.leader_arms[name].disconnect()
 
-            # Disconnect leader arms
-            for name in self.leader_arms:
-                try:
-                    self.leader_arms[name].disconnect()
-                except Exception as e:
-                    logging.error(f"Error disconnecting leader arm {name}: {e}")
+        for name in self.cameras:
+            self.cameras[name].disconnect()
 
-            self.is_connected = False
-        except Exception as e:
-            logging.error(f"Error disconnecting robot: {e}")
-            # Ensure we mark as disconnected even if there's an error
-            self.is_connected = False
+        self.is_connected = False
 
     def __del__(self):
         if getattr(self, "is_connected", False):
