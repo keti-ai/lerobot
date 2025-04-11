@@ -15,9 +15,7 @@ from pathlib import Path
 from threading import Thread
 
 import numpy as np
-import pyrealsense2 as rs
 from PIL import Image
-import cv2
 
 from lerobot.common.robot_devices.cameras.configs import IntelRealSenseCameraConfig
 from lerobot.common.robot_devices.utils import (
@@ -259,131 +257,80 @@ class IntelRealSenseCamera:
         return cam_sn
 
     def connect(self):
-        """Connect to the camera and start the read loop."""
         if self.is_connected:
-            return
-            
-        logging.info(f"Connecting to camera {self.serial_number}...")
-        
-        try:
-            # Try to reset the camera if it's busy
-            if self.force_hardware_reset:
-                logging.info("Attempting to reset camera...")
-                try:
-                    ctx = rs.context()
-                    devices = ctx.query_devices()
-                    for dev in devices:
-                        if str(dev.get_info(rs.camera_info.serial_number)) == str(self.serial_number):
-                            dev.hardware_reset()
-                            logging.info("Camera reset successful")
-                            time.sleep(2)  # Wait for camera to reinitialize
-                            break
-                except Exception as e:
-                    logging.warning(f"Failed to reset camera: {e}")
-            
-            # Initialize stop event and thread
-            self.stop_event = threading.Event()
-            self.thread = Thread(target=self.read_loop)
-            self.thread.daemon = True
-            
-            # Start thread
-            self.thread.start()
-            logging.info("Camera thread started")
-            
-            # Wait for first frame
-            max_tries = 30  # 3 seconds timeout
-            for i in range(max_tries):
-                if self.color_image is not None:
-                    logging.info("Camera connected successfully")
-                    self.is_connected = True
-                    return
-                time.sleep(0.1)
-                
-            raise TimeoutError("Timeout waiting for first frame")
-            
-        except Exception as e:
-            logging.error(f"Error connecting to camera: {e}")
-            self.disconnect()
-            raise
-            
-    def read_loop(self):
-        """Read frames from the camera in a loop."""
-        logging.info("=== Starting read_loop ===")
-        logging.info(f"Thread ID: {threading.get_ident()}")
-        
-        try:
-            # Initialize pipeline
-            logging.info("Initializing pipeline...")
-            pipeline = rs.pipeline()
-            config = rs.config()
-            
-            # Enable device
-            logging.info(f"Enabling device {self.serial_number}...")
-            config.enable_device(str(self.serial_number))
-            
-            # Enable streams
-            logging.info("Enabling color stream...")
-            config.enable_stream(rs.stream.color, self.width, self.height, rs.format.bgr8, self.fps)
-            if self.use_depth:
-                logging.info("Enabling depth stream...")
+            raise RobotDeviceAlreadyConnectedError(
+                f"IntelRealSenseCamera({self.serial_number}) is already connected."
+            )
+
+        if self.mock:
+            import tests.mock_pyrealsense2 as rs
+        else:
+            import pyrealsense2 as rs
+
+        config = rs.config()
+        config.enable_device(str(self.serial_number))
+
+        if self.fps and self.width and self.height:
+            # TODO(rcadene): can we set rgb8 directly?
+            config.enable_stream(rs.stream.color, self.width, self.height, rs.format.rgb8, self.fps)
+        else:
+            config.enable_stream(rs.stream.color)
+
+        if self.use_depth:
+            if self.fps and self.width and self.height:
                 config.enable_stream(rs.stream.depth, self.width, self.height, rs.format.z16, self.fps)
-            
-            # Start pipeline
-            logging.info("Starting pipeline...")
-            pipeline.start(config)
-            logging.info("Pipeline started successfully")
-            
-            # Get device
-            device = pipeline.get_active_profile().get_device()
-            logging.info(f"Device info: {device.get_info(rs.camera_info.name)}")
-            
-            # Main loop
-            while not self.stop_event.is_set():
-                try:
-                    # Wait for frames
-                    frames = pipeline.wait_for_frames()
-                    
-                    # Get color frame
-                    color_frame = frames.get_color_frame()
-                    if not color_frame:
-                        logging.warning("No color frame available")
-                        continue
-                        
-                    # Convert to numpy array
-                    color_image = np.asanyarray(color_frame.get_data())
-                    
-                    # Convert BGR to RGB
-                    color_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB)
-                    
-                    # Get depth frame if needed
-                    if self.use_depth:
-                        depth_frame = frames.get_depth_frame()
-                        if not depth_frame:
-                            logging.warning("No depth frame available")
-                            continue
-                        depth_image = np.asanyarray(depth_frame.get_data())
-                        self.depth_image = depth_image
-                    
-                    # Update color image
-                    self.color_image = color_image
-                    
-                except Exception as e:
-                    logging.error(f"Error in read_loop: {e}")
-                    logging.error(traceback.format_exc())
-                    time.sleep(0.1)  # Small delay before retry
-                    
-        except Exception as e:
-            logging.error(f"Fatal error in read_loop: {e}")
-            logging.error(traceback.format_exc())
-            
-        finally:
-            logging.info("Cleaning up pipeline...")
-            try:
-                pipeline.stop()
-            except:
-                pass
-            logging.info("Pipeline stopped")
-            
+            else:
+                config.enable_stream(rs.stream.depth)
+
+        self.camera = rs.pipeline()
+        try:
+            profile = self.camera.start(config)
+            is_camera_open = True
+        except RuntimeError:
+            is_camera_open = False
+            traceback.print_exc()
+
+        # If the camera doesn't work, display the camera indices corresponding to
+        # valid cameras.
+        if not is_camera_open:
+            # Verify that the provided `serial_number` is valid before printing the traceback
+            camera_infos = find_cameras()
+            serial_numbers = [cam["serial_number"] for cam in camera_infos]
+            if self.serial_number not in serial_numbers:
+                raise ValueError(
+                    f"`serial_number` is expected to be one of these available cameras {serial_numbers}, but {self.serial_number} is provided instead. "
+                    "To find the serial number you should use, run `python lerobot/common/robot_devices/cameras/intelrealsense.py`."
+                )
+
+            raise OSError(f"Can't access IntelRealSenseCamera({self.serial_number}).")
+
+        color_stream = profile.get_stream(rs.stream.color)
+        color_profile = color_stream.as_video_stream_profile()
+        actual_fps = color_profile.fps()
+        actual_width = color_profile.width()
+        actual_height = color_profile.height()
+
+        # Using `math.isclose` since actual fps can be a float (e.g. 29.9 instead of 30)
+        if self.fps is not None and not math.isclose(self.fps, actual_fps, rel_tol=1e-3):
+            # Using `OSError` since it's a broad that encompasses issues related to device communication
+            raise OSError(
+                f"Can't set {self.fps=} for IntelRealSenseCamera({self.serial_number}). Actual value is {actual_fps}."
+            )
+        if self.width is not None and self.width != actual_width:
+            raise OSError(
+                f"Can't set {self.width=} for IntelRealSenseCamera({self.serial_number}). Actual value is {actual_width}."
+            )
+        if self.height is not None and self.height != actual_height:
+            raise OSError(
+                f"Can't set {self.height=} for IntelRealSenseCamera({self.serial_number}). Actual value is {actual_height}."
+            )
+
+        self.fps = round(actual_fps)
+        self.width = round(actual_width)
+        self.height = round(actual_height)
+
+        self.is_connected = True
+
     def read(self, temporary_color: str | None = None) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """Read a frame from the camera returned in the format height x width x channels (e.g. 480 x 640 x 3)
         of type `np.uint8`, contrarily to the pytorch format which is float channel first.
@@ -460,75 +407,58 @@ class IntelRealSenseCamera:
         else:
             return color_image
 
+    def read_loop(self):
+        while not self.stop_event.is_set():
+            if self.use_depth:
+                self.color_image, self.depth_map = self.read()
+            else:
+                self.color_image = self.read()
+
     def async_read(self):
-        """Read the latest frame from the camera."""
-        logging.info("=== Starting async_read ===")
-        logging.info(f"Thread ID: {threading.get_ident()}")
-        start_time = time.time()
-        
-        try:
-            if not self.is_connected:
-                logging.error("Camera is not connected")
-                return None
-                
-            if self.thread is None or not self.thread.is_alive():
-                logging.error("Camera thread is not running")
-                return None
-                
-            # Wait for color image with timeout
-            max_tries = 10  # 1 second timeout
-            for i in range(max_tries):
-                if self.color_image is not None:
-                    break
-                time.sleep(0.1)
-                
-            if self.color_image is None:
-                logging.error("Timeout waiting for color image")
-                return None
-                
-            # Return color image
-            color_image = self.color_image.copy()
-            logging.info(f"Color image shape: {color_image.shape}")
-            
-            end_time = time.time()
-            logging.info(f"async_read took {end_time - start_time:.3f} seconds")
-            
-            return color_image
-            
-        except Exception as e:
-            logging.error(f"Error in async_read: {e}")
-            logging.error(traceback.format_exc())
-            return None
+        """Access the latest color image"""
+        if not self.is_connected:
+            raise RobotDeviceNotConnectedError(
+                f"IntelRealSenseCamera({self.serial_number}) is not connected. Try running `camera.connect()` first."
+            )
+
+        if self.thread is None:
+            self.stop_event = threading.Event()
+            self.thread = Thread(target=self.read_loop, args=())
+            self.thread.daemon = True
+            self.thread.start()
+
+        num_tries = 0
+        while self.color_image is None:
+            # TODO(rcadene, aliberts): intelrealsense has diverged compared to opencv over here
+            num_tries += 1
+            time.sleep(1 / self.fps)
+            if num_tries > self.fps and (self.thread.ident is None or not self.thread.is_alive()):
+                raise Exception(
+                    "The thread responsible for `self.async_read()` took too much time to start. There might be an issue. Verify that `self.thread.start()` has been called."
+                )
+
+        if self.use_depth:
+            return self.color_image, self.depth_map
+        else:
+            return self.color_image
 
     def disconnect(self):
-        """Disconnect from the camera and stop the read loop."""
         if not self.is_connected:
-            return
-            
-        logging.info(f"Disconnecting from camera {self.serial_number}...")
-        
-        try:
-            # Set stop event
+            raise RobotDeviceNotConnectedError(
+                f"IntelRealSenseCamera({self.serial_number}) is not connected. Try running `camera.connect()` first."
+            )
+
+        if self.thread is not None and self.thread.is_alive():
+            # wait for the thread to finish
             self.stop_event.set()
-            
-            # Wait for thread to finish
-            if self.thread is not None:
-                self.thread.join(timeout=1.0)
-                if self.thread.is_alive():
-                    logging.warning("Camera thread did not stop gracefully")
-                    
-            # Reset state
+            self.thread.join()
             self.thread = None
             self.stop_event = None
-            self.color_image = None
-            self.depth_map = None
-            self.is_connected = False
-            
-            logging.info("Camera disconnected successfully")
-            
-        except Exception as e:
-            logging.error(f"Error disconnecting from camera: {e}")
-            raise
+
+        self.camera.stop()
+        self.camera = None
+
+        self.is_connected = False
 
     def __del__(self):
         if getattr(self, "is_connected", False):
