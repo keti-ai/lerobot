@@ -39,6 +39,7 @@ python lerobot/scripts/push_dataset_to_hub.py \
 
 # 4. PI0 정책 학습
 python lerobot/scripts/train.py \
+
 --policy.type=pi0 \
 --env.type=pusht \
 --train.dataset.repo_id=${REPO_ID} \
