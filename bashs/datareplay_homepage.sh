@@ -1,8 +1,7 @@
 
 recorder=syhlab
-exp_name=test_record
-exp_num=20250411_185907
+exp_name=justmove
+exp_num=20250421_154412
 
 cd ..
-python lerobot/scripts/visualize_dataset_html.py \
-  --repo-id=${recorder}/${exp_name}_${exp_num}  \
+python lerobot/scripts/visualize_dataset_html.py
