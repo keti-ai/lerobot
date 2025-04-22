@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # 1. 실험 변수 고정
+# 250422 add shared folder
 NAS_MOUNT_PATH=/mnt/nas/lerobot_shared
 
 ROBOT_TYPE=so100
