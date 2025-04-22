@@ -41,11 +41,13 @@ cd ..
 # --raw-format pusht_zarr
 
 # 4. 정책 학습 (서버에서 실행)
-python lerobot/scripts/train.py \
+torchrun --nproc_per_node=4 \
+ lerobot/scripts/train.py \
   --policy.type=pi0fast \
-  --policy.use_amp=true \
+  --policy.use_amp=false \
   --policy.device=cuda \
-  --batch_size=2 \
+  --policy.precision float16 \
+  --batch_size=32 \
   --steps=1000 \
   --dataset.repo_id=${REPO_ID} \
   --policy.tokenizer_max_length=32 \
@@ -63,7 +65,7 @@ python lerobot/scripts/train.py \
 #   exit 1
 # fi
 
-# 6. 평가 (서버 or 로컬)
+# 6. 평가 (서버 or 로컬)bfloat16
 # python lerobot/scripts/eval.py \
 # --policy.path=${CHECKPOINT_DIR}/pretrained_model \
 # --env.type=pusht \
