@@ -3,7 +3,7 @@
 # 1. 실험 변수 고정
 ROBOT_TYPE=so100
 CAMERA_SERIAL=918512073045
-EXP_NAME=justmove
+EXP_NAME=move_aroundT
 EXP_NUM=$(date +"%Y%m%d_%H%M%S")
 #EXP_NUM=20250421_102543
 REPO_ID=syhlab/${EXP_NAME}_${EXP_NUM}
@@ -32,14 +32,16 @@ python lerobot/scripts/control_robot.py \
 }" \
 --control.type=record \
 --control.fps=30 \
---control.single_task='testdemo' \
+--control.single_task="Move the object around the green T without touching it." \
 --control.repo_id=${REPO_ID} \
 --control.output_dir=${DATASET_DIR} \
---control.num_episodes=5 \
+--control.num_episodes=10 \
 --control.push_to_hub=false \
 --control.warmup_time_s=2 \
---control.episode_time_s=5 \
---control.reset_time_s=5
+--control.episode_time_s=10 \
+--control.reset_time_s=5 \
+--control.display_data=true
+
 #
 ## 3. 데이터셋 포맷 변환
 #python lerobot/scripts/push_dataset_to_hub.py \
