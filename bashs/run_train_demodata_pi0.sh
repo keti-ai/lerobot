@@ -49,6 +49,7 @@ POLICY_TYPE=pi0fast
 
 python lerobot/scripts/train.py \
   --policy.type=pi0fast \
+  --policy.use_amp=true \
   --policy.device=cuda \
   --batch_size=8 \
   --steps=50000 \
