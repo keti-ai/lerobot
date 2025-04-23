@@ -23,6 +23,8 @@ NAS_MOUNT_PATH=/mnt/nas/lerobot_shared
 # 자동 생성되는 학습 결과 경로
 NOW=$(date '+%Y-%m-%d/%H-%M-%S')
 OUTPUT_DIR=${NAS_MOUNT_PATH}/outputs/train/${NOW}_${POLICY_TYPE}
+
+echo "🚀 Starting training with dataset: ${REPO_ID}"
 cd ..
 #echo "🚀 Starting training with dataset: ${REPO_ID}"
 #echo "📂 Output directory: ${OUTPUT_DIR}"

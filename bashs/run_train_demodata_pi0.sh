@@ -5,6 +5,7 @@ ROBOT_TYPE=so100
 CAMERA_SERIAL=918512073045
 EXP_NAME=move_aroundT
 EXP_NUM=20250421_162801
+POLICY_TYPE=pi0fast
 REPO_ID=syhlab/${EXP_NAME}_${EXP_NUM}
 
 # NAS 기준 경로 (공유)
@@ -48,8 +49,8 @@ cd ..
 POLICY_TYPE=pi0fast
 
 python lerobot/scripts/train.py \
-  --policy.type=pi0fast \
   --policy.use_amp=true \
+  --policy.type=${POLICY_TYPE} \
   --policy.device=cuda \
   --batch_size=8 \
   --steps=50000 \
