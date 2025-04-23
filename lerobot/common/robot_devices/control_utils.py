@@ -101,8 +101,12 @@ def is_headless():
         return True
 
 
-def predict_action(observation, policy, device, use_amp):
+def predict_action(observation, policy, device, use_amp, task=None):
     observation = copy(observation)
+
+    if task is not None:
+        observation["task"] = task  # ← 여기서 명시적으로 넣어줌
+
     with (
         torch.inference_mode(),
         torch.autocast(device_type=device.type) if device.type == "cuda" and use_amp else nullcontext(),
@@ -252,7 +256,7 @@ def control_loop(
 
             if policy is not None:
                 pred_action = predict_action(
-                    observation, policy, get_safe_torch_device(policy.config.device), policy.config.use_amp
+                    observation, policy, get_safe_torch_device(policy.config.device), policy.config.use_amp,task=single_task
                 )
                 # Action can eventually be clipped using `max_relative_target`,
                 # so action actually sent is saved in the dataset.
