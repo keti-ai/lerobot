@@ -275,6 +275,7 @@ def control_loop(
                 # so action actually sent is saved in the dataset.
                 action = robot.send_action(pred_action)
                 action = {"action": action}
+                print(torch.isnan(action).any(), action)
 
         try:
             if teleoperate:
