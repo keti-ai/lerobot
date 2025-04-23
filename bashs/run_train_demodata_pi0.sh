@@ -44,11 +44,9 @@ cd ..
 #torchrun --nproc_per_node=4 \
 python lerobot/scripts/train.py \
   --policy.type=pi0fast \
-  --policy.use_amp=false \
   --policy.device=cuda \
-  --policy.precision float16 \
   --batch_size=8 \
-  --steps=1000 \
+  --steps=50000 \
   --dataset.repo_id=${REPO_ID} \
   --policy.tokenizer_max_length=32 \
   --policy.max_input_seq_len=128 \
@@ -57,6 +55,7 @@ python lerobot/scripts/train.py \
   --policy.freeze_vision_encoder=true \
   --policy.freeze_lm_head=true \
   --policy.proj_width=512
+
 
 # 5. 체크포인트 자동 탐색 (서버)
 # CHECKPOINT_DIR=$(find ${NAS_MOUNT_PATH}/checkpoints -type d -path "*/checkpoints/*" | sort | tail -n1)
