@@ -5,7 +5,6 @@ ROBOT_TYPE=so100
 CAMERA_SERIAL=918512073045
 EXP_NAME=move_aroundT
 EXP_NUM=20250421_162801
-POLICY_TYPE=pi0fast
 REPO_ID=syhlab/${EXP_NAME}_${EXP_NUM}
 
 # NAS 기준 경로 (공유)
@@ -30,7 +29,7 @@ cd ..
 # --control.fps=30 \
 # --control.single_task="Move the object around the green T without touching it." \
 # --control.repo_id=${REPO_ID} \
-# --control.output_dir=${DATASET_DIR} \
+# --control.root=${DATASET_DIR} \
 # --control.num_episodes=10 \
 # --control.push_to_hub=false \
 # --control.warmup_time_s=2 \
@@ -46,8 +45,10 @@ cd ..
 # --raw-format pusht_zarr
 
 ## 4. 정책 학습 (서버에서 실행)
+POLICY_TYPE=pi0fast
+
 python lerobot/scripts/train.py \
-  --policy.type=${POLICY_TYPE} \
+  --policy.type=pi0fast \
   --policy.device=cuda \
   --batch_size=8 \
   --steps=50000 \
@@ -60,17 +61,17 @@ python lerobot/scripts/train.py \
   --policy.freeze_lm_head=true \
   --policy.proj_width=512 \
   --output_dir=${OUTPUT_DIR}
-
-## 5. 체크포인트 경로 설정 (평가 시)
-CHECKPOINT_DIR=${OUTPUT_DIR}/checkpoints/last/pretrained_model
-
-## 6. 평가 (로컬 실행)
-python lerobot/scripts/eval.py \
-  --policy.path=${CHECKPOINT_DIR} \
-  --env.type=pusht \
-  --eval.batch_size=10 \
-  --eval.n_episodes=20 \
-  --policy.device=cuda \
-  --policy.use_amp=false
+#
+### 5. 체크포인트 경로 설정 (평가 시)
+#CHECKPOINT_DIR=${OUTPUT_DIR}/checkpoints/last/pretrained_model
+#
+### 6. 평가 (로컬 실행)
+#python lerobot/scripts/eval.py \
+#  --policy.path=${CHECKPOINT_DIR} \
+#  --env.type=pusht \
+#  --eval.batch_size=10 \
+#  --eval.n_episodes=20 \
+#  --policy.device=cuda \
+#  --policy.use_amp=false
 
 echo "✅ Experiment done: ${REPO_ID}"
