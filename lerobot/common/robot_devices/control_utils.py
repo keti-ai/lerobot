@@ -288,6 +288,7 @@ def control_loop(
                 print(f"[PERF] Step took {time.time() - start_time:.3f}s")
 
                 action = {"action": action}
+                print(torch.isnan(action).any(), action)
 
         try:
             if teleoperate:
