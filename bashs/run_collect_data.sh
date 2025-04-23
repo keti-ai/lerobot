@@ -22,8 +22,8 @@ python lerobot/scripts/control_robot.py \
   --control.fps=30 \
   --control.single_task="Move the object around the green T without touching it." \
   --control.repo_id=${REPO_ID} \
-  --control.output_dir=${DATASET_DIR} \
-  --control.num_episodes=10 \
+  --control.root=${DATASET_DIR} \
+  --control.num_episodes=1 \
   --control.push_to_hub=false \
   --control.warmup_time_s=2 \
   --control.episode_time_s=10 \
