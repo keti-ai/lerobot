@@ -268,14 +268,26 @@ def control_loop(
             observation["task"] = [single_task]
             observation["robot_type"] = [policy.robot_type] if hasattr(policy, "robot_type") else [""]
             if policy is not None:
+                # 🔍 1. 시간 측정 시작
+                start_time = time.time()
                 pred_action = predict_action(
                     observation, policy, get_safe_torch_device(policy.config.device), policy.config.use_amp,task=single_task
                 )
                 # Action can eventually be clipped using `max_relative_target`,
                 # so action actually sent is saved in the dataset.
+                # 🧪 2. nan 여부와 예측된 action 출력
+                print("[DEBUG] pred_action:", torch.isnan(pred_action).any(), pred_action)
+
+                # 🎯 실제 로봇으로 전달되는 action
                 action = robot.send_action(pred_action)
+
+                # 🧪 3. send 이후 action이 clip되었는지도 로그 출력
+                print("[DEBUG] robot.send_action() output:", torch.isnan(action).any(), action)
+
+                # ⏱️ 4. 처리 속도 확인
+                print(f"[PERF] Step took {time.time() - start_time:.3f}s")
+
                 action = {"action": action}
-                print(torch.isnan(action).any(), action)
 
         try:
             if teleoperate:
