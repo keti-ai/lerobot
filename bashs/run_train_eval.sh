@@ -57,7 +57,7 @@ echo "🤖 Starting real-robot evaluation recording to: ${EVAL_DATASET_DIR}"
 
 python lerobot/scripts/control_robot.py \
   --robot.type=${ROBOT_TYPE} \
-  --robot.cameras="{\"head\": {\"type\": \"intelrealsense\", \"serial_number\": ${CAMERA_SERIAL}, \"fps\": 30, \"width\": 1280, \"height\": 720, \"force_hardware_reset\":false}}" \
+  --robot.cameras="{\"head\": {\"type\": \"intelrealsense\", \"serial_number\": ${CAMERA_SERIAL}, \"fps\": 30, \"width\": 1280, \"height\": 720, \"force_hardware_reset\":true}}" \
   --control.type=record \
   --control.fps=30 \
   --control.single_task="Move the object around the green T without touching it." \
