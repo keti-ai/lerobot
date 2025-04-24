@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# 항상 새로운 시간 기반 EXP_NUM
-EXP_NAME=move_aroundT
+# 실험 이름 및 시간 기반 고유 식별자
+EXP_NAME=tape_to_box
 NOW=$(date '+%Y%m%d_%H%M%S')
 EXP_NUM=${NOW}
 REPO_ID=syhlab/${EXP_NAME}_${EXP_NUM}
@@ -20,14 +20,14 @@ python lerobot/scripts/control_robot.py \
   --robot.cameras="{\"head\": {\"type\": \"intelrealsense\", \"serial_number\": ${CAMERA_SERIAL}, \"fps\": 30, \"width\": 1280, \"height\": 720}}" \
   --control.type=record \
   --control.fps=30 \
-  --control.single_task="Move the object around the green T without touching it." \
+  --control.single_task="Pick up the circular black object from the left side and insert it into the open box on the right side." \
   --control.repo_id=${REPO_ID} \
   --control.root=${DATASET_DIR} \
   --control.num_episodes=1 \
   --control.push_to_hub=false \
   --control.warmup_time_s=2 \
-  --control.episode_time_s=10 \
-  --control.reset_time_s=5 \
+  --control.episode_time_s=20 \
+  --control.reset_time_s=8 \
   --control.display_data=true
 
 echo "✅ Data collection done: ${REPO_ID}"
