@@ -24,6 +24,8 @@ from termcolor import colored
 from torch.amp import GradScaler
 from torch.optim import Optimizer
 
+from torch.utils.tensorboard import SummaryWriter
+
 from lerobot.common.datasets.factory import make_dataset
 from lerobot.common.datasets.sampler import EpisodeAwareSampler
 from lerobot.common.datasets.utils import cycle
@@ -198,6 +200,7 @@ def train(cfg: TrainPipelineConfig):
     train_tracker = MetricsTracker(
         cfg.batch_size, dataset.num_frames, dataset.num_episodes, train_metrics, initial_step=step
     )
+    tb_writer = SummaryWriter(log_dir=str(cfg.output_dir / "tensorboard"))
 
     logging.info("Start offline training on a fixed dataset")
     for _ in range(step, cfg.steps):
@@ -235,6 +238,12 @@ def train(cfg: TrainPipelineConfig):
                 if output_dict:
                     wandb_log_dict.update(output_dict)
                 wandb_logger.log_dict(wandb_log_dict, step)
+            if output_dict:
+                for key, value in output_dict.items():
+                    if isinstance(value, (int, float)):
+                        tb_writer.add_scalar(f"train/{key}", value, step)
+            for key, meter in train_metrics.items():
+                tb_writer.add_scalar(f"train/{key}", meter.avg, step)
             train_tracker.reset_averages()
 
         if cfg.save_checkpoint and is_saving_step:
@@ -280,6 +289,7 @@ def train(cfg: TrainPipelineConfig):
 
     if eval_env:
         eval_env.close()
+    tb_writer.close()
     logging.info("End of training")
 
 
