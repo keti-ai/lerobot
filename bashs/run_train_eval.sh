@@ -15,7 +15,8 @@ NAS_MOUNT_PATH=/mnt/nas/lerobot_shared
 NOW=$(date '+%Y-%m-%d/%H-%M-%S')
 OUTPUT_DIR=${NAS_MOUNT_PATH}/outputs/train/${NOW}_${POLICY_TYPE}
 
-echo "🚀 Starting training with dataset: ${REPO_ID} , at ${NOW}"
+echo "🚀 Starting training with dataset: ${REPO_ID}"
+echo "📂 Output directory: ${OUTPUT_DIR}"
 cd ..
 
 # 1. 학습
@@ -35,6 +36,7 @@ python lerobot/scripts/train.py \
  --output_dir=${OUTPUT_DIR}
 
 echo "✅ Training complete: ${REPO_ID}"
+echo "📦 Checkpoints saved to: ${OUTPUT_DIR}/checkpoints/"
 
 # 2-1. 평가 (sim)
 TRAINED_DATE="2025-04-22/18-09-59"
