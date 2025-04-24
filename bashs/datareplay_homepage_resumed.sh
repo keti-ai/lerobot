@@ -2,8 +2,9 @@
 
 # 실험 변수 설정
 ROBOT_TYPE=so100
-EXP_NAME=move_to_tape
-EXP_NUM=20250509_162336
+CAMERA_SERIAL=918512073045
+EXP_NAME=tape_to_box
+EXP_NUM=20250424_162603
 REPO_ID=syhlab/${EXP_NAME}_${EXP_NUM}
 
 # NAS 기준 경로
@@ -20,5 +21,5 @@ cd ..
 python lerobot/scripts/visualize_dataset_html.py \
   --repo-id=${REPO_ID} \
   --root=${DATASET_DIR} \
-  --host 10.252.205.103 \
+  --host 10.252.216.80 \
   --port 9090
