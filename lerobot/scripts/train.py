@@ -47,7 +47,7 @@ from lerobot.common.utils.utils import (
     has_method,
     init_logging,
 )
-from lerobot.common.utils.wandb_utils import WandBLogger
+# from lerobot.common.utils.wandb_utils import WandBLogger
 from lerobot.configs import parser
 from lerobot.configs.train import TrainPipelineConfig
 from lerobot.scripts.eval import eval_policy
