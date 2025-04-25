@@ -19,22 +19,24 @@ echo "🚀 Starting training with dataset: ${REPO_ID}"
 echo "📂 Output directory: ${OUTPUT_DIR}"
 cd ..
 
-CUDA_VISIBLE_DEVICES=1
 
 # 1. 학습
-python lerobot/scripts/train.py \
+CUDA_VISIBLE_DEVICES=1 python lerobot/scripts/train.py \
  --policy.type=${POLICY_TYPE} \
  --policy.device=cuda \
  --batch_size=8 \
  --steps=50000 \
  --dataset.repo_id=${REPO_ID} \
  --dataset.root=${NAS_MOUNT_PATH}/datasets/raw/${REPO_ID} \
- --policy.chunk_size=8 \
+ --policy.input_features='{"observation.images.head": {"type": "VISUAL", "shape": [3, 720, 1280]}}' \
+ --policy.chunk_size=50 \
  --policy.tokenizer_max_length=128 \
- --policy.n_action_steps=5 \
+ --policy.n_action_steps=50 \
  --policy.freeze_vision_encoder=true \
- --policy.proj_width=512 \
+ --policy.proj_width=1024 \
  --output_dir=${OUTPUT_DIR}
+
+ # gemma proj width ==1024
 
 echo "✅ Training complete: ${REPO_ID}"
 echo "📦 Checkpoints saved to: ${OUTPUT_DIR}/checkpoints/"
