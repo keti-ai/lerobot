@@ -26,6 +26,7 @@ python lerobot/scripts/train.py \
  --batch_size=8 \
  --steps=50000 \
  --dataset.repo_id=${REPO_ID} \
+ --dataset.root=${NAS_MOUNT_PATH}/datasets/raw/${REPO_ID} \
  --policy.tokenizer_max_length=32 \
  --policy.max_input_seq_len=128 \
  --policy.max_decoding_steps=128 \
