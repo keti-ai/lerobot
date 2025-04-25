@@ -6,7 +6,7 @@ EXP_NUM=20250424_162603  # ← 수집 시와 동일하게 명시
 REPO_ID=syhlab/${EXP_NAME}_${EXP_NUM}
 CAMERA_SERIAL=918512073045
 ROBOT_TYPE=so100
-POLICY_TYPE=pi0fast
+POLICY_TYPE=pi0
 
 # NAS 경로
 NAS_MOUNT_PATH=/mnt/nas/lerobot_shared
@@ -19,6 +19,8 @@ echo "🚀 Starting training with dataset: ${REPO_ID}"
 echo "📂 Output directory: ${OUTPUT_DIR}"
 cd ..
 
+CUDA_VISIBLE_DEVICES=1
+
 # 1. 학습
 python lerobot/scripts/train.py \
  --policy.type=${POLICY_TYPE} \
@@ -27,12 +29,10 @@ python lerobot/scripts/train.py \
  --steps=50000 \
  --dataset.repo_id=${REPO_ID} \
  --dataset.root=${NAS_MOUNT_PATH}/datasets/raw/${REPO_ID} \
- --policy.tokenizer_max_length=32 \
- --policy.max_input_seq_len=128 \
- --policy.max_decoding_steps=128 \
  --policy.chunk_size=8 \
+ --policy.tokenizer_max_length=128 \
+ --policy.n_action_steps=5 \
  --policy.freeze_vision_encoder=true \
- --policy.freeze_lm_head=true \
  --policy.proj_width=512 \
  --output_dir=${OUTPUT_DIR}
 
