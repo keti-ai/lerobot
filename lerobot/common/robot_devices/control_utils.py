@@ -258,13 +258,13 @@ def control_loop(
                 # Action can eventually be clipped using `max_relative_target`,
                 # so action actually sent is saved in the dataset.
                 # 🧪 2. nan 여부와 예측된 action 출력
-                print("[DEBUG] pred_action:", torch.isnan(pred_action).any(), pred_action)
+                # print("[DEBUG] pred_action:", torch.isnan(pred_action).any(), pred_action)
 
                 # 🎯 실제 로봇으로 전달되는 action
                 action = robot.send_action(pred_action)
 
                 # 🧪 3. send 이후 action이 clip되었는지도 로그 출력
-                print("[DEBUG] robot.send_action() output:", torch.isnan(action).any(), action)
+                # print("[DEBUG] robot.send_action() output:", torch.isnan(action).any(), action)
 
                 # ⏱️ 4. 처리 속도 확인
                 print(f"[PERF] Step took {time.time() - start_time:.3f}s")
