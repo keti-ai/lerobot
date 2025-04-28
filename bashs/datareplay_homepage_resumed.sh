@@ -21,5 +21,5 @@ cd ..
 python lerobot/scripts/visualize_dataset_html.py \
   --repo-id=${REPO_ID} \
   --root=${DATASET_DIR} \
-  --host 10.252.216.80 \
+  --host 10.252.205.103 \
   --port 9090
