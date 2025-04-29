@@ -273,6 +273,9 @@ def record(
 
     # Load pretrained policy
     policy = None if cfg.policy is None else make_policy(cfg.policy, ds_meta=dataset.meta)
+    if policy is not None and hasattr(policy, "set_attention_phrases") and hasattr(cfg, "attention_phrases"):
+        if cfg.attention_phrases is not None:
+            policy.set_attention_phrases(cfg.attention_phrases)
 
     if not robot.is_connected:
         robot.connect()
