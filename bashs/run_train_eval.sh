@@ -69,7 +69,9 @@ CHECKPOINT_DIR=${OUTPUT_DIR}/checkpoints/last/pretrained_model
 NOW=$(date '+%Y%m%d_%H%M%S')
 EVAL_EXP_NAME=eval_${EXP_NAME}_${EXP_NUM}_${NOW}
 EVAL_DATASET_DIR=${NAS_MOUNT_PATH}/datasets/raw/syhlab/${EVAL_EXP_NAME}
+
 echo "🤖 Starting real-robot evaluation recording to: ${EVAL_DATASET_DIR}"
+echo "🤖 checkpoint path: ${CHECKPOINT_DIR}"
 
 python lerobot/scripts/control_robot.py \
   --robot.type=${ROBOT_TYPE} \
@@ -85,8 +87,8 @@ python lerobot/scripts/control_robot.py \
   --control.episode_time_s=10 \
   --control.reset_time_s=5 \
   --control.policy.path=${CHECKPOINT_DIR} \
-  --control.display_data=false # if no error librealsense
+  --control.attention_phrases="[\"▁black\"]" \
+  --control.display_data=false
 
 echo "✅ Real-robot evaluation complete: ${EVAL_EXP_NAME}"
-
 echo "✅ Train & Eval complete: ${REPO_ID}"
