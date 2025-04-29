@@ -87,7 +87,8 @@ class RecordControlConfig(ControlConfig):
     play_sounds: bool = True
     # Resume recording on an existing dataset.
     resume: bool = False
-
+    # 25.04.28 syh for attetion check
+    attention_phrases: list[str] | None = None
     def __post_init__(self):
         # HACK: We parse again the cli args here to get the pretrained path if there was one.
         policy_path = parser.get_path_arg("control.policy")

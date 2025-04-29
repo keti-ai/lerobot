@@ -192,6 +192,103 @@ class PI0FASTPolicy(PreTrainedPolicy):
             actions[:, :, motor_idx] = aloha_gripper_from_angular_inv(actions[:, :, motor_idx])
         return actions
 
+    def set_attention_phrases(self, attention_phrases: list[str]):
+        """
+        Sets the list of attention phrases to monitor during action generation.
+
+        Args:
+            attention_phrases (list[str]): List of phrases to match against input text tokens.
+        """
+        self.attention_phrases = attention_phrases
+
+    def visualize_attention_from_phrases(self, attentions, task_text):
+        if task_text is None:
+            return
+
+        if isinstance(task_text, list):
+            task_text = task_text[0]
+        if isinstance(task_text, torch.Tensor):
+            task_text = task_text[0]
+
+        tokenized = self.language_tokenizer(
+            task_text,
+            add_special_tokens=True,
+            return_tensors="pt"
+        )
+        tokens = tokenized.input_ids[0]
+
+        phrase_token_indices = []
+        for phrase in self.attention_phrases:
+            phrase_tokens = self.language_tokenizer(phrase, add_special_tokens=False)["input_ids"]
+            match_found = False
+            for i in range(len(tokens) - len(phrase_tokens) + 1):
+                if torch.equal(tokens[i:i + len(phrase_tokens)], torch.tensor(phrase_tokens)):
+                    phrase_token_indices.extend(range(i, i + len(phrase_tokens)))
+                    match_found = True
+                    break
+            if not match_found:
+                raise ValueError(f"Phrase '{phrase}' not found in tokenized task!")
+
+        # 이제 attention 시각화
+        self.visualize_cross_attention(
+            attentions=attentions,
+            text_token_idx=phrase_token_indices,
+            image_token_start=0,
+            image_token_end=255,
+        )
+
+    def visualize_cross_attention(
+            self, attentions, text_token_idx=0, image_token_start=0, image_token_end=255,
+            images: torch.Tensor | None = None
+    ):
+        """
+        attentions: output.attentions from pi0_paligemma.generate()
+        text_token_idx: 관심있는 텍스트 토큰 인덱스 (int 또는 list of int)
+        image_token_start: 이미지 토큰 시작 인덱스
+        image_token_end: 이미지 토큰 끝 인덱스
+        images: 원본 이미지를 함께 넣으면 overlay
+        """
+
+        if not isinstance(text_token_idx, list):
+            text_token_idx = [text_token_idx]
+
+        cross_attn_layer = attentions[0]  # (batch_size, num_heads, query_len, key_len)
+        attn_map = cross_attn_layer[0]  # (num_heads, query_len, key_len)
+
+        # 여러 phrase들을 합쳐서 attention 평균
+        attn_list = []
+        for idx in text_token_idx:
+            text_to_image_attn = attn_map[:, idx,
+                                 image_token_start:image_token_end + 1]  # (num_heads, num_image_tokens)
+            attn_list.append(text_to_image_attn)
+
+        # 여러 phrase 평균
+        text_to_image_attn = torch.stack(attn_list).mean(dim=0)  # (num_heads, num_image_tokens)
+
+        # 여러 head 평균
+        mean_attn = text_to_image_attn.mean(dim=0).cpu().numpy()
+
+        grid_size = int(np.sqrt(mean_attn.shape[0]))
+        heatmap = mean_attn.reshape(grid_size, grid_size)
+
+        if images is None:
+            plt.figure(figsize=(6, 6))
+            plt.imshow(heatmap, cmap="hot")
+            plt.colorbar()
+            plt.title(f"Cross Attention Heatmap (Text tokens {text_token_idx})")
+            plt.show()
+        else:
+            # (b, c, h, w) -> (h, w, c) 로 변환
+            img = images[0].permute(1, 2, 0).cpu().numpy()
+            img = (img + 1.0) / 2.0  # SigLIP normalized [-1,1] → [0,1] 복구
+
+            fig, ax = plt.subplots(figsize=(6, 6))
+            ax.imshow(img)
+            ax.imshow(heatmap, cmap="hot", alpha=0.5, extent=(0, img.shape[1], img.shape[0], 0))
+            plt.title(f"Cross Attention Overlay (Text tokens {text_token_idx})")
+            plt.axis("off")
+            plt.show()
+
     @torch.no_grad
     def select_action(self, batch: dict[str, Tensor]) -> Tensor:
         """Select a single action given environment observations.
@@ -210,7 +307,19 @@ class PI0FASTPolicy(PreTrainedPolicy):
         # Action queue logic for n_action_steps > 1. When the action_queue is depleted, populate it by
         # querying the policy.
         if len(self._action_queue) == 0:
-            actions = self.model.generate_actions(batch)
+            # 🔥 attention 필요 여부를 판단
+            return_attentions = hasattr(self, "attention_phrases") and self.attention_phrases
+
+            # 🔥 필요 여부에 따라 generate_actions 호출
+            outputs = self.model.generate_actions(batch, return_attentions=return_attentions)
+
+            if isinstance(outputs, tuple):
+                # 새로운 버전 (actions, attentions)
+                actions, attentions = outputs
+            else:
+                # 예전 버전 (actions만 나오는 경우)
+                actions = outputs
+                attentions = None
 
             actions = actions[:, : self.config.n_action_steps]
 
@@ -223,7 +332,12 @@ class PI0FASTPolicy(PreTrainedPolicy):
 
             if self.config.adapt_to_pi_aloha:
                 actions = self._pi_aloha_encode_actions(actions)
-
+        # 🔥 여기 추가
+            if hasattr(self, "attention_phrases") and self.attention_phrases:
+                self.visualize_attention_from_phrases(
+                    attentions=attentions,
+                    task_text=batch.get("task", None),
+                )
             # `self.model.forward` returns a (batch_size, n_action_steps, action_dim) tensor, but the queue
             # effectively has shape (n_action_steps, batch_size, *), hence the transpose.
             self._action_queue.extend(actions.transpose(0, 1))
@@ -845,7 +959,7 @@ class PI0FAST(nn.Module):
             dim=0,
         )
 
-    def generate_actions(self, batch: dict[str, Tensor]):
+    def generate_actions(self, batch: dict[str, Tensor], return_attentions: bool = False):
         # TODO: keep like this or move to the policy .forward
         images, img_masks = self.prepare_images(batch)
 
@@ -862,20 +976,38 @@ class PI0FAST(nn.Module):
         )
         token_type_ids = token_type_ids.to(dtype=torch.int64)
         prefix_position_ids = torch.cumsum(pad_masks, dim=1) - 1
-        output_tokens = self.pi0_paligemma.generate(
-            input_ids=None,
-            attention_mask=pad_masks,
-            position_ids=prefix_position_ids,
-            past_key_values=None,
-            inputs_embeds=embs,
-            use_cache=self.config.use_cache,
-            max_new_tokens=self.config.max_decoding_steps,
-            do_sample=False,
-            num_beams=1,
-            token_type_ids=token_type_ids,
-        )
-        actions = self.extract_actions(output_tokens, self.action_horizon, self.action_dim)
-        return actions
+        if return_attentions:
+            output_tokens = self.pi0_paligemma.generate(
+                input_ids=None,
+                attention_mask=pad_masks,
+                position_ids=prefix_position_ids,
+                past_key_values=None,
+                inputs_embeds=embs,
+                use_cache=self.config.use_cache,
+                max_new_tokens=self.config.max_decoding_steps,
+                do_sample=False,
+                num_beams=1,
+                token_type_ids=token_type_ids,
+                output_attentions=True,
+                return_dict_in_generate=True,
+            )
+            actions = self.extract_actions(output_tokens.sequences, self.action_horizon, self.action_dim)
+            return actions, output_tokens.attentions
+        else:
+            output_tokens = self.pi0_paligemma.generate(
+                input_ids=None,
+                attention_mask=pad_masks,
+                position_ids=prefix_position_ids,
+                past_key_values=None,
+                inputs_embeds=embs,
+                use_cache=self.config.use_cache,
+                max_new_tokens=self.config.max_decoding_steps,
+                do_sample=False,
+                num_beams=1,
+                token_type_ids=token_type_ids,
+            )
+            actions = self.extract_actions(output_tokens, self.action_horizon, self.action_dim)
+            return actions
 
     def embed_image(self, image: torch.Tensor):
         return self.pi0_paligemma.get_image_features(image)
