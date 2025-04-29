@@ -153,7 +153,7 @@ class PI0FASTPolicy(PreTrainedPolicy):
             config.output_features, config.normalization_mapping, dataset_stats
         )
 
-        self.language_tokenizer = AutoProcessor.from_pretrained("google/paligemma-3b-pt-224")
+        self.language_tokenizer = AutoTokenizer.from_pretrained("google/paligemma-3b-pt-224")
         self.model = PI0FAST(config)
 
         self.reset()
@@ -266,28 +266,38 @@ class PI0FASTPolicy(PreTrainedPolicy):
         text_to_image_attn = torch.stack(attn_list).mean(dim=0)  # (num_heads, num_image_tokens)
 
         # 여러 head 평균
-        mean_attn = text_to_image_attn.mean(dim=0).cpu().numpy()
+        mean_attn = text_to_image_attn.mean(dim=0).to(torch.float32).cpu().numpy()
 
-        grid_size = int(np.sqrt(mean_attn.shape[0]))
-        heatmap = mean_attn.reshape(grid_size, grid_size)
+        L = len(mean_attn)
+        if L % 256 != 0:
+            print(f"[Error] Attention length {L} is not divisible by 256, skipping visualization")
+            return
+
+        num_images = L // 256
+        try:
+            heatmap = mean_attn.reshape(num_images, 16, 16)  # 16x16 per image token map
+        except Exception as e:
+            print(f"[Error] Failed to reshape attention map: {e}")
+            return
 
         if images is None:
-            plt.figure(figsize=(6, 6))
-            plt.imshow(heatmap, cmap="hot")
-            plt.colorbar()
-            plt.title(f"Cross Attention Heatmap (Text tokens {text_token_idx})")
-            plt.show()
+            for i in range(num_images):
+                plt.figure(figsize=(6, 6))
+                plt.imshow(heatmap[i], cmap="hot")
+                plt.colorbar()
+                plt.title(f"Cross Attention Heatmap (Image {i}, Text tokens {text_token_idx})")
+                plt.show()
         else:
-            # (b, c, h, w) -> (h, w, c) 로 변환
             img = images[0].permute(1, 2, 0).cpu().numpy()
             img = (img + 1.0) / 2.0  # SigLIP normalized [-1,1] → [0,1] 복구
 
-            fig, ax = plt.subplots(figsize=(6, 6))
-            ax.imshow(img)
-            ax.imshow(heatmap, cmap="hot", alpha=0.5, extent=(0, img.shape[1], img.shape[0], 0))
-            plt.title(f"Cross Attention Overlay (Text tokens {text_token_idx})")
-            plt.axis("off")
-            plt.show()
+            for i in range(num_images):
+                fig, ax = plt.subplots(figsize=(6, 6))
+                ax.imshow(img)
+                ax.imshow(heatmap[i], cmap="hot", alpha=0.5, extent=(0, img.shape[1], img.shape[0], 0))
+                plt.title(f"Cross Attention Overlay (Image {i}, Text tokens {text_token_idx})")
+                plt.axis("off")
+                plt.show()
 
     @torch.no_grad
     def select_action(self, batch: dict[str, Tensor]) -> Tensor:
