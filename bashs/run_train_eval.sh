@@ -29,7 +29,7 @@ echo "📂 Output directory: ${OUTPUT_DIR}"
 
 
 # 1. 학습
-python lerobot/scripts/train.py \
+CUDA_VISIBLE_DEVICES=0 python lerobot/scripts/train.py \
   --policy.type=${POLICY_TYPE} \
   --policy.device=cuda \
   --batch_size=8 \
