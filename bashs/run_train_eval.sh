@@ -91,7 +91,6 @@ python lerobot/scripts/control_robot.py \
   --control.episode_time_s=10 \
   --control.reset_time_s=5 \
   --control.policy.path=${CHECKPOINT_DIR} \
-  --control.attention_phrases="[\"▁black\"]" \
   --control.display_data=false
 
 echo "✅ Real-robot evaluation complete: ${EVAL_EXP_NAME}"
