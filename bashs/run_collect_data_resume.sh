@@ -26,7 +26,7 @@ python lerobot/scripts/control_robot.py \
   --control.resume=true \
   --control.warmup_time_s=2 \
   --control.episode_time_s=5 \
-  --control.reset_time_s=5 \
+  --control.reset_time_s=3 \
   --control.display_data=true
 
 echo "✅ Resume data collection done: ${REPO_ID}"
