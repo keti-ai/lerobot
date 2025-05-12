@@ -9,37 +9,42 @@ HAND_CAMERA_SERIAL=218622278274
 ROBOT_TYPE=so100
 POLICY_TYPE=pi0
 
+# 25.05.12 기준
+# - chunk_size: 10
+# - n_action_steps: 50 (pi0은 시퀀스 길게 설정)
+# - tokenizer_max_length: 128
+# - proj_width: 1024 (Gemma 계열 기본값)
+# - input_features 명시 필요
+
 # NAS 경로
 NAS_MOUNT_PATH=/mnt/nas/lerobot_shared
 
 # 자동 생성되는 학습 결과 경로
 NOW=$(date '+%Y-%m-%d/%H-%M-%S')
 OUTPUT_DIR=${NAS_MOUNT_PATH}/outputs/train/${NOW}_${POLICY_TYPE}
+cd ..
 
 echo "🚀 Starting training with dataset: ${REPO_ID}"
 echo "📂 Output directory: ${OUTPUT_DIR}"
-cd ..
-
 
 # 1. 학습
-python lerobot/scripts/train.py \
+CUDA_VISIBLE_DEVICES=1 python lerobot/scripts/train.py \
   --policy.type=${POLICY_TYPE} \
   --policy.device=cuda \
   --batch_size=8 \
   --steps=50000 \
   --dataset.repo_id=${REPO_ID} \
   --dataset.root=${NAS_MOUNT_PATH}/datasets/raw/${REPO_ID} \
+  --policy.input_features='{
+  "observation.images.head": {"type": "VISUAL", "shape": [3, 720, 1280]},
+  "observation.images.wrist": {"type": "VISUAL", "shape": [3, 720, 1280]}
+}'
   --policy.chunk_size=10 \
-  --policy.n_action_steps=5 \
+  --policy.n_action_steps=50 \
+  --policy.tokenizer_max_length=128 \
   --policy.proj_width=1024 \
-  --policy.tokenizer_max_length=64 \
-  --policy.max_input_seq_len=128 \
-  --policy.max_decoding_steps=64 \
   --policy.freeze_vision_encoder=true \
-  --policy.freeze_lm_head=true \
   --output_dir=${OUTPUT_DIR}
-
- # gemma proj width ==1024
 
 echo "✅ Training complete: ${REPO_ID}"
 echo "📦 Checkpoints saved to: ${OUTPUT_DIR}/checkpoints/"
