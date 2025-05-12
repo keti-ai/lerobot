@@ -13,7 +13,7 @@ cd ..
 python lerobot/scripts/control_robot.py \
   --robot.type=${ROBOT_TYPE} \
   --robot.cameras="{
-    \"head\": {\"type\": \"intelrealsense\", \"serial_number\": ${HEAD_CAMERA_SERIAL}, \"fps\": 30, \"width\": 1280, \"height\": 720},
+    \"head\": {\"type\": \"intelrealsense\", \"serial_number\": ${HEAD_CAMERA_SERIAL}, \"fps\": 30, \"width\": 1280, \"height\": 720, \"force_hardware_reset\":false},
     \"wrist\": {\"type\": \"intelrealsense\", \"serial_number\": ${HAND_CAMERA_SERIAL}, \"fps\": 30, \"width\": 1280, \"height\": 720}
   }" \
   --control.type=record \
