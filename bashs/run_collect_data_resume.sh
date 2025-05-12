@@ -13,7 +13,7 @@ cd ..
 python lerobot/scripts/control_robot.py \
   --robot.type=${ROBOT_TYPE} \
   --robot.cameras="{
-    \"head\": {\"type\": \"intelrealsense\", \"serial_number\": ${HEAD_CAMERA_SERIAL}, \"fps\": 30, \"width\": 1280, \"height\": 720, \"force_hardware_reset\":false},
+    \"head\": {\"type\": \"intelrealsense\", \"serial_number\": ${HEAD_CAMERA_SERIAL}, \"fps\": 30, \"width\": 1280, \"height\": 720},
     \"wrist\": {\"type\": \"intelrealsense\", \"serial_number\": ${HAND_CAMERA_SERIAL}, \"fps\": 30, \"width\": 1280, \"height\": 720}
   }" \
   --control.type=record \
@@ -26,7 +26,7 @@ python lerobot/scripts/control_robot.py \
   --control.resume=true \
   --control.warmup_time_s=2 \
   --control.episode_time_s=5 \
-  --control.reset_time_s=3 \
+  --control.reset_time_s=5 \
   --control.display_data=true
 
 echo "✅ Resume data collection done: ${REPO_ID}"
