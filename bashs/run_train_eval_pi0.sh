@@ -38,7 +38,7 @@ CUDA_VISIBLE_DEVICES=1 python lerobot/scripts/train.py \
   --policy.input_features='{
   "observation.images.head": {"type": "VISUAL", "shape": [3, 720, 1280]},
   "observation.images.wrist": {"type": "VISUAL", "shape": [3, 720, 1280]}
-}'
+}' \
   --policy.chunk_size=10 \
   --policy.n_action_steps=50 \
   --policy.tokenizer_max_length=128 \
