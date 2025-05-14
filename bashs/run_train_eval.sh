@@ -29,15 +29,15 @@ echo "📂 Output directory: ${OUTPUT_DIR}"
 
 
 # 1. 학습
-CUDA_VISIBLE_DEVICES=0 python lerobot/scripts/train.py \
+CUDA_VISIBLE_DEVICES=3 python lerobot/scripts/train.py \
   --policy.type=${POLICY_TYPE} \
   --policy.device=cuda \
   --batch_size=8 \
   --steps=50000 \
   --dataset.repo_id=${REPO_ID} \
   --dataset.root=${NAS_MOUNT_PATH}/datasets/raw/${REPO_ID} \
-  --policy.chunk_size=10 \
-  --policy.n_action_steps=5 \
+  --policy.chunk_size=20 \
+  --policy.n_action_steps=20 \
   --policy.proj_width=1024 \
   --policy.tokenizer_max_length=64 \
   --policy.max_input_seq_len=128 \
