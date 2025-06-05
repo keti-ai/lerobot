@@ -90,8 +90,6 @@ echo "📂 Output directory: ${OUTPUT_DIR}"
    --control.episode_time_s=5 \
    --control.reset_time_s=5 \
    --control.policy.path=${CHECKPOINT_DIR} \
-   --control.policy.input_features='{"observation.images.head":{"type":"VISUAL","shape":[3,720,1280]},"observation.images.wrist":{"type":"VISUAL","shape":[3,720,1280]},"observation.state":{"type":"STATE","shape":[6]}}' \
-   --control.policy.output_features='{"action":{"type":"ACTION","shape":[6]}}' \
    --control.display_data=false
 
  echo "✅ Real-robot evaluation complete: ${EVAL_EXP_NAME}"
