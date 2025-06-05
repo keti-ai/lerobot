@@ -105,7 +105,9 @@ def predict_action(observation, policy, device, use_amp, task=None):
     observation = copy(observation)
 
     if task is not None:
-        observation["task"] = task  # ← 여기서 명시적으로 넣어줌
+        if isinstance(task, str):
+            task = [task]
+        observation["task"] = task
 
     with (
         torch.inference_mode(),
@@ -117,8 +119,8 @@ def predict_action(observation, policy, device, use_amp, task=None):
                     observation[name] = observation[name].type(torch.float32) / 255
                     observation[name] = observation[name].permute(2, 0, 1).contiguous()
                 observation[name] = observation[name].unsqueeze(0).to(device)
-            elif isinstance(observation[name], str):
-                continue  # ✨ 문자열은 건너뜀
+            elif isinstance(observation[name], (str, list)):
+                continue  # 문자열 또는 문자열 리스트는 그대로 둠
             else:
                 raise TypeError(f"Unexpected type in observation['{name}']: {type(observation[name])}")
 
