@@ -105,35 +105,30 @@ def predict_action(observation, policy, device, use_amp, task=None):
     observation = copy(observation)
 
     if task is not None:
-        observation["task"] = task  # ← 여기서 명시적으로 넣어줌
+        if isinstance(task, str):
+            task = [task]
+        observation["task"] = task
 
     with (
         torch.inference_mode(),
         torch.autocast(device_type=device.type) if device.type == "cuda" and use_amp else nullcontext(),
     ):
-        # Convert to pytorch format: channel first and float32 in [0,1] with batch dimension
-        for name in observation:
-            # Skip all observations that are not tensors (e.g. text)
-            if not isinstance(observation[name], torch.Tensor):
-                continue
+        for name in list(observation.keys()):
+            if isinstance(observation[name], torch.Tensor):
+                # Skip all observations that are not tensors (e.g. text)
 
             if "image" in name:
                 observation[name] = observation[name].type(torch.float32) / 255
                 observation[name] = observation[name].permute(2, 0, 1).contiguous()
-            observation[name] = observation[name].unsqueeze(0)
-            observation[name] = observation[name].to(device)
+            observation[name] = observation[name].unsqueeze(0).to(device)
+            elif isinstance(observation[name], (str, list)):
+                continue  # 문자열 또는 문자열 리스트는 그대로 둠
+            else:
+                raise TypeError(f"Unexpected type in observation['{name}']: {type(observation[name])}")
 
-        # Compute the next action with the policy
-        # based on the current observation
         action = policy.select_action(observation)
+        return action.squeeze(0).to(dtype=torch.float32, device="cpu")
 
-        # Remove batch dimension
-        action = action.squeeze(0)
-
-        # Move to cpu, if not already the case
-        action = action.to("cpu")
-
-    return action
 
 
 def init_keyboard_listener():
@@ -275,89 +270,14 @@ def control_loop(
                 )
                 # Action can eventually be clipped using `max_relative_target`,
                 # so action actually sent is saved in the dataset.
-                # 🧪 2. nan 여부와 예측된 action 출력
-                # print("[DEBUG] pred_action:", torch.isnan(pred_action).any(), pred_action)
-
-                # 🎯 실제 로봇으로 전달되는 action
                 action = robot.send_action(pred_action)
-
-                # 🧪 3. send 이후 action이 clip되었는지도 로그 출력
-                # print("[DEBUG] robot.send_action() output:", torch.isnan(action).any(), action)
-
-                # ⏱️ 4. 처리 속도 확인
-                print(f"[PERF] Step took {time.time() - start_time:.3f}s")
-
                 action = {"action": action}
-
-        try:
-            if teleoperate:
-                logging.debug("Performing teleop step...")
-                observation, action = robot.teleop_step(record_data=True)
-            else:
-                logging.debug("Capturing observation...")
-                # Try to get observation with a timeout
-                max_retries = 3
-                retry_count = 0
-                while retry_count < max_retries:
-                    try:
-                        # For SO100 robot, we need to handle the camera reads separately
-                        if robot.robot_type == "so100":
-                            # First get the robot state
-                            follower_pos = {}
-                            for name in robot.follower_arms:
-                                follower_pos[name] = robot.follower_arms[name].read("Present_Position")
-                                follower_pos[name] = torch.from_numpy(follower_pos[name])
-
-                            # Create state by concatenating follower current position
-                            state = []
-                            for name in robot.follower_arms:
-                                if name in follower_pos:
-                                    state.append(follower_pos[name])
-                            state = torch.cat(state)
-
-                            # Then get camera images
-                            images = {}
-                            for name in robot.cameras:
-                                try:
-                                    images[name] = robot.cameras[name].async_read()
-                                    images[name] = torch.from_numpy(images[name])
-                                except Exception as e:
-                                    logging.error(f"Error reading camera {name}: {e}")
-                                    # If camera read fails, use a black image
-                                    images[name] = torch.zeros((robot.cameras[name].height,
-                                                             robot.cameras[name].width,
-                                                             robot.cameras[name].channels),
-                                                            dtype=torch.uint8)
-
-                            # Create observation dictionary
-                            observation = {}
-                            observation["observation.state"] = state
-                            for name in robot.cameras:
-                                observation[f"observation.images.{name}"] = images[name]
-                        else:
-                            observation = robot.capture_observation()
-                        break
-                    except Exception as e:
-                        retry_count += 1
-                        if retry_count == max_retries:
-                            raise e
-                        logging.warning(f"Failed to capture observation, retrying ({retry_count}/{max_retries}): {e}")
-                        time.sleep(0.1)
-
-                if policy is not None:
-                    logging.debug("Computing policy action...")
-                    pred_action = predict_action(observation, policy, device, use_amp)
-                    # Action can eventually be clipped using `max_relative_target`,
-                    # so action actually sent is saved in the dataset.
-                    action = robot.send_action(pred_action)
-                    action = {"action": action}
 
             if dataset is not None:
                 logging.debug("Adding frame to dataset...")
                 frame = {**observation, **action}
                 dataset.add_frame(frame)
         if dataset is not None:
-            observation = {k: v for k, v in observation.items() if k not in ["task", "robot_type"]}
             frame = {**observation, **action, "task": single_task}
             dataset.add_frame(frame)
 
