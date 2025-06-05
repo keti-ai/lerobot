@@ -116,11 +116,11 @@ def predict_action(observation, policy, device, use_amp, task=None):
         for name in list(observation.keys()):
             if isinstance(observation[name], torch.Tensor):
                 # Skip all observations that are not tensors (e.g. text)
-
+                continue
             if "image" in name:
                 observation[name] = observation[name].type(torch.float32) / 255
                 observation[name] = observation[name].permute(2, 0, 1).contiguous()
-            observation[name] = observation[name].unsqueeze(0).to(device)
+                observation[name] = observation[name].unsqueeze(0).to(device)
             elif isinstance(observation[name], (str, list)):
                 continue  # 문자열 또는 문자열 리스트는 그대로 둠
             else:
@@ -313,11 +313,6 @@ def control_loop(
             events["exit_early"] = False
             break
 
-    except Exception as e:
-        logging.error(f"Error in control loop: {e}")
-        logging.error(traceback.format_exc())
-        # Add a small delay to prevent rapid error logging
-        time.sleep(0.1)
 
 def reset_environment(robot, events, reset_time_s, fps):
     # TODO(rcadene): refactor warmup_record and reset_environment
