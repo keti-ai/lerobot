@@ -19,7 +19,7 @@ sudo chmod 777 /dev/ttyACM1
 # 텔레오퍼레이션 실행
 python -m lerobot.teleoperate \
     --robot.type=so100_follower \
-    --robot.port=/dev/ttyACM1 \
+    --robot.port=/dev/ttyACM0 \
     --robot.calibration_dir="${SCRIPT_DIR}/../cali/lerobot/calibration/robots/so100_follower" \
     --robot.cameras="{
     \"head\": {\"type\": \"intelrealsense\", \"serial_number_or_name\": ${HEAD_CAMERA_SERIAL}, \"fps\": 30, \"width\": 1280, \"height\": 720},
@@ -27,7 +27,7 @@ python -m lerobot.teleoperate \
     }" \
     --robot.id=black \
     --teleop.type=so100_leader \
-    --teleop.port=/dev/ttyACM0 \
+    --teleop.port=/dev/ttyACM1 \
     --teleop.calibration_dir="${SCRIPT_DIR}/../cali/lerobot/calibration/teleoperators/so100_leader" \
     --teleop.id=blue \
     --display_data=true
