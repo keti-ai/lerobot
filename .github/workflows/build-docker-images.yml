@@ -19,8 +19,8 @@ name: Builds
 on:
   workflow_dispatch:
   workflow_call:
-  schedule:
-    - cron: "0 1 * * *"
+#  schedule:
+#    - cron: "0 1 * * *"
 
 permissions: {}
 
