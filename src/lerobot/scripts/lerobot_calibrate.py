@@ -15,6 +15,8 @@
 """
 Helper to recalibrate your device (robot or teleoperator).
 
+Requires: pip install 'lerobot[hardware]'
+
 Example:
 
 ```shell
@@ -31,28 +33,34 @@ from pprint import pformat
 
 import draccus
 
-from lerobot.cameras.opencv.configuration_opencv import OpenCVCameraConfig  # noqa: F401
-from lerobot.cameras.realsense.configuration_realsense import RealSenseCameraConfig  # noqa: F401
+from lerobot.cameras.opencv import OpenCVCameraConfig  # noqa: F401
+from lerobot.cameras.realsense import RealSenseCameraConfig  # noqa: F401
 from lerobot.robots import (  # noqa: F401
     Robot,
     RobotConfig,
+    bi_openarm_follower,
+    bi_so_follower,
     hope_jr,
     koch_follower,
     lekiwi,
     make_robot_from_config,
     omx_follower,
-    so100_follower,
-    so101_follower,
+    openarm_follower,
+    so_follower,
 )
 from lerobot.teleoperators import (  # noqa: F401
     Teleoperator,
     TeleoperatorConfig,
+    bi_openarm_leader,
+    bi_so_leader,
     homunculus,
     koch_leader,
     make_teleoperator_from_config,
     omx_leader,
-    so100_leader,
-    so101_leader,
+    openarm_leader,
+    openarm_mini,
+    so_leader,
+    unitree_g1,
 )
 from lerobot.utils.import_utils import register_third_party_plugins
 from lerobot.utils.utils import init_logging
@@ -81,8 +89,11 @@ def calibrate(cfg: CalibrateConfig):
         device = make_teleoperator_from_config(cfg.device)
 
     device.connect(calibrate=False)
-    device.calibrate()
-    device.disconnect()
+
+    try:
+        device.calibrate()
+    finally:
+        device.disconnect()
 
 
 def main():

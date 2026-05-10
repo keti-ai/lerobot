@@ -19,18 +19,21 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 from torch import Tensor
 
-from lerobot.configs.types import FeatureType, NormalizationMode, PipelineFeatureType, PolicyFeature
-from lerobot.datasets.lerobot_dataset import LeRobotDataset
+from lerobot.configs import FeatureType, NormalizationMode, PipelineFeatureType, PolicyFeature
+from lerobot.types import EnvTransition, PolicyAction, TransitionKey
+
+if TYPE_CHECKING:
+    from lerobot.datasets import LeRobotDataset
+
 from lerobot.utils.constants import ACTION
 
 from .converters import from_tensor_to_numpy, to_tensor
-from .core import EnvTransition, PolicyAction, TransitionKey
-from .pipeline import PolicyProcessorPipeline, ProcessorStep, ProcessorStepRegistry
+from .pipeline import PolicyProcessorPipeline, ProcessorStep, ProcessorStepRegistry, RobotObservation
 
 
 @dataclass
@@ -239,7 +242,7 @@ class _NormalizationMixin:
             config["normalize_observation_keys"] = sorted(self.normalize_observation_keys)
         return config
 
-    def _normalize_observation(self, observation: dict[str, Any], inverse: bool) -> dict[str, Tensor]:
+    def _normalize_observation(self, observation: RobotObservation, inverse: bool) -> dict[str, Tensor]:
         """
         Applies (un)normalization to all relevant features in an observation dictionary.
 

@@ -21,12 +21,23 @@ from typing import Any
 from draccus.choice_types import ChoiceRegistry
 
 
-def is_package_available(pkg_name: str, return_version: bool = False) -> tuple[bool, str] | bool:
-    """Copied from https://github.com/huggingface/transformers/blob/main/src/transformers/utils/import_utils.py
-    Check if the package spec exists and grab its version to avoid importing a local directory.
-    **Note:** this doesn't work for all packages.
+def is_package_available(
+    pkg_name: str, import_name: str | None = None, return_version: bool = False
+) -> tuple[bool, str] | bool:
     """
-    package_exists = importlib.util.find_spec(pkg_name) is not None
+    Check if the package spec exists and grab its version to avoid importing a local directory.
+
+    Args:
+        pkg_name: The name of the package as installed via pip (e.g. "python-can").
+        import_name: The actual name used to import the package (e.g. "can").
+                     Defaults to pkg_name if not provided.
+        return_version: Whether to return the version string.
+    """
+    if import_name is None:
+        import_name = pkg_name
+
+    # Check if the module spec exists using the import name
+    package_exists = importlib.util.find_spec(import_name) is not None
     package_version = "N/A"
     if package_exists:
         try:
@@ -37,7 +48,7 @@ def is_package_available(pkg_name: str, return_version: bool = False) -> tuple[b
             # Fallback method: Only for "torch" and versions containing "dev"
             if pkg_name == "torch":
                 try:
-                    package = importlib.import_module(pkg_name)
+                    package = importlib.import_module(import_name)
                     temp_version = getattr(package, "__version__", "N/A")
                     # Check if the version contains "dev"
                     if "dev" in temp_version:
@@ -48,9 +59,6 @@ def is_package_available(pkg_name: str, return_version: bool = False) -> tuple[b
                 except ImportError:
                     # If the package can't be imported, it's not available
                     package_exists = False
-            elif pkg_name == "grpc":
-                package = importlib.import_module(pkg_name)
-                package_version = getattr(package, "__version__", "N/A")
             else:
                 # For packages other than "torch", don't attempt the fallback and set as not available
                 package_exists = False
@@ -61,8 +69,72 @@ def is_package_available(pkg_name: str, return_version: bool = False) -> tuple[b
         return package_exists
 
 
+def get_safe_default_codec():
+    logger = logging.getLogger(__name__)
+    if importlib.util.find_spec("torchcodec"):
+        return "torchcodec"
+    else:
+        logger.warning(
+            "'torchcodec' is not available in your platform, falling back to 'pyav' as a default decoder"
+        )
+        return "pyav"
+
+
+_require_package_cache: dict[str, bool] = {}
+
+
+def require_package(pkg_name: str, extra: str, import_name: str | None = None) -> None:
+    """Raise an informative ImportError if a package required by an optional feature is missing."""
+    cache_key = import_name or pkg_name
+    if cache_key not in _require_package_cache:
+        _require_package_cache[cache_key] = is_package_available(pkg_name, import_name)
+    if not _require_package_cache[cache_key]:
+        raise ImportError(
+            f"'{pkg_name}' is required but not installed. Install it with: "
+            f"pip install 'lerobot[{extra}]' (or uv pip install 'lerobot[{extra}]')"
+        )
+
+
+# ── Centralised availability flags ────────────────────────────────────────
+# Every optional-dependency check lives here so that the rest of the codebase
+# can simply ``from lerobot.utils.import_utils import _foo_available``.
+# Do NOT define ad-hoc ``is_package_available(...)`` calls in other modules.
+
+# ML / training
 _transformers_available = is_package_available("transformers")
 _peft_available = is_package_available("peft")
+_scipy_available = is_package_available("scipy")
+_diffusers_available = is_package_available("diffusers")
+_torchdiffeq_available = is_package_available("torchdiffeq")
+
+# Hardware SDKs
+_serial_available = is_package_available("pyserial", import_name="serial")
+_deepdiff_available = is_package_available("deepdiff")
+_dynamixel_sdk_available = is_package_available("dynamixel-sdk", import_name="dynamixel_sdk")
+_feetech_sdk_available = is_package_available("feetech-servo-sdk", import_name="scservo_sdk")
+_reachy2_sdk_available = is_package_available("reachy2_sdk")
+_can_available = is_package_available("python-can", "can")
+_unitree_sdk_available = is_package_available("unitree-sdk2py", "unitree_sdk2py")
+_pyrealsense2_available = is_package_available("pyrealsense2") or is_package_available(
+    "pyrealsense2-macosx", import_name="pyrealsense2"
+)
+_zmq_available = is_package_available("pyzmq", import_name="zmq")
+_hebi_available = is_package_available("hebi-py", import_name="hebi")
+_teleop_available = is_package_available("teleop")
+_placo_available = is_package_available("placo")
+_hidapi_available = is_package_available("hidapi", import_name="hid")
+
+# Data / serialization
+_pandas_available = is_package_available("pandas")
+_faker_available = is_package_available("faker")
+
+# Misc
+_pynput_available = is_package_available("pynput")
+_pygame_available = is_package_available("pygame")
+_qwen_vl_utils_available = is_package_available("qwen-vl-utils", import_name="qwen_vl_utils")
+_wallx_deps_available = (
+    _transformers_available and _peft_available and _torchdiffeq_available and _qwen_vl_utils_available
+)
 
 
 def make_device_from_device_class(config: ChoiceRegistry) -> Any:

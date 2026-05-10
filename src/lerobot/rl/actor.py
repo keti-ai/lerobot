@@ -60,13 +60,10 @@ from torch.multiprocessing import Event, Queue
 from lerobot.cameras import opencv  # noqa: F401
 from lerobot.configs import parser
 from lerobot.configs.train import TrainRLServerPipelineConfig
-from lerobot.policies.factory import make_policy
+from lerobot.policies import make_policy
 from lerobot.policies.sac.modeling_sac import SACPolicy
-from lerobot.processor import TransitionKey
-from lerobot.rl.process import ProcessSignalHandler
-from lerobot.rl.queue import get_last_item_from_queue
-from lerobot.robots import so100_follower  # noqa: F401
-from lerobot.teleoperators import gamepad, so101_leader  # noqa: F401
+from lerobot.robots import so_follower  # noqa: F401
+from lerobot.teleoperators import gamepad, so_leader  # noqa: F401
 from lerobot.teleoperators.utils import TeleopEvents
 from lerobot.transport import services_pb2, services_pb2_grpc
 from lerobot.transport.utils import (
@@ -77,6 +74,9 @@ from lerobot.transport.utils import (
     send_bytes_in_chunks,
     transitions_to_bytes,
 )
+from lerobot.types import TransitionKey
+from lerobot.utils.device_utils import get_safe_torch_device
+from lerobot.utils.process import ProcessSignalHandler
 from lerobot.utils.random_utils import set_seed
 from lerobot.utils.robot_utils import precise_sleep
 from lerobot.utils.transition import (
@@ -86,7 +86,6 @@ from lerobot.utils.transition import (
 )
 from lerobot.utils.utils import (
     TimerManager,
-    get_safe_torch_device,
     init_logging,
 )
 
@@ -96,6 +95,7 @@ from .gym_manipulator import (
     make_robot_env,
     step_env_and_process_transition,
 )
+from .queue import get_last_item_from_queue
 
 # Main entry point
 
@@ -175,33 +175,36 @@ def actor_cli(cfg: TrainRLServerPipelineConfig):
     interactions_process.start()
     receive_policy_process.start()
 
-    act_with_policy(
-        cfg=cfg,
-        shutdown_event=shutdown_event,
-        parameters_queue=parameters_queue,
-        transitions_queue=transitions_queue,
-        interactions_queue=interactions_queue,
-    )
-    logging.info("[ACTOR] Policy process joined")
+    try:
+        act_with_policy(
+            cfg=cfg,
+            shutdown_event=shutdown_event,
+            parameters_queue=parameters_queue,
+            transitions_queue=transitions_queue,
+            interactions_queue=interactions_queue,
+        )
+        logging.info("[ACTOR] Policy loop finished")
+    except Exception:
+        logging.exception("[ACTOR] Unhandled exception in act_with_policy")
+        shutdown_event.set()
+    finally:
+        logging.info("[ACTOR] Closing queues")
+        transitions_queue.close()
+        interactions_queue.close()
+        parameters_queue.close()
 
-    logging.info("[ACTOR] Closing queues")
-    transitions_queue.close()
-    interactions_queue.close()
-    parameters_queue.close()
+        transitions_process.join()
+        logging.info("[ACTOR] Transitions process joined")
+        interactions_process.join()
+        logging.info("[ACTOR] Interactions process joined")
+        receive_policy_process.join()
+        logging.info("[ACTOR] Receive policy process joined")
 
-    transitions_process.join()
-    logging.info("[ACTOR] Transitions process joined")
-    interactions_process.join()
-    logging.info("[ACTOR] Interactions process joined")
-    receive_policy_process.join()
-    logging.info("[ACTOR] Receive policy process joined")
+        transitions_queue.cancel_join_thread()
+        interactions_queue.cancel_join_thread()
+        parameters_queue.cancel_join_thread()
 
-    logging.info("[ACTOR] join queues")
-    transitions_queue.cancel_join_thread()
-    interactions_queue.cancel_join_thread()
-    parameters_queue.cancel_join_thread()
-
-    logging.info("[ACTOR] queues closed")
+        logging.info("[ACTOR] Cleanup complete")
 
 
 # Core algorithm functions
@@ -398,7 +401,7 @@ def act_with_policy(
 
         if cfg.env.fps is not None:
             dt_time = time.perf_counter() - start_time
-            precise_sleep(1 / cfg.env.fps - dt_time)
+            precise_sleep(max(1 / cfg.env.fps - dt_time, 0.0))
 
 
 #  Communication Functions - Group all gRPC/messaging functions
