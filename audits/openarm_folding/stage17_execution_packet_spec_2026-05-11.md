@@ -56,8 +56,6 @@ PYTHONPATH=/home/syhlabtop/workspace/lerobot/src \
   --json-out /home/syhlabtop/openarm_folding_20260511/shadow_reviews/snapshot_20260511_154554_execution_packet_no_send.json
 ```
 
-## Remaining Blockers Before Any Actuator Write
-
 ## Verification
 
 The no-send execution packet was generated on `syhlabtop`:

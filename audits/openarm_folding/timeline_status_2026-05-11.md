@@ -30,7 +30,8 @@ Stage 14 refreshed A6000 snapshot action review      DONE
 Stage 15 guarded first-motion command path spec      DONE FOR DRY-RUN
 Stage 16 guarded first-motion runtime preflight      DONE FOR NO-SEND
 Stage 17 guarded first-motion execution packet       DONE FOR NO-SEND
-Stage 18 guarded first-motion actuator write         BLOCKED
+Stage 18 guarded first-motion actuator writer        DONE FOR DRY-RUN
+Stage 19 first actuator write execution              OPERATOR GATED
 ```
 
 The next real-machine work is on `syhlabtop`. The objective is still not motion.
@@ -47,6 +48,7 @@ audits/openarm_folding/post_gripper_zero_snapshot_review_2026-05-11.md
 audits/openarm_folding/stage15_guarded_first_motion_spec_2026-05-11.md
 audits/openarm_folding/stage16_runtime_preflight_spec_2026-05-11.md
 audits/openarm_folding/stage17_execution_packet_spec_2026-05-11.md
+audits/openarm_folding/stage18_guarded_actuator_write_spec_2026-05-11.md
 ```
 
 ## A6000 Status
@@ -358,6 +360,20 @@ actuator_commands_sent: false
 all rows would_send: false
 ```
 
+Stage 18 guarded actuator writer prepared:
+
+```text
+tool: audits/openarm_folding/guarded_first_motion_actuator_write.py
+spec: audits/openarm_folding/stage18_guarded_actuator_write_spec_2026-05-11.md
+scope: can1 right arm joint_1..joint_7 only
+excluded: left arm, right_gripper, left_gripper
+default: dry-run readback validation only
+execute gate: --execute --power-held --confirm SEND_RIGHT_ARM_JOINTS_ONCE_20260511
+dry-run json: /home/syhlabtop/openarm_folding_20260511/shadow_reviews/snapshot_20260511_154554_stage18_dry_run.json
+dry-run json sha256: c300381df2ac5d7fc93123a9bb2168bed28f7e475bb7b7dfed9dcc3e9fdbb8ad
+dry-run actuator_commands_sent: false
+```
+
 ## Motion Gate
 
 Motion remains blocked. A6000 has produced offline action proposals only; no
@@ -365,5 +381,6 @@ policy output has been sent to robot actuators. The only hardware write after
 the original no-send pipeline was the operator-approved gripper-only zero on
 motor ID `008` for `can0` and `can1`. Stage 15 defined a dry-run target table
 only, Stage 16 verified current readback without command writes, and Stage 17
-built a no-send execution packet. Guarded actuator write remains blocked until a
-separate runtime writer, operator approval, and abort procedure are implemented.
+built a no-send execution packet. Stage 18 now has a guarded right-arm writer
+and its dry-run validation passed, but actual execution remains blocked until
+the operator explicitly runs the execute command while holding power/abort.

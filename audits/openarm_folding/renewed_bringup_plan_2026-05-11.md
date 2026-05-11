@@ -106,7 +106,8 @@ Stage 14 refreshed A6000 snapshot action review      DONE
 Stage 15 guarded first-motion command path spec      DONE FOR DRY-RUN
 Stage 16 guarded first-motion runtime preflight      DONE FOR NO-SEND
 Stage 17 guarded first-motion execution packet       DONE FOR NO-SEND
-Stage 18 guarded first-motion actuator write         BLOCKED
+Stage 18 guarded first-motion actuator writer        DONE FOR DRY-RUN
+Stage 19 first actuator write execution              OPERATOR GATED
 ```
 
 The previous A6000 action review for `snapshot_20260511_135634` remains useful
@@ -129,8 +130,9 @@ approved as an actuator command.
 
    Stage 15 created the dry-run target table. Stage 16 verified fresh readback
    drift with no-send CAN reads. Stage 17 built a no-send execution packet. A
-   separate actuator writer with explicit operator approval and an abort
-   procedure is still required before any actuator command is considered.
+   Stage 18 adds a guarded right-arm writer and its dry-run validation passed.
+   Actual execution still requires the operator-held power/abort gate and exact
+   typed confirmation.
 
 2. Keep the runtime path bound to the refreshed post-gripper-zero review
    artifact.
@@ -190,8 +192,9 @@ The following remain out of scope until a separate explicit motion gate:
 
 ## Open Blockers
 
-- A guarded dry-run target table, no-send runtime preflight, and no-send
-  execution packet exist, but an actuator writer does not.
+- A guarded dry-run target table, no-send runtime preflight, no-send execution
+  packet, and guarded right-arm writer dry-run exist. Actual write is still
+  operator gated.
 - The refreshed A6000 action review has large deltas and four clamped rows; it
   is not a motion candidate without a guarded cap/selection path.
 - `left_joint_7` wrist-flap direction/range needs explicit handling before any
@@ -202,8 +205,8 @@ The following remain out of scope until a separate explicit motion gate:
 
 Stage 15 is complete for dry-run only. Stage 16 is complete for no-send runtime
 preflight only. Stage 17 is complete for no-send execution packet only. Stage 18
-requires a separate actuator writer with exact target-table approval and
-operator abort procedure.
+has the guarded writer; Stage 19 is the first actuator write and requires exact
+target-table approval plus operator abort control.
 
 Motion remains blocked unless a later stage separately defines and approves a
 guarded first-motion execution path and the operator approves the exact target
