@@ -28,13 +28,14 @@ Stage 12 syhlabtop gripper-only zero adjustment      DONE
 Stage 13 refreshed no-send snapshot after gripper    DONE
 Stage 14 refreshed A6000 snapshot action review      DONE
 Stage 15 guarded first-motion command path spec      DONE FOR DRY-RUN
-Stage 16 guarded first-motion execution              BLOCKED
+Stage 16 guarded first-motion runtime preflight      DONE FOR NO-SEND
+Stage 17 guarded first-motion execution              BLOCKED
 ```
 
 The next real-machine work is on `syhlabtop`. The objective is still not motion.
-Stage 15 produced a guarded dry-run target table only. Stage 16 remains blocked
-until a separate runtime command path, fresh readback check, operator gate, and
-abort procedure exist.
+Stage 15 produced a guarded dry-run target table, and Stage 16 verified current
+readback drift without sending commands. Guarded execution remains blocked until
+a separate command path, operator gate, and abort procedure exist.
 
 Current renewed work spec:
 
@@ -42,6 +43,7 @@ Current renewed work spec:
 audits/openarm_folding/renewed_bringup_plan_2026-05-11.md
 audits/openarm_folding/post_gripper_zero_snapshot_review_2026-05-11.md
 audits/openarm_folding/stage15_guarded_first_motion_spec_2026-05-11.md
+audits/openarm_folding/stage16_runtime_preflight_spec_2026-05-11.md
 ```
 
 ## A6000 Status
@@ -324,11 +326,27 @@ send_allowed: false
 motion_allowed: false
 ```
 
+Stage 16 no-send runtime preflight completed:
+
+```text
+tool: audits/openarm_folding/guarded_first_motion_runtime_preflight.py
+spec: audits/openarm_folding/stage16_runtime_preflight_spec_2026-05-11.md
+preflight json: /home/syhlabtop/openarm_folding_20260511/shadow_reviews/snapshot_20260511_154554_runtime_preflight.json
+preflight json sha256: e29ca7aa1ec00a124a0f141842b7efa1a01a8bbb45397ad6ade6f9db3dcc49aa
+all_within_drift_limit: true
+blocking_keys: []
+arm drift limit: 1 deg
+gripper drift limit: 3 deg
+send_allowed: false
+motion_allowed: false
+```
+
 ## Motion Gate
 
 Motion remains blocked. A6000 has produced offline action proposals only; no
 policy output has been sent to robot actuators. The only hardware write after
 the original no-send pipeline was the operator-approved gripper-only zero on
 motor ID `008` for `can0` and `can1`. Stage 15 defined a dry-run target table
-only. Stage 16 remains blocked until a separate runtime command path, fresh
-readback check, operator approval, and abort procedure are implemented.
+only, and Stage 16 verified current readback without command writes. Guarded
+execution remains blocked until a separate runtime command path, operator
+approval, and abort procedure are implemented.

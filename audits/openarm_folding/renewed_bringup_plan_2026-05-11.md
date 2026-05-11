@@ -104,7 +104,8 @@ Stage 12 syhlabtop gripper-only zero adjustment      DONE
 Stage 13 refreshed no-send snapshot after gripper    DONE
 Stage 14 refreshed A6000 snapshot action review      DONE
 Stage 15 guarded first-motion command path spec      DONE FOR DRY-RUN
-Stage 16 guarded first-motion execution              BLOCKED
+Stage 16 guarded first-motion runtime preflight      DONE FOR NO-SEND
+Stage 17 guarded first-motion execution              BLOCKED
 ```
 
 The previous A6000 action review for `snapshot_20260511_135634` remains useful
@@ -125,9 +126,10 @@ approved as an actuator command.
 
 1. Add a runtime command path, but do not execute it without a separate gate.
 
-   Stage 15 only created the dry-run target table. Stage 16 requires a separate
-   command implementation with fresh readback verification, explicit operator
-   approval, and an abort procedure before any actuator command is considered.
+   Stage 15 created the dry-run target table. Stage 16 verified fresh readback
+   drift with no-send CAN reads. A separate command implementation with explicit
+   operator approval and an abort procedure is still required before any
+   actuator command is considered.
 
 2. Keep the runtime path bound to the refreshed post-gripper-zero review
    artifact.
@@ -187,7 +189,8 @@ The following remain out of scope until a separate explicit motion gate:
 
 ## Open Blockers
 
-- A guarded dry-run target table exists, but a runtime command path does not.
+- A guarded dry-run target table and no-send runtime preflight exist, but a
+  runtime command path does not.
 - The refreshed A6000 action review has large deltas and four clamped rows; it
   is not a motion candidate without a guarded cap/selection path.
 - `left_joint_7` wrist-flap direction/range needs explicit handling before any
@@ -196,9 +199,10 @@ The following remain out of scope until a separate explicit motion gate:
 
 ## Acceptance Criteria for the Next Milestone
 
-Stage 15 is complete for dry-run only. Stage 16 requires a separate runtime
-command path with fresh current readback, exact target-table approval, and
-operator abort procedure.
+Stage 15 is complete for dry-run only. Stage 16 is complete for no-send runtime
+preflight only. Stage 17 requires a separate runtime command path with exact
+target-table approval and operator abort procedure.
 
-Motion remains blocked unless Stage 15 separately defines and approves a guarded
-first-motion path and the operator approves the exact target table.
+Motion remains blocked unless a later stage separately defines and approves a
+guarded first-motion execution path and the operator approves the exact target
+table.
