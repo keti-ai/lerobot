@@ -108,9 +108,22 @@ right_gripper max-closed sample: 36.031 deg
 left_gripper  max-closed sample: 38.173 deg
 ```
 
-This conflicts with the A6000 review/audit gripper limit of `[-65, 0]`.
-The existing bimanual record configs in `../openarm_lerobot` use
-`gripper: [-90, 45]`, which is more consistent with the observed closed values.
+This differs from the A6000 review/audit gripper limit of `[-65, 0]`, but it
+does not by itself prove a calibration or zero-position error. The LeRobot
+OpenArm side-specific baseline uses `[-65, 0]`, while the existing bimanual
+record configs in `../openarm_lerobot` use `gripper: [-90, 45]`.
+
+The likely interpretation is:
+
+```text
+[-65, 0]   baseline / Quest frozen contract / conservative working range
+[-90, 45]  syhlabtop bimanual record preset / wider physical range
+```
+
+For initial folding deploy work, following the LeRobot baseline `[-65, 0]`
+remains the safer default unless the task explicitly requires more closing
+travel. If full close is required later, use an explicit folding-specific
+gripper limit decision instead of silently inheriting the wider record preset.
 
 ## Impact on A6000 Snapshot Action Review
 
@@ -122,8 +135,9 @@ Arm joint limits used by A6000 were mostly consistent with observed direction:
 
 Open issues before command candidacy:
 
-- gripper limits in A6000 review should not remain `[-65, 0]` for this hardware
-  state;
+- gripper limits should be explicitly selected: baseline `[-65, 0]` for a
+  conservative deploy range, or a wider folding-specific range only after
+  operator approval;
 - `left_joint_7` wrist-flap direction/range must be reviewed before treating a
   policy delta as a physical up/down wrist command;
 - any future command path must apply a small per-step delta cap and must print

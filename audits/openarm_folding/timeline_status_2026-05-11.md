@@ -240,8 +240,11 @@ Key findings:
 - `right_joint_7` wrist flap up is positive, while `left_joint_7` wrist flap up
   is negative; `left_joint_7` range/sign needs explicit handling before motion.
 - both grippers close in the positive direction and reached about `+36` to
-  `+38 deg`, so the A6000 review gripper limit `[-65, 0]` does not match this
-  hardware state.
+  `+38 deg`; this shows the existing bimanual record preset `[-90, 45]` covers
+  more physical travel than the LeRobot baseline `[-65, 0]`, but does not prove
+  the baseline range is wrong.
+- For initial deploy safety, prefer the LeRobot baseline gripper range unless a
+  separate folding-specific gripper range is explicitly approved.
 
 ## Motion Gate
 
