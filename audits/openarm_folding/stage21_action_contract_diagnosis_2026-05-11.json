@@ -1,0 +1,1250 @@
+{
+  "action_names": [
+    "right_joint_1.pos",
+    "right_joint_2.pos",
+    "right_joint_3.pos",
+    "right_joint_4.pos",
+    "right_joint_5.pos",
+    "right_joint_6.pos",
+    "right_joint_7.pos",
+    "right_gripper.pos",
+    "left_joint_1.pos",
+    "left_joint_2.pos",
+    "left_joint_3.pos",
+    "left_joint_4.pos",
+    "left_joint_5.pos",
+    "left_joint_6.pos",
+    "left_joint_7.pos",
+    "left_gripper.pos"
+  ],
+  "dataset_contract": {
+    "dataset_rows": 1505,
+    "feature_count": 16,
+    "rows": [
+      {
+        "dataset_action": {
+          "max": 32.21977996826172,
+          "mean": -10.109159469604492,
+          "median": -12.351648330688477,
+          "min": -66.76923370361328,
+          "p01": -60.523956298828125,
+          "p05": -42.06593322753906,
+          "p95": 22.901098251342773,
+          "p99": 30.901098251342773,
+          "std": 19.25208854675293
+        },
+        "dataset_action_minus_state": {
+          "max": 3.185443878173828,
+          "mean": 0.3260760009288788,
+          "median": 0.3552560806274414,
+          "min": -2.8813838958740234,
+          "p01": -2.4798667430877686,
+          "p05": -1.2530754804611206,
+          "p95": 1.7982234954833984,
+          "p99": 2.4736626148223877,
+          "std": 0.9318392276763916
+        },
+        "dataset_state": {
+          "max": 31.24449348449707,
+          "mean": -10.435235023498535,
+          "median": -12.622382164001465,
+          "min": -65.95331573486328,
+          "p01": -59.502891540527344,
+          "p05": -41.5041389465332,
+          "p95": 21.102874755859375,
+          "p99": 30.392072677612305,
+          "std": 18.709081649780273
+        },
+        "is_gripper": false,
+        "key": "right_joint_1.pos",
+        "snapshots": {
+          "chest_154554": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -1.125632405281067,
+            "current_state_dataset_percentile": 74.4186046511628,
+            "delta_deg": -7.280193209648132,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -8.4058256149292
+          },
+          "high_175613": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": 1.1037753820419312,
+            "current_state_dataset_percentile": 76.01328903654485,
+            "delta_deg": -8.316562533378601,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -7.21278715133667
+          }
+        }
+      },
+      {
+        "dataset_action": {
+          "max": 13.230769157409668,
+          "mean": 1.1497206687927246,
+          "median": 0.3956044018268585,
+          "min": -8.131868362426758,
+          "p01": -7.952527046203613,
+          "p05": -7.604395389556885,
+          "p95": 12.879120826721191,
+          "p99": 13.230769157409668,
+          "std": 6.368868827819824
+        },
+        "dataset_action_minus_state": {
+          "max": 2.864258289337158,
+          "mean": 0.3885837197303772,
+          "median": 0.47125911712646484,
+          "min": -1.9112093448638916,
+          "p01": -0.8361403942108154,
+          "p05": -0.4205164909362793,
+          "p95": 1.0725955963134766,
+          "p99": 1.5524516105651855,
+          "std": 0.4862183630466461
+        },
+        "dataset_state": {
+          "max": 13.037664413452148,
+          "mean": 0.7611368894577026,
+          "median": -0.14207009971141815,
+          "min": -9.03784465789795,
+          "p01": -8.447707176208496,
+          "p05": -7.717685222625732,
+          "p95": 12.141529083251953,
+          "p99": 12.360098838806152,
+          "std": 6.195111274719238
+        },
+        "is_gripper": false,
+        "key": "right_joint_2.pos",
+        "snapshots": {
+          "chest_154554": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -0.2950686812400818,
+            "current_state_dataset_percentile": 40.59800664451827,
+            "delta_deg": -9.255453169345856,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -9.550521850585938
+          },
+          "high_175613": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -1.2130601406097412,
+            "current_state_dataset_percentile": 36.34551495016611,
+            "delta_deg": -10.086367845535278,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -11.29942798614502
+          }
+        }
+      },
+      {
+        "dataset_action": {
+          "max": 67.64835357666016,
+          "mean": 28.398962020874023,
+          "median": 33.89011001586914,
+          "min": -39.9560432434082,
+          "p01": -27.1068115234375,
+          "p05": -9.802197456359863,
+          "p95": 57.4505500793457,
+          "p99": 67.20879364013672,
+          "std": 20.162092208862305
+        },
+        "dataset_action_minus_state": {
+          "max": 3.798604965209961,
+          "mean": 0.1249648928642273,
+          "median": 0.1325531005859375,
+          "min": -2.8225555419921875,
+          "p01": -2.1989688873291016,
+          "p05": -1.1807029247283936,
+          "p95": 1.3266912698745728,
+          "p99": 2.1161587238311768,
+          "std": 0.7068278789520264
+        },
+        "dataset_state": {
+          "max": 67.26473236083984,
+          "mean": 28.273998260498047,
+          "median": 33.75804138183594,
+          "min": -40.24955368041992,
+          "p01": -26.981515884399414,
+          "p05": -9.606124877929688,
+          "p95": 57.3635368347168,
+          "p99": 67.02342224121094,
+          "std": 20.108184814453125
+        },
+        "is_gripper": false,
+        "key": "right_joint_3.pos",
+        "snapshots": {
+          "chest_154554": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": 13.540373802185059,
+            "current_state_dataset_percentile": 17.00996677740864,
+            "delta_deg": -20.782405853271484,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -7.242032051086426
+          },
+          "high_175613": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": 14.611363410949707,
+            "current_state_dataset_percentile": 17.209302325581397,
+            "delta_deg": -23.19632339477539,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -8.584959983825684
+          }
+        }
+      },
+      {
+        "dataset_action": {
+          "max": 116.87911987304688,
+          "mean": 94.78742980957031,
+          "median": 103.78022003173828,
+          "min": 2.5934066772460938,
+          "p01": 5.2729668617248535,
+          "p05": 40.237361907958984,
+          "p95": 116.24614715576172,
+          "p99": 116.87911987304688,
+          "std": 25.525188446044922
+        },
+        "dataset_action_minus_state": {
+          "max": 4.773780822753906,
+          "mean": 0.8198496699333191,
+          "median": 0.9730148315429688,
+          "min": -6.741180419921875,
+          "p01": -3.0899722576141357,
+          "p05": -0.8887611031532288,
+          "p95": 2.547123432159424,
+          "p99": 3.3894333839416504,
+          "std": 1.107492208480835
+        },
+        "dataset_state": {
+          "max": 115.83084869384766,
+          "mean": 93.96759033203125,
+          "median": 102.7603988647461,
+          "min": 2.874187469482422,
+          "p01": 8.291211128234863,
+          "p05": 39.87361526489258,
+          "p95": 115.1270523071289,
+          "p99": 115.83084869384766,
+          "std": 25.304080963134766
+        },
+        "is_gripper": false,
+        "key": "right_joint_4.pos",
+        "snapshots": {
+          "chest_154554": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": 0.3606394827365875,
+            "current_state_dataset_percentile": 0.0,
+            "delta_deg": -67.93003645539284,
+            "outside_dataset_state_minmax": true,
+            "proposed_deg": -67.56939697265625
+          },
+          "high_175613": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -4.229317665100098,
+            "current_state_dataset_percentile": 0.0,
+            "delta_deg": -72.75268459320068,
+            "outside_dataset_state_minmax": true,
+            "proposed_deg": -76.98200225830078
+          }
+        }
+      },
+      {
+        "dataset_action": {
+          "max": 48.30769348144531,
+          "mean": 23.658367156982422,
+          "median": 25.714284896850586,
+          "min": -0.6593406796455383,
+          "p01": -0.5714285969734192,
+          "p05": 3.2087912559509277,
+          "p95": 44.43955993652344,
+          "p99": 44.70329666137695,
+          "std": 14.048205375671387
+        },
+        "dataset_action_minus_state": {
+          "max": 3.4026756286621094,
+          "mean": 0.28472623229026794,
+          "median": 0.5707836151123047,
+          "min": -6.036979675292969,
+          "p01": -5.160952091217041,
+          "p05": -1.917778730392456,
+          "p95": 1.4880447387695312,
+          "p99": 2.6066901683807373,
+          "std": 1.2808563709259033
+        },
+        "dataset_state": {
+          "max": 48.0524787902832,
+          "mean": 23.373641967773438,
+          "median": 25.05898094177246,
+          "min": -0.4699241816997528,
+          "p01": -0.44806724786758423,
+          "p05": 2.878558874130249,
+          "p95": 43.5062370300293,
+          "p99": 43.897911071777344,
+          "std": 13.979022979736328
+        },
+        "is_gripper": false,
+        "key": "right_joint_5.pos",
+        "snapshots": {
+          "chest_154554": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -3.0708999633789062,
+            "current_state_dataset_percentile": 0.0,
+            "delta_deg": -28.88401985168457,
+            "outside_dataset_state_minmax": true,
+            "proposed_deg": -31.954919815063477
+          },
+          "high_175613": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -3.988891363143921,
+            "current_state_dataset_percentile": 0.0,
+            "delta_deg": -29.323063135147095,
+            "outside_dataset_state_minmax": true,
+            "proposed_deg": -33.311954498291016
+          }
+        }
+      },
+      {
+        "dataset_action": {
+          "max": 49.978023529052734,
+          "mean": 26.96982192993164,
+          "median": 28.263736724853516,
+          "min": -1.0989011526107788,
+          "p01": -1.0109890699386597,
+          "p05": -0.5714285969734192,
+          "p95": 49.53845977783203,
+          "p99": 49.62285232543945,
+          "std": 14.023463249206543
+        },
+        "dataset_action_minus_state": {
+          "max": 10.056324005126953,
+          "mean": 1.104749321937561,
+          "median": 0.20738792419433594,
+          "min": -3.392772674560547,
+          "p01": -1.5456671714782715,
+          "p05": -0.5565284490585327,
+          "p95": 9.524961471557617,
+          "p99": 9.726512908935547,
+          "std": 2.6117351055145264
+        },
+        "dataset_state": {
+          "max": 40.664833068847656,
+          "mean": 25.86507225036621,
+          "median": 28.075237274169922,
+          "min": -1.6064850091934204,
+          "p01": -1.4972003698349,
+          "p05": -0.5704658627510071,
+          "p95": 39.96541213989258,
+          "p99": 40.33610534667969,
+          "std": 12.754071235656738
+        },
+        "is_gripper": false,
+        "key": "right_joint_6.pos",
+        "snapshots": {
+          "chest_154554": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -0.42621031403541565,
+            "current_state_dataset_percentile": 5.382059800664452,
+            "delta_deg": -12.784426778554916,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -13.210637092590332
+          },
+          "high_175613": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -0.44806724786758423,
+            "current_state_dataset_percentile": 5.3156146179401995,
+            "delta_deg": -13.771598279476166,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -14.21966552734375
+          }
+        }
+      },
+      {
+        "dataset_action": {
+          "max": 21.846153259277344,
+          "mean": -51.606056213378906,
+          "median": -50.241756439208984,
+          "min": -83.12088012695312,
+          "p01": -83.03296661376953,
+          "p05": -82.5934066772461,
+          "p95": -9.749495506286621,
+          "p99": 7.21754789352417,
+          "std": 19.971050262451172
+        },
+        "dataset_action_minus_state": {
+          "max": 3.622048854827881,
+          "mean": 0.2964506447315216,
+          "median": 0.9046707153320312,
+          "min": -7.00408935546875,
+          "p01": -6.610567569732666,
+          "p05": -2.6525282859802246,
+          "p95": 1.6960052251815796,
+          "p99": 2.4498143196105957,
+          "std": 1.6239957809448242
+        },
+        "dataset_state": {
+          "max": 22.064579010009766,
+          "mean": -51.90250778198242,
+          "median": -51.4840202331543,
+          "min": -81.16574096679688,
+          "p01": -80.88159942626953,
+          "p05": -80.52751922607422,
+          "p95": -10.419228553771973,
+          "p99": 6.729738712310791,
+          "std": 19.57955551147461
+        },
+        "is_gripper": false,
+        "key": "right_joint_7.pos",
+        "snapshots": {
+          "chest_154554": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": 5.977872848510742,
+            "current_state_dataset_percentile": 98.67109634551495,
+            "delta_deg": 47.30645179748535,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": 53.284324645996094
+          },
+          "high_175613": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -3.7921788692474365,
+            "current_state_dataset_percentile": 95.88039867109634,
+            "delta_deg": 52.936919927597046,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": 49.14474105834961
+          }
+        }
+      },
+      {
+        "dataset_action": {
+          "max": -0.0,
+          "mean": -8.479879379272461,
+          "median": 0.0,
+          "min": -42.33256530761719,
+          "p01": -41.88221740722656,
+          "p05": -39.480369567871094,
+          "p95": -0.0,
+          "p99": -0.0,
+          "std": 15.209221839904785
+        },
+        "dataset_action_minus_state": {
+          "max": 6.685554504394531,
+          "mean": 0.7605745196342468,
+          "median": 0.5136380791664124,
+          "min": -7.963891983032227,
+          "p01": -4.952832221984863,
+          "p05": -0.7904128432273865,
+          "p95": 4.9068827629089355,
+          "p99": 4.99431037902832,
+          "std": 1.7517290115356445
+        },
+        "dataset_state": {
+          "max": 0.22949786484241486,
+          "mean": -9.240453720092773,
+          "median": -1.0163476467132568,
+          "min": -41.42982864379883,
+          "p01": -41.42982864379883,
+          "p05": -39.02556610107422,
+          "p95": -0.05464234575629234,
+          "p99": -0.05464234575629234,
+          "std": 14.619283676147461
+        },
+        "is_gripper": true,
+        "key": "right_gripper.pos",
+        "snapshots": {
+          "chest_154554": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -23.244853973388672,
+            "current_state_dataset_percentile": 22.12624584717608,
+            "delta_deg": 12.940731048583984,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -10.304122924804688
+          },
+          "high_175613": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": 0.0,
+            "current_state_dataset_percentile": 99.93355481727575,
+            "delta_deg": -9.062175750732422,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -9.062175750732422
+          }
+        }
+      },
+      {
+        "dataset_action": {
+          "max": 75.9120864868164,
+          "mean": 14.980131149291992,
+          "median": 15.95604419708252,
+          "min": -48.92307662963867,
+          "p01": -47.235164642333984,
+          "p05": -38.28571319580078,
+          "p95": 48.87031173706055,
+          "p99": 67.90152740478516,
+          "std": 22.804418563842773
+        },
+        "dataset_action_minus_state": {
+          "max": 4.387565612792969,
+          "mean": 0.025926876813173294,
+          "median": 0.0568084716796875,
+          "min": -4.881343841552734,
+          "p01": -2.998105525970459,
+          "p05": -1.5978425741195679,
+          "p95": 1.7748891115188599,
+          "p99": 3.199073553085327,
+          "std": 1.0370069742202759
+        },
+        "dataset_state": {
+          "max": 74.1933822631836,
+          "mean": 14.954204559326172,
+          "median": 16.03206443786621,
+          "min": -48.35847854614258,
+          "p01": -46.93865203857422,
+          "p05": -37.82343292236328,
+          "p95": 48.0524787902832,
+          "p99": 66.6457290649414,
+          "std": 22.374650955200195
+        },
+        "is_gripper": false,
+        "key": "left_joint_1.pos",
+        "snapshots": {
+          "chest_154554": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -1.1037753820419312,
+            "current_state_dataset_percentile": 15.14950166112957,
+            "delta_deg": 23.998066306114197,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": 22.894290924072266
+          },
+          "high_175613": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": 0.8414921164512634,
+            "current_state_dataset_percentile": 15.548172757475085,
+            "delta_deg": 22.777598917484283,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": 23.619091033935547
+          }
+        }
+      },
+      {
+        "dataset_action": {
+          "max": 6.549450397491455,
+          "mean": -7.761235237121582,
+          "median": -7.340659141540527,
+          "min": -22.19780158996582,
+          "p01": -21.846153259277344,
+          "p05": -19.384614944458008,
+          "p95": 4.668118953704834,
+          "p99": 6.2751545906066895,
+          "std": 7.062473773956299
+        },
+        "dataset_action_minus_state": {
+          "max": 1.766146183013916,
+          "mean": -0.4446577727794647,
+          "median": -0.502678632736206,
+          "min": -2.9495019912719727,
+          "p01": -2.2123947143554688,
+          "p05": -1.3264201879501343,
+          "p95": 0.50560063123703,
+          "p99": 1.0812431573867798,
+          "std": 0.5982657670974731
+        },
+        "dataset_state": {
+          "max": 6.349440574645996,
+          "mean": -7.316578388214111,
+          "median": -7.114433765411377,
+          "min": -22.042722702026367,
+          "p01": -21.274232864379883,
+          "p05": -18.85161018371582,
+          "p95": 4.465371131896973,
+          "p99": 5.933283805847168,
+          "std": 6.871789455413818
+        },
+        "is_gripper": false,
+        "key": "left_joint_2.pos",
+        "snapshots": {
+          "chest_154554": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -1.9124821424484253,
+            "current_state_dataset_percentile": 76.47840531561462,
+            "delta_deg": 24.340405344963074,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": 22.42792320251465
+          },
+          "high_175613": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -3.617323398590088,
+            "current_state_dataset_percentile": 66.51162790697674,
+            "delta_deg": 24.475903034210205,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": 20.858579635620117
+          }
+        }
+      },
+      {
+        "dataset_action": {
+          "max": 85.93406677246094,
+          "mean": -24.67563819885254,
+          "median": -34.32966995239258,
+          "min": -59.38461685180664,
+          "p01": -57.89011001586914,
+          "p05": -57.36263656616211,
+          "p95": 65.22196197509766,
+          "p99": 82.28743743896484,
+          "std": 31.215524673461914
+        },
+        "dataset_action_minus_state": {
+          "max": 4.805702209472656,
+          "mean": -0.16174498200416565,
+          "median": -0.1281423568725586,
+          "min": -4.597066879272461,
+          "p01": -3.571937084197998,
+          "p05": -1.7846885919570923,
+          "p95": 1.2526215314865112,
+          "p99": 2.8379178047180176,
+          "std": 0.9794183969497681
+        },
+        "dataset_state": {
+          "max": 84.92513275146484,
+          "mean": -24.513891220092773,
+          "median": -33.97661209106445,
+          "min": -58.95909118652344,
+          "p01": -57.864498138427734,
+          "p05": -56.92202377319336,
+          "p95": 65.82213592529297,
+          "p99": 82.36083221435547,
+          "std": 31.103097915649414
+        },
+        "is_gripper": false,
+        "key": "left_joint_3.pos",
+        "snapshots": {
+          "chest_154554": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": 6.742865562438965,
+            "current_state_dataset_percentile": 91.89368770764119,
+            "delta_deg": 20.601357460021973,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": 27.344223022460938
+          },
+          "high_175613": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": 5.999729633331299,
+            "current_state_dataset_percentile": 91.62790697674419,
+            "delta_deg": 20.711760997772217,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": 26.711490631103516
+          }
+        }
+      },
+      {
+        "dataset_action": {
+          "max": 114.15384674072266,
+          "mean": 91.11942291259766,
+          "median": 97.27472686767578,
+          "min": -7.252747058868408,
+          "p01": 5.670329570770264,
+          "p05": 45.230770111083984,
+          "p95": 112.83516693115234,
+          "p99": 113.97801971435547,
+          "std": 23.785329818725586
+        },
+        "dataset_action_minus_state": {
+          "max": 4.539207458496094,
+          "mean": 0.6485604047775269,
+          "median": 0.8152999877929688,
+          "min": -9.236437797546387,
+          "p01": -4.752188205718994,
+          "p05": -1.0071243047714233,
+          "p95": 2.3362982273101807,
+          "p99": 3.214442253112793,
+          "std": 1.2206811904907227
+        },
+        "dataset_state": {
+          "max": 113.84186553955078,
+          "mean": 90.47085571289062,
+          "median": 96.4655990600586,
+          "min": -0.16392704844474792,
+          "p01": 5.915799140930176,
+          "p05": 45.45150375366211,
+          "p95": 111.98402404785156,
+          "p99": 113.00779724121094,
+          "std": 23.407869338989258
+        },
+        "is_gripper": false,
+        "key": "left_joint_4.pos",
+        "snapshots": {
+          "chest_154554": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -1.5627710819244385,
+            "current_state_dataset_percentile": 0.0,
+            "delta_deg": -58.37613272666931,
+            "outside_dataset_state_minmax": true,
+            "proposed_deg": -59.93890380859375
+          },
+          "high_175613": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": 5.234736919403076,
+            "current_state_dataset_percentile": 0.9966777408637874,
+            "delta_deg": -59.616023540496826,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -54.38128662109375
+          }
+        }
+      },
+      {
+        "dataset_action": {
+          "max": 8.483516693115234,
+          "mean": -27.856477737426758,
+          "median": -30.901098251342773,
+          "min": -60.79121017456055,
+          "p01": -57.534942626953125,
+          "p05": -44.509891510009766,
+          "p95": -0.04395604506134987,
+          "p99": 7.780219554901123,
+          "std": 13.54782485961914
+        },
+        "dataset_action_minus_state": {
+          "max": 4.708610534667969,
+          "mean": -0.19819238781929016,
+          "median": -0.3835716247558594,
+          "min": -3.75213623046875,
+          "p01": -2.800910711288452,
+          "p05": -1.6678080558776855,
+          "p95": 1.8407673835754395,
+          "p99": 4.037603855133057,
+          "std": 1.1112245321273804
+        },
+        "dataset_state": {
+          "max": 8.556991577148438,
+          "mean": -27.65828514099121,
+          "median": -30.28278923034668,
+          "min": -60.03008270263672,
+          "p01": -56.029388427734375,
+          "p05": -45.13676071166992,
+          "p95": -0.07649928331375122,
+          "p99": 7.352234363555908,
+          "std": 13.381861686706543
+        },
+        "is_gripper": false,
+        "key": "left_joint_5.pos",
+        "snapshots": {
+          "chest_154554": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -16.35991859436035,
+            "current_state_dataset_percentile": 81.79401993355482,
+            "delta_deg": 23.61408233642578,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": 7.25416374206543
+          },
+          "high_175613": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -3.005329132080078,
+            "current_state_dataset_percentile": 93.35548172757476,
+            "delta_deg": 25.79583740234375,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": 22.790508270263672
+          }
+        }
+      },
+      {
+        "dataset_action": {
+          "max": 1.0109890699386597,
+          "mean": -15.834660530090332,
+          "median": -15.868131637573242,
+          "min": -31.868131637573242,
+          "p01": -31.868131637573242,
+          "p05": -25.626371383666992,
+          "p95": 1.0109890699386597,
+          "p99": 1.0109890699386597,
+          "std": 8.141549110412598
+        },
+        "dataset_action_minus_state": {
+          "max": 2.5546951293945312,
+          "mean": -0.09409967809915543,
+          "median": -0.11378860473632812,
+          "min": -3.284496307373047,
+          "p01": -2.377253770828247,
+          "p05": -0.893310546875,
+          "p95": 0.9281502962112427,
+          "p99": 1.583261251449585,
+          "std": 0.5888729095458984
+        },
+        "dataset_state": {
+          "max": 1.890625238418579,
+          "mean": -15.740561485290527,
+          "median": -15.879066467285156,
+          "min": -31.594205856323242,
+          "p01": -31.550491333007812,
+          "p05": -25.793373107910156,
+          "p95": 1.344201683998108,
+          "p99": 1.519057273864746,
+          "std": 8.139631271362305
+        },
+        "is_gripper": false,
+        "key": "left_joint_6.pos",
+        "snapshots": {
+          "chest_154554": {
+            "abs_delta_dataset_percentile": 89.70099667774086,
+            "current_deg": -5.562591075897217,
+            "current_state_dataset_percentile": 86.57807308970101,
+            "delta_deg": -0.8909873962402344,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -6.453578472137451
+          },
+          "high_175613": {
+            "abs_delta_dataset_percentile": 25.780730897009967,
+            "current_deg": -2.633761167526245,
+            "current_state_dataset_percentile": 86.77740863787375,
+            "delta_deg": 0.13089370727539062,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -2.5028674602508545
+          }
+        }
+      },
+      {
+        "dataset_action": {
+          "max": 67.9120864868164,
+          "mean": 41.651023864746094,
+          "median": 47.25274658203125,
+          "min": -32.83516311645508,
+          "p01": -22.809669494628906,
+          "p05": -8.219779968261719,
+          "p95": 63.78022003173828,
+          "p99": 67.29669952392578,
+          "std": 19.49783706665039
+        },
+        "dataset_action_minus_state": {
+          "max": 6.870960235595703,
+          "mean": -0.19836969673633575,
+          "median": -0.6431045532226562,
+          "min": -4.536998748779297,
+          "p01": -3.1138885021209717,
+          "p05": -1.6415839195251465,
+          "p95": 3.135469675064087,
+          "p99": 4.852652072906494,
+          "std": 1.5106433629989624
+        },
+        "dataset_state": {
+          "max": 68.66357421875,
+          "mean": 41.84939193725586,
+          "median": 47.46234130859375,
+          "min": -33.62689971923828,
+          "p01": -21.338054656982422,
+          "p05": -6.895864009857178,
+          "p95": 64.5544662475586,
+          "p99": 67.98600769042969,
+          "std": 19.451732635498047
+        },
+        "is_gripper": false,
+        "key": "left_joint_7.pos",
+        "snapshots": {
+          "chest_154554": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -2.10919451713562,
+            "current_state_dataset_percentile": 7.109634551495017,
+            "delta_deg": -26.08888554573059,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -28.19808006286621
+          },
+          "high_175613": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": 0.22949786484241486,
+            "current_state_dataset_percentile": 8.970099667774086,
+            "delta_deg": -30.51051516830921,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -30.281017303466797
+          }
+        }
+      },
+      {
+        "dataset_action": {
+          "max": -0.0,
+          "mean": -11.051558494567871,
+          "median": 0.0,
+          "min": -65.0,
+          "p01": -65.0,
+          "p05": -58.417720794677734,
+          "p95": -0.0,
+          "p99": -0.0,
+          "std": 20.281396865844727
+        },
+        "dataset_action_minus_state": {
+          "max": 11.660676956176758,
+          "mean": 1.2295217514038086,
+          "median": 0.42621031403541565,
+          "min": -10.75544548034668,
+          "p01": -6.89945650100708,
+          "p05": -2.0281195640563965,
+          "p95": 9.343841552734375,
+          "p99": 9.539678573608398,
+          "std": 2.8768558502197266
+        },
+        "dataset_state": {
+          "max": 0.8852060437202454,
+          "mean": -12.28108024597168,
+          "median": -1.9780529737472534,
+          "min": -65.53803253173828,
+          "p01": -65.07903289794922,
+          "p05": -58.21595764160156,
+          "p95": -0.05464234575629234,
+          "p99": -0.05464234575629234,
+          "std": 19.759124755859375
+        },
+        "is_gripper": true,
+        "key": "left_gripper.pos",
+        "snapshots": {
+          "chest_154554": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -26.610822677612305,
+            "current_state_dataset_percentile": 21.3953488372093,
+            "delta_deg": 22.310766220092773,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -4.300056457519531
+          },
+          "high_175613": {
+            "abs_delta_dataset_percentile": 100.0,
+            "current_deg": -26.588966369628906,
+            "current_state_dataset_percentile": 21.461794019933556,
+            "delta_deg": 22.018329620361328,
+            "outside_dataset_state_minmax": false,
+            "proposed_deg": -4.570636749267578
+          }
+        }
+      }
+    ]
+  },
+  "dataset_repo": "lerobot/full_folding",
+  "dataset_root": "/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/datasets/full_folding_novideo",
+  "episodes": [
+    0
+  ],
+  "max_dataset_rows": 2000,
+  "postprocess_probes": {
+    "chest_154554": {
+      "action_shape": [
+        1,
+        30,
+        16
+      ],
+      "max_full_postprocess_error_deg": 0.0,
+      "max_reconstruction_error_deg": 0.0,
+      "model_dir": "/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/models/folding_latest",
+      "policy_type": "pi05",
+      "relative_exclude_joints": [
+        "gripper"
+      ],
+      "rows": [
+        {
+          "absolute_deg": -8.272677421569824,
+          "absolute_minus_state_deg": -7.147045135498047,
+          "cached_state_deg": -1.125632405281067,
+          "key": "right_joint_1.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -7.147045135498047
+        },
+        {
+          "absolute_deg": -10.425773620605469,
+          "absolute_minus_state_deg": -10.130704879760742,
+          "cached_state_deg": -0.2950686812400818,
+          "key": "right_joint_2.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -10.130704879760742
+        },
+        {
+          "absolute_deg": -9.977686882019043,
+          "absolute_minus_state_deg": -23.5180606842041,
+          "cached_state_deg": 13.540373802185059,
+          "key": "right_joint_3.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -23.5180606842041
+        },
+        {
+          "absolute_deg": -70.814697265625,
+          "absolute_minus_state_deg": -71.17533874511719,
+          "cached_state_deg": 0.3606394827365875,
+          "key": "right_joint_4.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -71.17533874511719
+        },
+        {
+          "absolute_deg": -33.474571228027344,
+          "absolute_minus_state_deg": -30.403671264648438,
+          "cached_state_deg": -3.0708999633789062,
+          "key": "right_joint_5.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -30.403669357299805
+        },
+        {
+          "absolute_deg": -13.782418251037598,
+          "absolute_minus_state_deg": -13.356207847595215,
+          "cached_state_deg": -0.42621031403541565,
+          "key": "right_joint_6.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -13.356207847595215
+        },
+        {
+          "absolute_deg": 55.939002990722656,
+          "absolute_minus_state_deg": 49.96112823486328,
+          "cached_state_deg": 5.977872848510742,
+          "key": "right_joint_7.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": 49.96112823486328
+        },
+        {
+          "absolute_deg": -8.968307495117188,
+          "absolute_minus_state_deg": 14.276546478271484,
+          "cached_state_deg": -23.244853973388672,
+          "key": "right_gripper.pos",
+          "mask_relative": false,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -8.968307495117188
+        },
+        {
+          "absolute_deg": 26.489734649658203,
+          "absolute_minus_state_deg": 27.593509674072266,
+          "cached_state_deg": -1.1037753820419312,
+          "key": "left_joint_1.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": 27.593509674072266
+        },
+        {
+          "absolute_deg": 22.375898361206055,
+          "absolute_minus_state_deg": 24.288379669189453,
+          "cached_state_deg": -1.9124821424484253,
+          "key": "left_joint_2.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": 24.288379669189453
+        },
+        {
+          "absolute_deg": 27.030868530273438,
+          "absolute_minus_state_deg": 20.288002014160156,
+          "cached_state_deg": 6.742865562438965,
+          "key": "left_joint_3.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": 20.288002014160156
+        },
+        {
+          "absolute_deg": -58.450294494628906,
+          "absolute_minus_state_deg": -56.88752365112305,
+          "cached_state_deg": -1.5627710819244385,
+          "key": "left_joint_4.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -56.88752365112305
+        },
+        {
+          "absolute_deg": 6.544660568237305,
+          "absolute_minus_state_deg": 22.904579162597656,
+          "cached_state_deg": -16.35991859436035,
+          "key": "left_joint_5.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": 22.904579162597656
+        },
+        {
+          "absolute_deg": -5.172847270965576,
+          "absolute_minus_state_deg": 0.3897438049316406,
+          "cached_state_deg": -5.562591075897217,
+          "key": "left_joint_6.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": 0.3897438049316406
+        },
+        {
+          "absolute_deg": -28.321290969848633,
+          "absolute_minus_state_deg": -26.21209716796875,
+          "cached_state_deg": -2.10919451713562,
+          "key": "left_joint_7.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -26.21209716796875
+        },
+        {
+          "absolute_deg": -3.898632049560547,
+          "absolute_minus_state_deg": 22.712190628051758,
+          "cached_state_deg": -26.610822677612305,
+          "key": "left_gripper.pos",
+          "mask_relative": false,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -3.898632049560547
+        }
+      ],
+      "snapshot_dir": "/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/syhlabtop_snapshots/snapshot_20260511_154554",
+      "use_relative_actions": true
+    },
+    "high_175613": {
+      "action_shape": [
+        1,
+        30,
+        16
+      ],
+      "max_full_postprocess_error_deg": 0.0,
+      "max_reconstruction_error_deg": 0.0,
+      "model_dir": "/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/models/folding_latest",
+      "policy_type": "pi05",
+      "relative_exclude_joints": [
+        "gripper"
+      ],
+      "rows": [
+        {
+          "absolute_deg": -3.878161907196045,
+          "absolute_minus_state_deg": -4.981937408447266,
+          "cached_state_deg": 1.1037753820419312,
+          "key": "right_joint_1.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -4.981937408447266
+        },
+        {
+          "absolute_deg": -8.849892616271973,
+          "absolute_minus_state_deg": -7.636832237243652,
+          "cached_state_deg": -1.2130601406097412,
+          "key": "right_joint_2.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -7.636832237243652
+        },
+        {
+          "absolute_deg": -9.659750938415527,
+          "absolute_minus_state_deg": -24.271114349365234,
+          "cached_state_deg": 14.611363410949707,
+          "key": "right_joint_3.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -24.271114349365234
+        },
+        {
+          "absolute_deg": -73.44774627685547,
+          "absolute_minus_state_deg": -69.21842956542969,
+          "cached_state_deg": -4.229317665100098,
+          "key": "right_joint_4.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -69.21842956542969
+        },
+        {
+          "absolute_deg": -33.79553985595703,
+          "absolute_minus_state_deg": -29.80664825439453,
+          "cached_state_deg": -3.988891363143921,
+          "key": "right_joint_5.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -29.80664825439453
+        },
+        {
+          "absolute_deg": -13.086467742919922,
+          "absolute_minus_state_deg": -12.638400077819824,
+          "cached_state_deg": -0.44806724786758423,
+          "key": "right_joint_6.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -12.638400077819824
+        },
+        {
+          "absolute_deg": 42.82704544067383,
+          "absolute_minus_state_deg": 46.619224548339844,
+          "cached_state_deg": -3.7921788692474365,
+          "key": "right_joint_7.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": 46.619224548339844
+        },
+        {
+          "absolute_deg": -11.275089263916016,
+          "absolute_minus_state_deg": -11.275089263916016,
+          "cached_state_deg": 0.0,
+          "key": "right_gripper.pos",
+          "mask_relative": false,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -11.275089263916016
+        },
+        {
+          "absolute_deg": 23.517780303955078,
+          "absolute_minus_state_deg": 22.676288604736328,
+          "cached_state_deg": 0.8414921164512634,
+          "key": "left_joint_1.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": 22.676288604736328
+        },
+        {
+          "absolute_deg": 20.95842170715332,
+          "absolute_minus_state_deg": 24.57574462890625,
+          "cached_state_deg": -3.617323398590088,
+          "key": "left_joint_2.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": 24.57574462890625
+        },
+        {
+          "absolute_deg": 25.96413803100586,
+          "absolute_minus_state_deg": 19.96440887451172,
+          "cached_state_deg": 5.999729633331299,
+          "key": "left_joint_3.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": 19.96440887451172
+        },
+        {
+          "absolute_deg": -51.36573028564453,
+          "absolute_minus_state_deg": -56.600467681884766,
+          "cached_state_deg": 5.234736919403076,
+          "key": "left_joint_4.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -56.600467681884766
+        },
+        {
+          "absolute_deg": 22.437976837158203,
+          "absolute_minus_state_deg": 25.44330596923828,
+          "cached_state_deg": -3.005329132080078,
+          "key": "left_joint_5.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": 25.44330596923828
+        },
+        {
+          "absolute_deg": 0.15399670600891113,
+          "absolute_minus_state_deg": 2.7877578735351562,
+          "cached_state_deg": -2.633761167526245,
+          "key": "left_joint_6.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": 2.7877578735351562
+        },
+        {
+          "absolute_deg": -24.521581649780273,
+          "absolute_minus_state_deg": -24.751079559326172,
+          "cached_state_deg": 0.22949786484241486,
+          "key": "left_joint_7.pos",
+          "mask_relative": true,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -24.751079559326172
+        },
+        {
+          "absolute_deg": -6.5633544921875,
+          "absolute_minus_state_deg": 20.025611877441406,
+          "cached_state_deg": -26.588966369628906,
+          "key": "left_gripper.pos",
+          "mask_relative": false,
+          "reconstruction_error_deg": 0.0,
+          "unnormalized_relative_deg": -6.5633544921875
+        }
+      ],
+      "snapshot_dir": "/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/syhlabtop_snapshots/snapshot_20260511_175613",
+      "use_relative_actions": true
+    }
+  },
+  "snapshot_summaries": {
+    "chest_154554": {
+      "max_abs_delta_deg": 67.93003645539284,
+      "max_abs_delta_key": "right_joint_4.pos",
+      "mean_abs_delta_deg": 25.461525093764067
+    },
+    "high_175613": {
+      "max_abs_delta_deg": 72.75268459320068,
+      "max_abs_delta_key": "right_joint_4.pos",
+      "mean_abs_delta_deg": 26.592659865505993
+    }
+  }
+}

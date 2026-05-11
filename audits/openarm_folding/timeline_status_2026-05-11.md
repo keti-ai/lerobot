@@ -33,6 +33,7 @@ Stage 17 guarded first-motion execution packet       DONE FOR NO-SEND
 Stage 18 guarded first-motion actuator writer        DONE FOR DRY-RUN
 Stage 19 first actuator write execution              BLOCKED: STALE PACKET
 Stage 20 high-overview camera/action review loop     DONE: LARGE DELTAS REMAIN
+Stage 21 action contract diagnosis                   DONE: POLICY DELTAS OFF-DISTRIBUTION
 ```
 
 The next real-machine work is on `syhlabtop`. The objective is still not motion.
@@ -52,6 +53,7 @@ audits/openarm_folding/stage17_execution_packet_spec_2026-05-11.md
 audits/openarm_folding/stage18_guarded_actuator_write_spec_2026-05-11.md
 audits/openarm_folding/stage19_first_write_blocked_2026-05-11.md
 audits/openarm_folding/stage20_high_overview_camera_trial_2026-05-11.md
+audits/openarm_folding/stage21_action_contract_diagnosis_2026-05-11.md
 ```
 
 Stage 20 tested a raised D435I base camera on a temporary 25 cm jig. The base
@@ -71,6 +73,24 @@ clamped_rows: 4
 This keeps motion blocked and shifts the likely root cause toward folding
 embodiment mismatch, wrist camera/task-signal mismatch, or action/state contract
 details rather than base camera height alone.
+
+Stage 21 compared `lerobot/full_folding` episode 0 parquet data against the
+syhlabtop A6000 action reviews. Dataset arm action deltas are small, while both
+syhlabtop snapshots are far outside the dataset delta distribution:
+
+```text
+dataset rows compared: 1505
+chest_154554 mean_abs_delta: 25.462 deg
+high_175613  mean_abs_delta: 26.593 deg
+right_joint_4 dataset p99 delta: 3.389 deg
+right_joint_4 syhlabtop delta: -67.930 / -72.753 deg
+postprocessor reconstruction error: 0.000000 deg
+```
+
+This rules out the paired relative/absolute postprocessor as the immediate
+cause and keeps policy RUN blocked. The next diagnostic target is the mismatch
+between current ready/zero state, visual input distribution, and dataset feature
+semantics before policy inference.
 
 ## A6000 Status
 
