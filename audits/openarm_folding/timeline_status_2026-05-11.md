@@ -17,8 +17,8 @@ Stage 5  syhlabtop repo/handoff readiness            DONE
 Stage 6  syhlabtop camera mapping                    DONE
 Stage 7  syhlabtop CAN/calibration mapping           DONE
 Stage 8  syhlabtop no-send observation snapshot      DONE
-Stage 9  A6000 snapshot action review                BLOCKED ON TRANSFER
-Stage 10 syhlabtop human/safety review               BLOCKED
+Stage 9  A6000 snapshot action review                DONE
+Stage 10 syhlabtop human/safety review               IN PROGRESS
 Stage 11 summary and next blocker list               NOT DONE
 ```
 
@@ -153,15 +153,45 @@ Current syhlabtop status says NAS is not mounted. Until that changes, the snapsh
 
 Then use an explicit operator-approved transfer method to A6000. Do not improvise a transfer command inside the robot session.
 
-## Blockers Before A6000 Shadow Action Review
+## A6000 Snapshot Action Review
 
-- Snapshot transfer to A6000 is still needed. NAS is not mounted on syhlabtop, so
-  use an approved manual transfer path or mount NAS.
-- A6000 must run `a6000_snapshot_action_review.py` on the syhlabtop snapshot.
-- Action review output must remain `send_allowed=false`.
-- Human review of camera orientation and proposed action deltas is still required
-  before any later motion gate.
+Snapshot transfer completed by approved `scp` from syhlabtop to A6000/NAS:
+
+```text
+/mnt/nas/lerobot_shared/openarm_folding_20260511/syhlabtop_snapshots/snapshot_20260511_135634.tar.gz
+sha256: 97f1a3d18b13ff4cc3deb78bb7c070991290bcca29e748d48fbab31972de8fbb
+```
+
+A6000 offline review completed with `a6000_snapshot_action_review.py`.
+
+Results:
+
+```text
+action_shape: [1, 30, 16]
+all_finite: true
+send_allowed: false
+rows in review csv: 16
+clamped rows: 4
+max_abs_delta: 62.198 deg at action_id=0, right_joint_4.pos
+```
+
+Output artifacts:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/shadow_replays/snapshot_20260511_135634_action_review.csv
+sha256: 7542511654c2124bade6047a3f7b91ae96b169d23fe21d41c20037db3605de9e
+
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/shadow_replays/snapshot_20260511_135634_action_review.json
+sha256: c2c53b2545ab3122d82602b4c1adc8c775db46eebc5ddeaf431f607da8e1b06f
+
+/mnt/nas/lerobot_shared/openarm_folding_20260511/a6000_shadow_replays/snapshot_20260511_135634_action_review.csv
+/mnt/nas/lerobot_shared/openarm_folding_20260511/a6000_shadow_replays/snapshot_20260511_135634_action_review.json
+```
+
+Human review of camera orientation and proposed action deltas is still required
+before any later motion gate.
 
 ## Motion Gate
 
-Motion remains blocked. The next acceptable milestone is offline A6000 snapshot action review only.
+Motion remains blocked. A6000 has produced an offline action proposal only; no
+policy output has been sent to robot actuators.

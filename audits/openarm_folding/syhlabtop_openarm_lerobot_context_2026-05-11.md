@@ -186,16 +186,33 @@ the snapshot metadata and A6000 replay must explicitly record the rename decisio
 
 ## Remaining Gates
 
-Before A6000 shadow action review, as of the no-send snapshot created on
-2026-05-11:
+The syhlabtop no-send snapshot has been transferred to A6000/NAS and reviewed
+offline on A6000. The A6000 output remains an offline proposal, not an actuator
+command.
 
-1. Transfer the local syhlabtop snapshot to A6000:
-   `/home/syhlabtop/openarm_folding_20260511/shadow_snapshots/snapshot_20260511_135634`.
-2. Run A6000 snapshot action review only; action output remains an offline
-   proposal, not an actuator command.
-3. Keep `send_allowed=false` and `motion_allowed=false` in review artifacts.
-4. Human review of camera orientation and proposed action deltas is still required
-   before any later motion gate.
+Completed A6000 review artifacts:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/shadow_replays/snapshot_20260511_135634_action_review.csv
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/shadow_replays/snapshot_20260511_135634_action_review.json
+/mnt/nas/lerobot_shared/openarm_folding_20260511/a6000_shadow_replays/snapshot_20260511_135634_action_review.csv
+/mnt/nas/lerobot_shared/openarm_folding_20260511/a6000_shadow_replays/snapshot_20260511_135634_action_review.json
+```
+
+Review result:
+
+```text
+action_shape: [1, 30, 16]
+all_finite: true
+send_allowed: false
+rows in review csv: 16
+clamped rows: 4
+max_abs_delta: 62.198 deg at action_id=0, right_joint_4.pos
+```
+
+Human review of camera orientation and proposed action deltas is still required
+before any later motion gate. Keep `send_allowed=false` and
+`motion_allowed=false` unless a new explicit motion gate is opened.
 
 ## No-Send Snapshot Created
 
