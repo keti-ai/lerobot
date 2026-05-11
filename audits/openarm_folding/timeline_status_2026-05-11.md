@@ -18,8 +18,8 @@ Stage 6  syhlabtop camera mapping                    DONE
 Stage 7  syhlabtop CAN/calibration mapping           DONE
 Stage 8  syhlabtop no-send observation snapshot      DONE
 Stage 9  A6000 snapshot action review                DONE
-Stage 10 syhlabtop human/safety review               IN PROGRESS
-Stage 11 summary and next blocker list               NOT DONE
+Stage 10 syhlabtop human/safety review               DONE FOR NO-SEND
+Stage 11 summary and next blocker list               DONE
 ```
 
 The next real-machine work is on `syhlabtop`. The objective is not motion. The objective is to prove that the robot PC can collect a correctly ordered observation snapshot without sending any policy output to motors.
@@ -210,6 +210,38 @@ Operator hardware review:
 - Camera mounts are judged correct at the hardware level.
 - Continue review against the existing dataset/LeRobot camera convention and the
   A6000 action proposal deltas.
+
+Stage 10/11 review summary:
+
+```text
+audits/openarm_folding/stage10_stage11_review_and_blockers_2026-05-11.md
+```
+
+Result:
+
+- no-send two-machine pipeline validated end to end;
+- A6000 action proposal received and inspected on syhlabtop;
+- 4 clamped rows and several large deltas were identified;
+- the action proposal is not approved as an actuator command;
+- motion remains blocked until a separate guarded motion path is implemented
+  and explicitly approved.
+
+Manual no-send direction probe:
+
+```text
+audits/openarm_folding/no_send_direction_probe_results_2026-05-11.md
+```
+
+Key findings:
+
+- `right_joint_2` physical shoulder lift is positive, while `left_joint_2`
+  physical shoulder lift is negative; this matches the existing mirrored limits.
+- `joint_4` elbow flex is positive on both arms.
+- `right_joint_7` wrist flap up is positive, while `left_joint_7` wrist flap up
+  is negative; `left_joint_7` range/sign needs explicit handling before motion.
+- both grippers close in the positive direction and reached about `+36` to
+  `+38 deg`, so the A6000 review gripper limit `[-65, 0]` does not match this
+  hardware state.
 
 ## Motion Gate
 
