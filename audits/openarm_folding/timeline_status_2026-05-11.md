@@ -37,6 +37,7 @@ Committed and pushed:
 
 ```text
 faa94c4b docs: add OpenArm folding baseline audit
+65de9226 docs: prepare syhlabtop shadow readiness handoff
 origin/audit/openarm-folding-baseline
 ```
 
