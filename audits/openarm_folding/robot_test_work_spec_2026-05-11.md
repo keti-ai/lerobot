@@ -60,10 +60,19 @@ Stop immediately if any of these happens:
 
 Purpose: prove both machines are on the intended repo state before touching hardware or weights.
 
-On both machines:
+On A6000:
 
 ```bash
 cd /home/syh/workspace/lerobot
+git status --short --branch
+git rev-parse --show-toplevel
+git branch --show-current
+```
+
+On syhlabtop:
+
+```bash
+cd /home/syhlabtop/workspace/lerobot
 git status --short --branch
 git rev-parse --show-toplevel
 git branch --show-current
@@ -73,7 +82,8 @@ Expected:
 
 - branch is `audit/openarm-folding-baseline`,
 - no unexpected source edits,
-- repo root is `/home/syh/workspace/lerobot`.
+- A6000 repo root is `/home/syh/workspace/lerobot`,
+- syhlabtop repo root is `/home/syhlabtop/workspace/lerobot`.
 
 Record output in:
 
@@ -195,7 +205,7 @@ Do this before connecting robot motors.
 On `syhlabtop`:
 
 ```bash
-cd /home/syh/workspace/lerobot
+cd /home/syhlabtop/workspace/lerobot
 uv run lerobot-find-cameras opencv \
   --output-dir <syhlabtop-work-root>/camera_maps/2026-05-11_opencv_probe \
   --record-time-s 3

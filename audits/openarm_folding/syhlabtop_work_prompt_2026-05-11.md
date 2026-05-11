@@ -6,7 +6,7 @@ Use this prompt on `syhlabtop`, the robot work PC.
 We are on syhlabtop, the real robot work PC, for the LeRobot OpenArm folding baseline.
 
 Date: 2026-05-11
-Repo expected: /home/syh/workspace/lerobot
+Repo expected on syhlabtop: /home/syhlabtop/workspace/lerobot
 Branch expected: audit/openarm-folding-baseline
 Primary objective: no-motion/shadow readiness only.
 

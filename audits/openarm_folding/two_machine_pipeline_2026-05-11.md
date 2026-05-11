@@ -42,10 +42,12 @@ Scope: `syhlabtop` + A6000 server
 
 | 순서 | 실행 기기 | 작업 | 명령/확인 | 산출물 |
 | ---: | --- | --- | --- | --- |
-| 1.1 | BOTH | repo 위치 확인 | `cd /home/syh/workspace/lerobot` | 현재 경로 확인 |
+| 1.1 | A6000 | repo 위치 확인 | `cd /home/syh/workspace/lerobot` | 현재 경로 확인 |
+| 1.1b | syhlabtop | repo 위치 확인 | `cd /home/syhlabtop/workspace/lerobot` | 현재 경로 확인 |
 | 1.2 | BOTH | branch 확인 | `git branch --show-current` | `audit/openarm-folding-baseline` |
 | 1.3 | BOTH | worktree 확인 | `git status --short --branch` | 예상 외 변경 없음 |
-| 1.4 | BOTH | repo root 확인 | `git rev-parse --show-toplevel` | `/home/syh/workspace/lerobot` |
+| 1.4 | A6000 | repo root 확인 | `git rev-parse --show-toplevel` | `/home/syh/workspace/lerobot` |
+| 1.4b | syhlabtop | repo root 확인 | `git rev-parse --show-toplevel` | `/home/syhlabtop/workspace/lerobot` |
 
 기록 파일:
 
@@ -169,7 +171,7 @@ Gate 4:
 OpenCV:
 
 ```bash
-cd /home/syh/workspace/lerobot
+cd /home/syhlabtop/workspace/lerobot
 uv run lerobot-find-cameras opencv \
   --output-dir <syhlabtop-work-root>/camera_maps/2026-05-11_opencv_probe \
   --record-time-s 3
@@ -178,7 +180,7 @@ uv run lerobot-find-cameras opencv \
 RealSense:
 
 ```bash
-cd /home/syh/workspace/lerobot
+cd /home/syhlabtop/workspace/lerobot
 uv run lerobot-find-cameras realsense \
   --output-dir <syhlabtop-work-root>/camera_maps/2026-05-11_realsense_probe \
   --record-time-s 3

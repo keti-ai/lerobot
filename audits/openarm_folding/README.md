@@ -13,6 +13,9 @@ Scope: metadata audit and no-motion/shadow-readiness prep for `lerobot/folding_l
 5. `robot_test_work_spec_2026-05-11.md`
 6. `a6000_persistent_setup_2026-05-11.md`
 7. `syhlabtop_work_prompt_2026-05-11.md`
+8. `timeline_status_2026-05-11.md`
+9. `syhlabtop_agent_ready_prompt_2026-05-11.md`
+10. `syhlabtop_stage_guides_2026-05-11.md`
 
 ## Storage Policy
 
@@ -52,6 +55,12 @@ Current NAS share copy:
 ```
 
 Until the syhlabtop mount is confirmed, write syhlabtop artifacts under a local `<syhlabtop-work-root>` and transfer snapshots to A6000 with `rsync`, `scp`, or the mounted NAS share.
+
+Known syhlabtop repo path from the live robot PC session:
+
+```text
+/home/syhlabtop/workspace/lerobot
+```
 
 ## Current A6000 Status
 
