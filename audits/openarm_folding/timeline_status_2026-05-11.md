@@ -483,3 +483,22 @@ syhlabtop-specific hardware input. The next required step is to verify the
 intended checkpoint identity/training export and reproduce dataset replay with
 the exact training-time inference code or a known-good Hugging Face baseline
 script. Robot motion remains blocked.
+
+Stage 25 replayed the model-card training dataset
+`lerobot-data-collection/level2_final_quality3_t_0_hil_data_c`, not
+`lerobot/full_folding`. The same large-delta failure remained:
+
+```text
+frame 0  model mean_abs_delta=25.588 deg, recorded mean_abs_delta=1.300 deg
+frame 1  model mean_abs_delta=24.644 deg, recorded mean_abs_delta=1.156 deg
+frame 10 model mean_abs_delta=26.065 deg, recorded mean_abs_delta=1.424 deg
+frame 30 model mean_abs_delta=27.654 deg, recorded mean_abs_delta=1.325 deg
+```
+
+Stage 26 recipe alignment identified the strongest root cause: `folding_latest`
+has `use_relative_actions=true`, but its saved action normalizer/unnormalizer
+quantiles match absolute action stats from the training dataset. Official
+LeRobot Pi05/action-representation docs require recomputing stats in relative
+action space before training with relative actions. The current recipe is
+therefore not aligned, and robot motion remains blocked until a corrected
+checkpoint/processor recipe passes dataset replay.
