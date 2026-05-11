@@ -1,11 +1,14 @@
 # OpenArm Folding Timeline Status
 
 Date: 2026-05-11
-Task: LeRobot OpenArm folding baseline, no-motion/shadow readiness.
+Task: LeRobot OpenArm folding baseline, no-motion/shadow readiness and
+post-gripper-zero bringup.
 
 ## Current Position in the Timeline
 
-We are between pipeline Stage 4 and Stage 5:
+The original no-send two-machine pipeline reached Stage 11. A gripper-only zero
+adjustment was then completed on `syhlabtop`, so the next required milestone is
+a refreshed post-gripper-zero no-send snapshot and A6000 offline review.
 
 ```text
 Stage 0  Goal/safety framing                         DONE
@@ -20,9 +23,23 @@ Stage 8  syhlabtop no-send observation snapshot      DONE
 Stage 9  A6000 snapshot action review                DONE
 Stage 10 syhlabtop human/safety review               DONE FOR NO-SEND
 Stage 11 summary and next blocker list               DONE
+Stage 12 syhlabtop gripper-only zero adjustment      DONE
+Stage 13 refreshed no-send snapshot after gripper    NEXT
+Stage 14 refreshed A6000 snapshot action review      BLOCKED BY STAGE 13
+Stage 15 guarded first-motion command path spec      NOT STARTED
+Stage 16 guarded first-motion execution              BLOCKED
 ```
 
-The next real-machine work is on `syhlabtop`. The objective is not motion. The objective is to prove that the robot PC can collect a correctly ordered observation snapshot without sending any policy output to motors.
+The next real-machine work is on `syhlabtop`. The objective is still not
+motion. The objective is to prove the current hardware state after gripper-only
+zero adjustment by collecting a correctly ordered observation snapshot without
+sending policy output to motors.
+
+Current renewed work spec:
+
+```text
+audits/openarm_folding/renewed_bringup_plan_2026-05-11.md
+```
 
 ## A6000 Status
 
@@ -255,7 +272,18 @@ Key findings:
 - No arm joint zero was changed and no full-arm zero-position calibration was
   run.
 
+Impact of the gripper-only zero adjustment:
+
+- The old A6000 review for `snapshot_20260511_135634` remains useful as an
+  end-to-end no-send pipeline validation.
+- That old review is stale as a command candidate because it used the
+  pre-gripper-zero hardware state.
+- The next required output is a refreshed post-gripper-zero no-send snapshot,
+  followed by a refreshed A6000 offline action review.
+
 ## Motion Gate
 
 Motion remains blocked. A6000 has produced an offline action proposal only; no
-policy output has been sent to robot actuators.
+policy output has been sent to robot actuators. The only hardware write after
+the original no-send pipeline was the operator-approved gripper-only zero on
+motor ID `008` for `can0` and `can1`.
