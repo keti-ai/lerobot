@@ -13,10 +13,10 @@ Stage 1  Repo preflight on A6000                     DONE
 Stage 2  Shared audit docs                           DONE
 Stage 3  A6000 model/config asset preparation        DONE
 Stage 4  A6000 offline policy load                   DONE
-Stage 5  syhlabtop repo/storage readiness            PARTIAL
-Stage 6  syhlabtop camera mapping                    NOT DONE
-Stage 7  syhlabtop CAN/calibration mapping           NOT DONE
-Stage 8  syhlabtop no-send observation snapshot      NOT DONE
+Stage 5  syhlabtop repo/handoff readiness            DONE
+Stage 6  syhlabtop camera mapping                    DONE
+Stage 7  syhlabtop CAN/calibration mapping           DONE
+Stage 8  syhlabtop no-send observation snapshot      DONE
 Stage 9  A6000 snapshot action review                BLOCKED ON TRANSFER
 Stage 10 syhlabtop human/safety review               BLOCKED
 Stage 11 summary and next blocker list               NOT DONE
@@ -104,22 +104,34 @@ Also confirmed:
 - `/data` does not exist on syhlabtop.
 - syhlabtop root filesystem has about 131G available.
 - Recommended syhlabtop work root is `/home/syhlabtop/openarm_folding_20260511`.
+- The latest real-robot context was imported from `/home/syhlabtop/workspace/openarm_lerobot`.
+- Camera mapping was confirmed from existing dataset/LeRobot contract and RSUSB samples:
+  - `left_wrist`: D405 `315122270766`
+  - `right_wrist`: D405 `230322273311`
+  - `base`: D435 `234322070493`
+  - D415 `211622062255` is auxiliary situation/workspace recording only.
+- CAN mapping from the existing OpenArm real-robot records:
+  - `can0`: physical left arm
+  - `can1`: physical right arm
+- A no-send snapshot was created without `OpenArmFollower.connect()`, without
+  handshake enable, without zeroing, without goal writes, without `send_action`,
+  and without rollout/record/replay.
 
 ## Next Required Output from Syhlabtop
 
-Minimum no-motion output:
+Minimum no-motion output produced:
 
 ```text
-<syhlabtop-work-root>/audits/2026-05-11_preflight_syhlabtop.md
-<syhlabtop-work-root>/camera_maps/...
-<syhlabtop-work-root>/hardware/openarm/...
-<syhlabtop-work-root>/calibration/...
+/home/syhlabtop/openarm_folding_20260511/audits/2026-05-11_preflight_syhlabtop.md
+/home/syhlabtop/openarm_folding_20260511/camera_maps/2026-05-11_camera_probe.md
+/home/syhlabtop/openarm_folding_20260511/hardware/openarm/2026-05-11_can_calibration_probe.md
+/home/syhlabtop/openarm_folding_20260511/calibration/2026-05-11_calibration_probe.md
 ```
 
-Target snapshot output, only after operator approves non-actuating robot IO:
+Target snapshot output produced:
 
 ```text
-snapshot_YYYYMMDD_HHMMSS/
+/home/syhlabtop/openarm_folding_20260511/shadow_snapshots/snapshot_20260511_135634/
   state_16.csv
   left_wrist.png
   right_wrist.png
@@ -127,7 +139,7 @@ snapshot_YYYYMMDD_HHMMSS/
   metadata.json
 ```
 
-If NAS is mounted on syhlabtop, copy snapshots to:
+NAS is not mounted on syhlabtop. If mounted later, copy snapshots to:
 
 ```text
 /mnt/nas/lerobot_shared/openarm_folding_20260511/syhlabtop_snapshots/
@@ -143,13 +155,13 @@ Then use an explicit operator-approved transfer method to A6000. Do not improvis
 
 ## Blockers Before A6000 Shadow Action Review
 
-- NAS is not mounted on syhlabtop; need transfer method after local snapshot.
-- Selected syhlabtop work root should be `/home/syhlabtop/openarm_folding_20260511`.
-- Need camera mapping for `left_wrist`, `right_wrist`, `base`.
-- Need CAN interface and calibration mapping.
-- Need exact 16-dim state snapshot in degrees.
-- Need metadata with `send_allowed=false`.
+- Snapshot transfer to A6000 is still needed. NAS is not mounted on syhlabtop, so
+  use an approved manual transfer path or mount NAS.
+- A6000 must run `a6000_snapshot_action_review.py` on the syhlabtop snapshot.
+- Action review output must remain `send_allowed=false`.
+- Human review of camera orientation and proposed action deltas is still required
+  before any later motion gate.
 
 ## Motion Gate
 
-Motion remains blocked. The next acceptable milestone is no-send snapshot capture and offline A6000 review only.
+Motion remains blocked. The next acceptable milestone is offline A6000 snapshot action review only.
