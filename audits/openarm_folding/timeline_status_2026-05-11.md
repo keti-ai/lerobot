@@ -31,7 +31,8 @@ Stage 15 guarded first-motion command path spec      DONE FOR DRY-RUN
 Stage 16 guarded first-motion runtime preflight      DONE FOR NO-SEND
 Stage 17 guarded first-motion execution packet       DONE FOR NO-SEND
 Stage 18 guarded first-motion actuator writer        DONE FOR DRY-RUN
-Stage 19 first actuator write execution              OPERATOR GATED
+Stage 19 first actuator write execution              BLOCKED: STALE PACKET
+Stage 20 refreshed snapshot/action review loop       NEXT
 ```
 
 The next real-machine work is on `syhlabtop`. The objective is still not motion.
@@ -49,6 +50,7 @@ audits/openarm_folding/stage15_guarded_first_motion_spec_2026-05-11.md
 audits/openarm_folding/stage16_runtime_preflight_spec_2026-05-11.md
 audits/openarm_folding/stage17_execution_packet_spec_2026-05-11.md
 audits/openarm_folding/stage18_guarded_actuator_write_spec_2026-05-11.md
+audits/openarm_folding/stage19_first_write_blocked_2026-05-11.md
 ```
 
 ## A6000 Status
@@ -374,6 +376,18 @@ dry-run json sha256: c300381df2ac5d7fc93123a9bb2168bed28f7e475bb7b7dfed9dcc3e9fd
 dry-run actuator_commands_sent: false
 ```
 
+Stage 19 operator-gated write attempt blocked:
+
+```text
+log: /home/syhlabtop/openarm_folding_20260511/shadow_reviews/snapshot_20260511_154554_stage18_execute_blocked.json
+sha256: 4aefc44e4b7dd74583bbebd63a57d1e6dbece9ecb294edfc7c7ca54589999d28
+send_allowed: false
+motion_allowed: false
+actuator_commands_sent: false
+blocked keys: right_joint_1.pos, right_joint_2.pos, right_joint_3.pos, right_joint_4.pos, right_joint_7.pos
+reason: fresh readback drift/target delta exceeded stale-packet limits
+```
+
 ## Motion Gate
 
 Motion remains blocked. A6000 has produced offline action proposals only; no
@@ -381,6 +395,7 @@ policy output has been sent to robot actuators. The only hardware write after
 the original no-send pipeline was the operator-approved gripper-only zero on
 motor ID `008` for `can0` and `can1`. Stage 15 defined a dry-run target table
 only, Stage 16 verified current readback without command writes, and Stage 17
-built a no-send execution packet. Stage 18 now has a guarded right-arm writer
-and its dry-run validation passed, but actual execution remains blocked until
-the operator explicitly runs the execute command while holding power/abort.
+built a no-send execution packet. Stage 18 added a guarded right-arm writer and
+its dry-run validation passed. Stage 19 was operator-gated but blocked before
+torque enable or MIT batch because the packet became stale. The next step is a
+new no-send snapshot and A6000 offline review from the current hardware state.

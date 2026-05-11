@@ -163,9 +163,6 @@ def validate_fresh_targets(
                 "validated": ok,
             }
         )
-    failed = [row["feature"] for row in rows if not row["validated"]]
-    if failed:
-        raise SystemExit(f"Fresh target validation failed: {failed}")
     return rows
 
 
@@ -273,6 +270,13 @@ def main() -> int:
             delta_limit_deg=args.delta_limit_deg,
         )
         payload["rows"] = rows
+        failed = [row["feature"] for row in rows if not row["validated"]]
+        if failed:
+            payload["errors"].append(f"fresh_target_validation_failed: {failed}")
+            print(json.dumps({k: v for k, v in payload.items() if k not in {"rows"}}, indent=2, sort_keys=True))
+            print()
+            print_table(rows, would_send=False)
+            raise SystemExit(f"Fresh target validation failed: {failed}")
         if args.execute:
             payload["send_allowed"] = True
             payload["motion_allowed"] = True

@@ -107,7 +107,8 @@ Stage 15 guarded first-motion command path spec      DONE FOR DRY-RUN
 Stage 16 guarded first-motion runtime preflight      DONE FOR NO-SEND
 Stage 17 guarded first-motion execution packet       DONE FOR NO-SEND
 Stage 18 guarded first-motion actuator writer        DONE FOR DRY-RUN
-Stage 19 first actuator write execution              OPERATOR GATED
+Stage 19 first actuator write execution              BLOCKED: STALE PACKET
+Stage 20 refreshed snapshot/action review loop       NEXT
 ```
 
 The previous A6000 action review for `snapshot_20260511_135634` remains useful
@@ -130,9 +131,11 @@ approved as an actuator command.
 
    Stage 15 created the dry-run target table. Stage 16 verified fresh readback
    drift with no-send CAN reads. Stage 17 built a no-send execution packet. A
-   Stage 18 adds a guarded right-arm writer and its dry-run validation passed.
-   Actual execution still requires the operator-held power/abort gate and exact
-   typed confirmation.
+   Stage 18 added a guarded right-arm writer and its dry-run validation passed.
+   Stage 19 received the operator gate but was blocked before actuator command
+   because current readback no longer matched the Stage 17 packet. The current
+   next step is to restart the offline single-step loop from the current robot
+   state.
 
 2. Keep the runtime path bound to the refreshed post-gripper-zero review
    artifact.
@@ -192,9 +195,8 @@ The following remain out of scope until a separate explicit motion gate:
 
 ## Open Blockers
 
-- A guarded dry-run target table, no-send runtime preflight, no-send execution
-  packet, and guarded right-arm writer dry-run exist. Actual write is still
-  operator gated.
+- The first guarded write attempt was blocked as stale. The previous Stage 17
+  packet must not be retried.
 - The refreshed A6000 action review has large deltas and four clamped rows; it
   is not a motion candidate without a guarded cap/selection path.
 - `left_joint_7` wrist-flap direction/range needs explicit handling before any
@@ -205,8 +207,9 @@ The following remain out of scope until a separate explicit motion gate:
 
 Stage 15 is complete for dry-run only. Stage 16 is complete for no-send runtime
 preflight only. Stage 17 is complete for no-send execution packet only. Stage 18
-has the guarded writer; Stage 19 is the first actuator write and requires exact
-target-table approval plus operator abort control.
+has the guarded writer. Stage 19 was attempted and blocked before actuator
+write. Stage 20 must produce a refreshed snapshot/action review from the current
+hardware state.
 
 Motion remains blocked unless a later stage separately defines and approves a
 guarded first-motion execution path and the operator approves the exact target
