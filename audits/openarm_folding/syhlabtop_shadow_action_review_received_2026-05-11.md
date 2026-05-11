@@ -66,9 +66,18 @@ left_gripper.pos   current=-4.098  proposed=-3.521   clamped=-3.521   delta=0.57
 
 ## Human Review Gate
 
+Operator hardware review:
+
+```text
+2026-05-11 operator note:
+The current robot posture is the intended zero posture, and the camera mounts
+are judged to be correct at the hardware level.
+```
+
 Before any later motion gate, a human must review:
 
-- camera orientation for `left_wrist`, `right_wrist`, and `base`;
+- camera stream mapping for `left_wrist`, `right_wrist`, and `base` against the
+  existing LeRobot dataset convention;
 - whether the first action proposal direction is plausible for the observed
   folding scene;
 - clamp rows at `right_joint_2.pos`, `right_joint_4.pos`, `left_joint_2.pos`,

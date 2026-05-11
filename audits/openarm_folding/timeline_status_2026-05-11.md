@@ -204,6 +204,13 @@ Received-review note:
 audits/openarm_folding/syhlabtop_shadow_action_review_received_2026-05-11.md
 ```
 
+Operator hardware review:
+
+- The current robot posture is the intended zero posture.
+- Camera mounts are judged correct at the hardware level.
+- Continue review against the existing dataset/LeRobot camera convention and the
+  A6000 action proposal deltas.
+
 ## Motion Gate
 
 Motion remains blocked. A6000 has produced an offline action proposal only; no
