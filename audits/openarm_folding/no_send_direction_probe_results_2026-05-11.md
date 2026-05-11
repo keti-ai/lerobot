@@ -125,6 +125,50 @@ remains the safer default unless the task explicitly requires more closing
 travel. If full close is required later, use an explicit folding-specific
 gripper limit decision instead of silently inheriting the wider record preset.
 
+## Gripper-Only Zero Adjustment
+
+After reviewing the OpenArm baseline docs, the operator clarified that the
+vendor-provided follower arms were already zeroed and only the gripper motors
+had been replaced. OpenArm's baseline defines gripper zero as fully closed.
+
+The grippers were manually set to fully closed and read before zeroing:
+
+```text
+left_gripper=38.173144
+right_gripper=35.812594
+```
+
+Then only motor ID `008` on each follower CAN bus was zeroed:
+
+```bash
+/home/syhlabtop/workspace/openarm_can/setup/openarm-can-set-zero can0 008
+/home/syhlabtop/workspace/openarm_can/setup/openarm-can-set-zero can1 008
+```
+
+No arm joint zero was changed. No full-arm zero-position calibration was run.
+
+Closed-position readback after gripper-only zero:
+
+```text
+left_gripper=-0.010928
+right_gripper=-0.010928
+```
+
+Slightly-open readback after gripper-only zero:
+
+```text
+left_gripper=-26.632680
+right_gripper=-23.244854
+```
+
+This confirms the baseline convention after adjustment:
+
+```text
+0 deg ~= fully closed
+negative gripper values ~= opening direction
+baseline gripper range [-65, 0] is now appropriate for initial deploy review
+```
+
 ## Impact on A6000 Snapshot Action Review
 
 Arm joint limits used by A6000 were mostly consistent with observed direction:
@@ -135,9 +179,8 @@ Arm joint limits used by A6000 were mostly consistent with observed direction:
 
 Open issues before command candidacy:
 
-- gripper limits should be explicitly selected: baseline `[-65, 0]` for a
-  conservative deploy range, or a wider folding-specific range only after
-  operator approval;
+- gripper baseline `[-65, 0]` is appropriate after gripper-only zero, but any
+  future wider folding-specific range still requires explicit operator approval;
 - `left_joint_7` wrist-flap direction/range must be reviewed before treating a
   policy delta as a physical up/down wrist command;
 - any future command path must apply a small per-step delta cap and must print

@@ -245,6 +245,15 @@ Key findings:
   the baseline range is wrong.
 - For initial deploy safety, prefer the LeRobot baseline gripper range unless a
   separate folding-specific gripper range is explicitly approved.
+- After confirming the vendor-provided follower arms were already zeroed and
+  only gripper motors had been replaced, both follower gripper motors were
+  manually closed and zeroed individually with motor ID `008` only:
+  `can0 008` and `can1 008`.
+- Post-adjustment closed readback was approximately `-0.011 deg` on both
+  grippers; slightly open readback moved negative (`left=-26.633`,
+  `right=-23.245`), matching OpenArm's `0=closed`, negative=open convention.
+- No arm joint zero was changed and no full-arm zero-position calibration was
+  run.
 
 ## Motion Gate
 
