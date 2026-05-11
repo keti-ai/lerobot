@@ -10,6 +10,9 @@ Current known state:
 - Current branch should be: audit/openarm-folding-baseline
 - This branch was fetched from origin and pulled successfully.
 - /home/syh/workspace/lerobot does not exist on syhlabtop; do not use it.
+- /mnt/nas/lerobot_shared is not mounted on syhlabtop.
+- /data does not exist on syhlabtop.
+- Use /home/syhlabtop/openarm_folding_20260511 as the syhlabtop work root.
 - A6000 has already prepared and verified the PI05 folding baseline offline.
 
 Primary objective:
@@ -39,11 +42,9 @@ First actions, read-only or non-actuating:
 1. cd /home/syhlabtop/workspace/lerobot
 2. git status --short --branch
 3. git log -1 --oneline --decorate
-4. test whether /mnt/nas/lerobot_shared is mounted.
-5. choose a syhlabtop work root:
-   prefer /data/keti/syh/openarm_folding_20260511 if available;
-   otherwise use /home/syhlabtop/openarm_folding_20260511.
-6. create local output folders only after confirming the chosen root.
+4. record that /mnt/nas/lerobot_shared is not mounted if still absent.
+5. use /home/syhlabtop/openarm_folding_20260511 as the work root.
+6. create local output folders under that work root.
 
 Required policy contract:
 - 16 state/action dims.
@@ -75,10 +76,11 @@ Deliverables for this syhlabtop session:
 1. preflight note
 2. NAS mount status
 3. selected syhlabtop work root
-4. camera mapping status
-5. CAN/calibration mapping status
-6. no-send snapshot bundle if safe and approved
-7. explicit statement that no robot motion and no send_action occurred
+4. transfer method blocker if NAS is still unavailable
+5. camera mapping status
+6. CAN/calibration mapping status
+7. no-send snapshot bundle if safe and approved
+8. explicit statement that no robot motion and no send_action occurred
 
 Expected final response format:
 - Repo state

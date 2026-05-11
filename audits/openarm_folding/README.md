@@ -16,6 +16,7 @@ Scope: metadata audit and no-motion/shadow-readiness prep for `lerobot/folding_l
 8. `timeline_status_2026-05-11.md`
 9. `syhlabtop_agent_ready_prompt_2026-05-11.md`
 10. `syhlabtop_stage_guides_2026-05-11.md`
+11. `syhlabtop_no_nas_fallback_2026-05-11.md`
 
 ## Storage Policy
 
@@ -60,6 +61,15 @@ Known syhlabtop repo path from the live robot PC session:
 
 ```text
 /home/syhlabtop/workspace/lerobot
+```
+
+Known syhlabtop storage state from the live robot PC session:
+
+```text
+/mnt/nas/lerobot_shared: not mounted
+/data: not present
+/: /dev/nvme0n1p2, 468G total, 131G available
+recommended work root: /home/syhlabtop/openarm_folding_20260511
 ```
 
 ## Current A6000 Status

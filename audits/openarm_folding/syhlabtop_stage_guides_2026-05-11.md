@@ -48,6 +48,11 @@ Choose syhlabtop work root:
 - /data/keti/syh/openarm_folding_20260511 if /data is local and writable
 - otherwise /home/syhlabtop/openarm_folding_20260511
 
+Known current syhlabtop state:
+- `/data` is absent.
+- `/mnt/nas/lerobot_shared` is absent.
+- use `/home/syhlabtop/openarm_folding_20260511`.
+
 Create:
 <syhlabtop-work-root>/audits
 <syhlabtop-work-root>/camera_maps
@@ -176,6 +181,8 @@ If /mnt/nas/lerobot_shared is mounted, copy the snapshot bundle to:
 /mnt/nas/lerobot_shared/openarm_folding_20260511/syhlabtop_snapshots/
 
 If NAS is not mounted, report the local snapshot path and do not improvise a transfer method without operator approval.
+
+Known current syhlabtop state: NAS is not mounted, so the expected handoff blocker is transfer from `/home/syhlabtop/openarm_folding_20260511/shadow_snapshots/` to the A6000 side.
 
 Do not run A6000 inference from syhlabtop.
 Do not send actions.

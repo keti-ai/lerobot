@@ -13,11 +13,11 @@ Stage 1  Repo preflight on A6000                     DONE
 Stage 2  Shared audit docs                           DONE
 Stage 3  A6000 model/config asset preparation        DONE
 Stage 4  A6000 offline policy load                   DONE
-Stage 5  syhlabtop repo/handoff readiness            PARTIAL
+Stage 5  syhlabtop repo/storage readiness            PARTIAL
 Stage 6  syhlabtop camera mapping                    NOT DONE
 Stage 7  syhlabtop CAN/calibration mapping           NOT DONE
 Stage 8  syhlabtop no-send observation snapshot      NOT DONE
-Stage 9  A6000 snapshot action review                BLOCKED
+Stage 9  A6000 snapshot action review                BLOCKED ON TRANSFER
 Stage 10 syhlabtop human/safety review               BLOCKED
 Stage 11 summary and next blocker list               NOT DONE
 ```
@@ -33,11 +33,12 @@ Repo:
 branch: audit/openarm-folding-baseline
 ```
 
-Committed and pushed:
+Committed and pushed before this no-NAS follow-up:
 
 ```text
 faa94c4b docs: add OpenArm folding baseline audit
 65de9226 docs: prepare syhlabtop shadow readiness handoff
+f4476842 docs: update OpenArm timeline commit status
 origin/audit/openarm-folding-baseline
 ```
 
@@ -81,7 +82,7 @@ Handoff root prepared:
   a6000_shadow_replays/
 ```
 
-`syhlabtop` still needs to confirm the same NAS mount. If it is not mounted, use local syhlabtop storage and transfer snapshots manually.
+`syhlabtop` has confirmed that this NAS path is not mounted. Use local syhlabtop storage and transfer snapshots manually after operator approval.
 
 ## Syhlabtop Status from Live Session
 
@@ -99,6 +100,10 @@ Also confirmed:
 - `/home/syh/workspace/lerobot` does not exist on syhlabtop.
 - The syhlabtop agent successfully read `audits/openarm_folding/syhlabtop_work_prompt_2026-05-11.md`.
 - Some git operations initially hit read-only sandbox restrictions, then succeeded after explicit approval.
+- `/mnt/nas/lerobot_shared` is not mounted on syhlabtop.
+- `/data` does not exist on syhlabtop.
+- syhlabtop root filesystem has about 131G available.
+- Recommended syhlabtop work root is `/home/syhlabtop/openarm_folding_20260511`.
 
 ## Next Required Output from Syhlabtop
 
@@ -128,10 +133,18 @@ If NAS is mounted on syhlabtop, copy snapshots to:
 /mnt/nas/lerobot_shared/openarm_folding_20260511/syhlabtop_snapshots/
 ```
 
+Current syhlabtop status says NAS is not mounted. Until that changes, the snapshot remains local under:
+
+```text
+/home/syhlabtop/openarm_folding_20260511/shadow_snapshots/
+```
+
+Then use an explicit operator-approved transfer method to A6000. Do not improvise a transfer command inside the robot session.
+
 ## Blockers Before A6000 Shadow Action Review
 
-- Need syhlabtop NAS mount status.
-- Need selected syhlabtop work root.
+- NAS is not mounted on syhlabtop; need transfer method after local snapshot.
+- Selected syhlabtop work root should be `/home/syhlabtop/openarm_folding_20260511`.
 - Need camera mapping for `left_wrist`, `right_wrist`, `base`.
 - Need CAN interface and calibration mapping.
 - Need exact 16-dim state snapshot in degrees.
