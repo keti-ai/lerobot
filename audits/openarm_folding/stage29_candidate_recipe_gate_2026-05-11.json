@@ -1,0 +1,1019 @@
+{
+  "candidates": [
+    "lerobot/folding_latest",
+    "lerobot-data-collection/folding_final10",
+    "lerobot-data-collection/folding_final",
+    "lerobot-data-collection/ablation2-5_0"
+  ],
+  "dataset_repo": "lerobot-data-collection/level2_final_quality3_t_0_hil_data_c",
+  "dataset_root": "/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/datasets/level2_final_quality3_t_0_hil_data_c",
+  "locked_recipe": {
+    "action_interpolation_multiplier": 3,
+    "action_representation": "relative trajectory",
+    "camera_keys": [
+      "observation.images.left_wrist",
+      "observation.images.right_wrist",
+      "observation.images.base"
+    ],
+    "camera_shapes": {
+      "observation.images.base": [
+        480,
+        640,
+        3
+      ],
+      "observation.images.left_wrist": [
+        720,
+        1280,
+        3
+      ],
+      "observation.images.right_wrist": [
+        720,
+        1280,
+        3
+      ]
+    },
+    "chunk_size": 30,
+    "hardware": "+5 cm upper arm extension and larger gripper jaws expected for final deployment",
+    "model": "pi05",
+    "n_action_steps": 30,
+    "relative_exclude_joints": [
+      "gripper"
+    ],
+    "robot": "bimanual OpenArm / openarms_follower",
+    "rtc_execution_horizon": 20,
+    "state_action_order": [
+      "right_joint_1.pos",
+      "right_joint_2.pos",
+      "right_joint_3.pos",
+      "right_joint_4.pos",
+      "right_joint_5.pos",
+      "right_joint_6.pos",
+      "right_joint_7.pos",
+      "right_gripper.pos",
+      "left_joint_1.pos",
+      "left_joint_2.pos",
+      "left_joint_3.pos",
+      "left_joint_4.pos",
+      "left_joint_5.pos",
+      "left_joint_6.pos",
+      "left_joint_7.pos",
+      "left_gripper.pos"
+    ],
+    "training_techniques": [
+      "SARM",
+      "RABC"
+    ]
+  },
+  "results": [
+    {
+      "deploy_candidate": false,
+      "gate": {
+        "checks": [
+          {
+            "actual": "pi05",
+            "name": "policy_type_pi05",
+            "passed": true
+          },
+          {
+            "name": "model_training_dataset_matches_replay_dataset",
+            "passed": true,
+            "replay_dataset_repo": "lerobot-data-collection/level2_final_quality3_t_0_hil_data_c",
+            "train_dataset_repo": "lerobot-data-collection/level2_final_quality3_t_0_hil_data_c"
+          },
+          {
+            "actual": "openarms_follower",
+            "name": "dataset_robot_type_openarms_follower",
+            "passed": true
+          },
+          {
+            "actual": [
+              "right_joint_1.pos",
+              "right_joint_2.pos",
+              "right_joint_3.pos",
+              "right_joint_4.pos",
+              "right_joint_5.pos",
+              "right_joint_6.pos",
+              "right_joint_7.pos",
+              "right_gripper.pos",
+              "left_joint_1.pos",
+              "left_joint_2.pos",
+              "left_joint_3.pos",
+              "left_joint_4.pos",
+              "left_joint_5.pos",
+              "left_joint_6.pos",
+              "left_joint_7.pos",
+              "left_gripper.pos"
+            ],
+            "name": "action_names_match_folding_16d",
+            "passed": true
+          },
+          {
+            "actual": [
+              "right_joint_1.pos",
+              "right_joint_2.pos",
+              "right_joint_3.pos",
+              "right_joint_4.pos",
+              "right_joint_5.pos",
+              "right_joint_6.pos",
+              "right_joint_7.pos",
+              "right_gripper.pos",
+              "left_joint_1.pos",
+              "left_joint_2.pos",
+              "left_joint_3.pos",
+              "left_joint_4.pos",
+              "left_joint_5.pos",
+              "left_joint_6.pos",
+              "left_joint_7.pos",
+              "left_gripper.pos"
+            ],
+            "name": "state_names_match_folding_16d",
+            "passed": true
+          },
+          {
+            "actual": {
+              "observation.images.base": [
+                480,
+                640,
+                3
+              ],
+              "observation.images.left_wrist": [
+                720,
+                1280,
+                3
+              ],
+              "observation.images.right_wrist": [
+                720,
+                1280,
+                3
+              ]
+            },
+            "name": "camera_keys_and_shapes_match_space_recipe",
+            "passed": true
+          },
+          {
+            "actual": true,
+            "name": "use_relative_actions_enabled",
+            "passed": true
+          },
+          {
+            "actual": [
+              "gripper"
+            ],
+            "name": "relative_exclude_gripper_only",
+            "passed": true
+          },
+          {
+            "actual": 30,
+            "name": "chunk_size_30",
+            "passed": true
+          },
+          {
+            "actual": 30,
+            "name": "n_action_steps_30",
+            "passed": true
+          },
+          {
+            "name": "rabc_recorded_in_train_config",
+            "passed": true,
+            "rabc_kappa": 0.0265,
+            "rabc_progress_path": "hf://datasets/lerobot-data-collection/level2_final_quality3_t_0_hil_data_c/sarm_progress.parquet",
+            "use_rabc": true
+          },
+          {
+            "action_span_ratio_limit": 3.0,
+            "max_arm_span_ratio_postprocessor_over_sampled_relative": 14.22959041595459,
+            "max_post_vs_absolute_q01_error_deg": 15.007696151733398,
+            "max_post_vs_absolute_q99_error_deg": 13.373424530029297,
+            "max_post_vs_relative_q01_error_deg": 69.9730453491211,
+            "max_post_vs_relative_q99_error_deg": 110.69503784179688,
+            "name": "postprocessor_action_stats_are_relative_for_arm_joints",
+            "passed": false,
+            "relative_stats_tolerance_deg": 2.0,
+            "sample_rows": 5000,
+            "worst_span_ratio_key": "left_joint_1.pos"
+          }
+        ],
+        "expected_runtime": {
+          "action_dim": 16,
+          "action_interpolation_multiplier": 3,
+          "action_representation": "relative trajectory; grippers excluded",
+          "camera_keys": [
+            "observation.images.left_wrist",
+            "observation.images.right_wrist",
+            "observation.images.base"
+          ],
+          "chunk_size": 30,
+          "model": "pi05",
+          "robot": "bimanual OpenArm",
+          "rtc_execution_horizon": 20,
+          "training_techniques": [
+            "SARM",
+            "RABC",
+            "DAgger/HIL",
+            "high-quality data fine-tuning"
+          ]
+        },
+        "locked_recipe": {
+          "action_interpolation_multiplier": 3,
+          "action_representation": "relative trajectory",
+          "camera_keys": [
+            "observation.images.left_wrist",
+            "observation.images.right_wrist",
+            "observation.images.base"
+          ],
+          "camera_shapes": {
+            "observation.images.base": [
+              480,
+              640,
+              3
+            ],
+            "observation.images.left_wrist": [
+              720,
+              1280,
+              3
+            ],
+            "observation.images.right_wrist": [
+              720,
+              1280,
+              3
+            ]
+          },
+          "chunk_size": 30,
+          "hardware": "+5 cm upper arm extension and larger gripper jaws expected for final deployment",
+          "model": "pi05",
+          "n_action_steps": 30,
+          "relative_exclude_joints": [
+            "gripper"
+          ],
+          "robot": "bimanual OpenArm / openarms_follower",
+          "rtc_execution_horizon": 20,
+          "state_action_order": [
+            "right_joint_1.pos",
+            "right_joint_2.pos",
+            "right_joint_3.pos",
+            "right_joint_4.pos",
+            "right_joint_5.pos",
+            "right_joint_6.pos",
+            "right_joint_7.pos",
+            "right_gripper.pos",
+            "left_joint_1.pos",
+            "left_joint_2.pos",
+            "left_joint_3.pos",
+            "left_joint_4.pos",
+            "left_joint_5.pos",
+            "left_joint_6.pos",
+            "left_joint_7.pos",
+            "left_gripper.pos"
+          ],
+          "training_techniques": [
+            "SARM",
+            "RABC"
+          ]
+        },
+        "source": "https://huggingface.co/spaces/lerobot/robot-folding#hardware",
+        "source_map": {
+          "action_interpolation": "src/lerobot/utils/action_interpolator.py",
+          "openarm_docs": "docs/source/openarm.mdx",
+          "pi05_processor_contract": "src/lerobot/policies/pi05/processor_pi05.py",
+          "pi05_relative_actions_docs": "docs/source/policy_pi0_README.md",
+          "relative_action_processor": "src/lerobot/processor/relative_action_processor.py",
+          "robot_folding_space": "https://huggingface.co/spaces/lerobot/robot-folding#hardware",
+          "rtc_inference": "src/lerobot/rollout/inference/rtc.py",
+          "sarm_rabc": "src/lerobot/rewards/sarm/rabc.py"
+        },
+        "summary": {
+          "failed_checks": [
+            "postprocessor_action_stats_are_relative_for_arm_joints"
+          ],
+          "passed": false
+        }
+      },
+      "name": "lerobot/folding_latest",
+      "path": "/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/candidate_recipe_gate_cache/lerobot__folding_latest",
+      "policy_type": "pi05",
+      "relative_exclude_joints": [
+        "gripper"
+      ],
+      "revision": null,
+      "source": "hub",
+      "use_relative_actions": true
+    },
+    {
+      "deploy_candidate": false,
+      "gate": {
+        "checks": [
+          {
+            "actual": "pi05",
+            "name": "policy_type_pi05",
+            "passed": true
+          },
+          {
+            "name": "model_training_dataset_matches_replay_dataset",
+            "passed": true,
+            "replay_dataset_repo": "lerobot-data-collection/level2_final_quality3_t_0_hil_data_c",
+            "train_dataset_repo": "lerobot-data-collection/level2_final_quality3_t_0_hil_data_c"
+          },
+          {
+            "actual": "openarms_follower",
+            "name": "dataset_robot_type_openarms_follower",
+            "passed": true
+          },
+          {
+            "actual": [
+              "right_joint_1.pos",
+              "right_joint_2.pos",
+              "right_joint_3.pos",
+              "right_joint_4.pos",
+              "right_joint_5.pos",
+              "right_joint_6.pos",
+              "right_joint_7.pos",
+              "right_gripper.pos",
+              "left_joint_1.pos",
+              "left_joint_2.pos",
+              "left_joint_3.pos",
+              "left_joint_4.pos",
+              "left_joint_5.pos",
+              "left_joint_6.pos",
+              "left_joint_7.pos",
+              "left_gripper.pos"
+            ],
+            "name": "action_names_match_folding_16d",
+            "passed": true
+          },
+          {
+            "actual": [
+              "right_joint_1.pos",
+              "right_joint_2.pos",
+              "right_joint_3.pos",
+              "right_joint_4.pos",
+              "right_joint_5.pos",
+              "right_joint_6.pos",
+              "right_joint_7.pos",
+              "right_gripper.pos",
+              "left_joint_1.pos",
+              "left_joint_2.pos",
+              "left_joint_3.pos",
+              "left_joint_4.pos",
+              "left_joint_5.pos",
+              "left_joint_6.pos",
+              "left_joint_7.pos",
+              "left_gripper.pos"
+            ],
+            "name": "state_names_match_folding_16d",
+            "passed": true
+          },
+          {
+            "actual": {
+              "observation.images.base": [
+                480,
+                640,
+                3
+              ],
+              "observation.images.left_wrist": [
+                720,
+                1280,
+                3
+              ],
+              "observation.images.right_wrist": [
+                720,
+                1280,
+                3
+              ]
+            },
+            "name": "camera_keys_and_shapes_match_space_recipe",
+            "passed": true
+          },
+          {
+            "actual": true,
+            "name": "use_relative_actions_enabled",
+            "passed": true
+          },
+          {
+            "actual": [
+              "gripper"
+            ],
+            "name": "relative_exclude_gripper_only",
+            "passed": true
+          },
+          {
+            "actual": 30,
+            "name": "chunk_size_30",
+            "passed": true
+          },
+          {
+            "actual": 30,
+            "name": "n_action_steps_30",
+            "passed": true
+          },
+          {
+            "name": "rabc_recorded_in_train_config",
+            "passed": true,
+            "rabc_kappa": 0.0265,
+            "rabc_progress_path": "hf://datasets/lerobot-data-collection/level2_final_quality3_t_0_hil_data_c/sarm_progress.parquet",
+            "use_rabc": true
+          },
+          {
+            "action_span_ratio_limit": 3.0,
+            "max_arm_span_ratio_postprocessor_over_sampled_relative": 14.22959041595459,
+            "max_post_vs_absolute_q01_error_deg": 15.007696151733398,
+            "max_post_vs_absolute_q99_error_deg": 13.373424530029297,
+            "max_post_vs_relative_q01_error_deg": 69.9730453491211,
+            "max_post_vs_relative_q99_error_deg": 110.69503784179688,
+            "name": "postprocessor_action_stats_are_relative_for_arm_joints",
+            "passed": false,
+            "relative_stats_tolerance_deg": 2.0,
+            "sample_rows": 5000,
+            "worst_span_ratio_key": "left_joint_1.pos"
+          }
+        ],
+        "expected_runtime": {
+          "action_dim": 16,
+          "action_interpolation_multiplier": 3,
+          "action_representation": "relative trajectory; grippers excluded",
+          "camera_keys": [
+            "observation.images.left_wrist",
+            "observation.images.right_wrist",
+            "observation.images.base"
+          ],
+          "chunk_size": 30,
+          "model": "pi05",
+          "robot": "bimanual OpenArm",
+          "rtc_execution_horizon": 20,
+          "training_techniques": [
+            "SARM",
+            "RABC",
+            "DAgger/HIL",
+            "high-quality data fine-tuning"
+          ]
+        },
+        "locked_recipe": {
+          "action_interpolation_multiplier": 3,
+          "action_representation": "relative trajectory",
+          "camera_keys": [
+            "observation.images.left_wrist",
+            "observation.images.right_wrist",
+            "observation.images.base"
+          ],
+          "camera_shapes": {
+            "observation.images.base": [
+              480,
+              640,
+              3
+            ],
+            "observation.images.left_wrist": [
+              720,
+              1280,
+              3
+            ],
+            "observation.images.right_wrist": [
+              720,
+              1280,
+              3
+            ]
+          },
+          "chunk_size": 30,
+          "hardware": "+5 cm upper arm extension and larger gripper jaws expected for final deployment",
+          "model": "pi05",
+          "n_action_steps": 30,
+          "relative_exclude_joints": [
+            "gripper"
+          ],
+          "robot": "bimanual OpenArm / openarms_follower",
+          "rtc_execution_horizon": 20,
+          "state_action_order": [
+            "right_joint_1.pos",
+            "right_joint_2.pos",
+            "right_joint_3.pos",
+            "right_joint_4.pos",
+            "right_joint_5.pos",
+            "right_joint_6.pos",
+            "right_joint_7.pos",
+            "right_gripper.pos",
+            "left_joint_1.pos",
+            "left_joint_2.pos",
+            "left_joint_3.pos",
+            "left_joint_4.pos",
+            "left_joint_5.pos",
+            "left_joint_6.pos",
+            "left_joint_7.pos",
+            "left_gripper.pos"
+          ],
+          "training_techniques": [
+            "SARM",
+            "RABC"
+          ]
+        },
+        "source": "https://huggingface.co/spaces/lerobot/robot-folding#hardware",
+        "source_map": {
+          "action_interpolation": "src/lerobot/utils/action_interpolator.py",
+          "openarm_docs": "docs/source/openarm.mdx",
+          "pi05_processor_contract": "src/lerobot/policies/pi05/processor_pi05.py",
+          "pi05_relative_actions_docs": "docs/source/policy_pi0_README.md",
+          "relative_action_processor": "src/lerobot/processor/relative_action_processor.py",
+          "robot_folding_space": "https://huggingface.co/spaces/lerobot/robot-folding#hardware",
+          "rtc_inference": "src/lerobot/rollout/inference/rtc.py",
+          "sarm_rabc": "src/lerobot/rewards/sarm/rabc.py"
+        },
+        "summary": {
+          "failed_checks": [
+            "postprocessor_action_stats_are_relative_for_arm_joints"
+          ],
+          "passed": false
+        }
+      },
+      "name": "lerobot-data-collection/folding_final10",
+      "path": "/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/candidate_recipe_gate_cache/lerobot-data-collection__folding_final10",
+      "policy_type": "pi05",
+      "relative_exclude_joints": [
+        "gripper"
+      ],
+      "revision": null,
+      "source": "hub",
+      "use_relative_actions": true
+    },
+    {
+      "deploy_candidate": false,
+      "gate": {
+        "checks": [
+          {
+            "actual": "pi05",
+            "name": "policy_type_pi05",
+            "passed": true
+          },
+          {
+            "name": "model_training_dataset_matches_replay_dataset",
+            "passed": false,
+            "replay_dataset_repo": "lerobot-data-collection/level2_final_quality3_t_0_hil_data_c",
+            "train_dataset_repo": "lerobot-data-collection/level2_final_quality3"
+          },
+          {
+            "actual": "openarms_follower",
+            "name": "dataset_robot_type_openarms_follower",
+            "passed": true
+          },
+          {
+            "actual": [
+              "right_joint_1.pos",
+              "right_joint_2.pos",
+              "right_joint_3.pos",
+              "right_joint_4.pos",
+              "right_joint_5.pos",
+              "right_joint_6.pos",
+              "right_joint_7.pos",
+              "right_gripper.pos",
+              "left_joint_1.pos",
+              "left_joint_2.pos",
+              "left_joint_3.pos",
+              "left_joint_4.pos",
+              "left_joint_5.pos",
+              "left_joint_6.pos",
+              "left_joint_7.pos",
+              "left_gripper.pos"
+            ],
+            "name": "action_names_match_folding_16d",
+            "passed": true
+          },
+          {
+            "actual": [
+              "right_joint_1.pos",
+              "right_joint_2.pos",
+              "right_joint_3.pos",
+              "right_joint_4.pos",
+              "right_joint_5.pos",
+              "right_joint_6.pos",
+              "right_joint_7.pos",
+              "right_gripper.pos",
+              "left_joint_1.pos",
+              "left_joint_2.pos",
+              "left_joint_3.pos",
+              "left_joint_4.pos",
+              "left_joint_5.pos",
+              "left_joint_6.pos",
+              "left_joint_7.pos",
+              "left_gripper.pos"
+            ],
+            "name": "state_names_match_folding_16d",
+            "passed": true
+          },
+          {
+            "actual": {
+              "observation.images.base": [
+                480,
+                640,
+                3
+              ],
+              "observation.images.left_wrist": [
+                720,
+                1280,
+                3
+              ],
+              "observation.images.right_wrist": [
+                720,
+                1280,
+                3
+              ]
+            },
+            "name": "camera_keys_and_shapes_match_space_recipe",
+            "passed": true
+          },
+          {
+            "actual": true,
+            "name": "use_relative_actions_enabled",
+            "passed": true
+          },
+          {
+            "actual": [
+              "gripper"
+            ],
+            "name": "relative_exclude_gripper_only",
+            "passed": true
+          },
+          {
+            "actual": 30,
+            "name": "chunk_size_30",
+            "passed": true
+          },
+          {
+            "actual": 30,
+            "name": "n_action_steps_30",
+            "passed": true
+          },
+          {
+            "name": "rabc_recorded_in_train_config",
+            "passed": true,
+            "rabc_kappa": 0.0265,
+            "rabc_progress_path": "hf://datasets/lerobot-data-collection/level2_final_quality3/sarm_progress.parquet",
+            "use_rabc": true
+          },
+          {
+            "action_span_ratio_limit": 3.0,
+            "max_arm_span_ratio_postprocessor_over_sampled_relative": 9.036028861999512,
+            "max_post_vs_absolute_q01_error_deg": 60.81137466430664,
+            "max_post_vs_absolute_q99_error_deg": 74.8038330078125,
+            "max_post_vs_relative_q01_error_deg": 35.88037872314453,
+            "max_post_vs_relative_q99_error_deg": 34.926082611083984,
+            "name": "postprocessor_action_stats_are_relative_for_arm_joints",
+            "passed": false,
+            "relative_stats_tolerance_deg": 2.0,
+            "sample_rows": 5000,
+            "worst_span_ratio_key": "left_joint_1.pos"
+          }
+        ],
+        "expected_runtime": {
+          "action_dim": 16,
+          "action_interpolation_multiplier": 3,
+          "action_representation": "relative trajectory; grippers excluded",
+          "camera_keys": [
+            "observation.images.left_wrist",
+            "observation.images.right_wrist",
+            "observation.images.base"
+          ],
+          "chunk_size": 30,
+          "model": "pi05",
+          "robot": "bimanual OpenArm",
+          "rtc_execution_horizon": 20,
+          "training_techniques": [
+            "SARM",
+            "RABC",
+            "DAgger/HIL",
+            "high-quality data fine-tuning"
+          ]
+        },
+        "locked_recipe": {
+          "action_interpolation_multiplier": 3,
+          "action_representation": "relative trajectory",
+          "camera_keys": [
+            "observation.images.left_wrist",
+            "observation.images.right_wrist",
+            "observation.images.base"
+          ],
+          "camera_shapes": {
+            "observation.images.base": [
+              480,
+              640,
+              3
+            ],
+            "observation.images.left_wrist": [
+              720,
+              1280,
+              3
+            ],
+            "observation.images.right_wrist": [
+              720,
+              1280,
+              3
+            ]
+          },
+          "chunk_size": 30,
+          "hardware": "+5 cm upper arm extension and larger gripper jaws expected for final deployment",
+          "model": "pi05",
+          "n_action_steps": 30,
+          "relative_exclude_joints": [
+            "gripper"
+          ],
+          "robot": "bimanual OpenArm / openarms_follower",
+          "rtc_execution_horizon": 20,
+          "state_action_order": [
+            "right_joint_1.pos",
+            "right_joint_2.pos",
+            "right_joint_3.pos",
+            "right_joint_4.pos",
+            "right_joint_5.pos",
+            "right_joint_6.pos",
+            "right_joint_7.pos",
+            "right_gripper.pos",
+            "left_joint_1.pos",
+            "left_joint_2.pos",
+            "left_joint_3.pos",
+            "left_joint_4.pos",
+            "left_joint_5.pos",
+            "left_joint_6.pos",
+            "left_joint_7.pos",
+            "left_gripper.pos"
+          ],
+          "training_techniques": [
+            "SARM",
+            "RABC"
+          ]
+        },
+        "source": "https://huggingface.co/spaces/lerobot/robot-folding#hardware",
+        "source_map": {
+          "action_interpolation": "src/lerobot/utils/action_interpolator.py",
+          "openarm_docs": "docs/source/openarm.mdx",
+          "pi05_processor_contract": "src/lerobot/policies/pi05/processor_pi05.py",
+          "pi05_relative_actions_docs": "docs/source/policy_pi0_README.md",
+          "relative_action_processor": "src/lerobot/processor/relative_action_processor.py",
+          "robot_folding_space": "https://huggingface.co/spaces/lerobot/robot-folding#hardware",
+          "rtc_inference": "src/lerobot/rollout/inference/rtc.py",
+          "sarm_rabc": "src/lerobot/rewards/sarm/rabc.py"
+        },
+        "summary": {
+          "failed_checks": [
+            "model_training_dataset_matches_replay_dataset",
+            "postprocessor_action_stats_are_relative_for_arm_joints"
+          ],
+          "passed": false
+        }
+      },
+      "name": "lerobot-data-collection/folding_final",
+      "path": "/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/candidate_recipe_gate_cache/lerobot-data-collection__folding_final",
+      "policy_type": "pi05",
+      "relative_exclude_joints": [
+        "gripper"
+      ],
+      "revision": null,
+      "source": "hub",
+      "use_relative_actions": true
+    },
+    {
+      "deploy_candidate": false,
+      "gate": {
+        "checks": [
+          {
+            "actual": "pi05",
+            "name": "policy_type_pi05",
+            "passed": true
+          },
+          {
+            "name": "model_training_dataset_matches_replay_dataset",
+            "passed": false,
+            "replay_dataset_repo": "lerobot-data-collection/level2_final_quality3_t_0_hil_data_c",
+            "train_dataset_repo": "lerobot-data-collection/level2_final_quality3"
+          },
+          {
+            "actual": "openarms_follower",
+            "name": "dataset_robot_type_openarms_follower",
+            "passed": true
+          },
+          {
+            "actual": [
+              "right_joint_1.pos",
+              "right_joint_2.pos",
+              "right_joint_3.pos",
+              "right_joint_4.pos",
+              "right_joint_5.pos",
+              "right_joint_6.pos",
+              "right_joint_7.pos",
+              "right_gripper.pos",
+              "left_joint_1.pos",
+              "left_joint_2.pos",
+              "left_joint_3.pos",
+              "left_joint_4.pos",
+              "left_joint_5.pos",
+              "left_joint_6.pos",
+              "left_joint_7.pos",
+              "left_gripper.pos"
+            ],
+            "name": "action_names_match_folding_16d",
+            "passed": true
+          },
+          {
+            "actual": [
+              "right_joint_1.pos",
+              "right_joint_2.pos",
+              "right_joint_3.pos",
+              "right_joint_4.pos",
+              "right_joint_5.pos",
+              "right_joint_6.pos",
+              "right_joint_7.pos",
+              "right_gripper.pos",
+              "left_joint_1.pos",
+              "left_joint_2.pos",
+              "left_joint_3.pos",
+              "left_joint_4.pos",
+              "left_joint_5.pos",
+              "left_joint_6.pos",
+              "left_joint_7.pos",
+              "left_gripper.pos"
+            ],
+            "name": "state_names_match_folding_16d",
+            "passed": true
+          },
+          {
+            "actual": {
+              "observation.images.base": [
+                480,
+                640,
+                3
+              ],
+              "observation.images.left_wrist": [
+                720,
+                1280,
+                3
+              ],
+              "observation.images.right_wrist": [
+                720,
+                1280,
+                3
+              ]
+            },
+            "name": "camera_keys_and_shapes_match_space_recipe",
+            "passed": true
+          },
+          {
+            "actual": true,
+            "name": "use_relative_actions_enabled",
+            "passed": true
+          },
+          {
+            "actual": [
+              "gripper"
+            ],
+            "name": "relative_exclude_gripper_only",
+            "passed": true
+          },
+          {
+            "actual": 30,
+            "name": "chunk_size_30",
+            "passed": true
+          },
+          {
+            "actual": 30,
+            "name": "n_action_steps_30",
+            "passed": true
+          },
+          {
+            "name": "rabc_recorded_in_train_config",
+            "passed": true,
+            "rabc_kappa": 0.0265,
+            "rabc_progress_path": "hf://datasets/lerobot-data-collection/level2_final_quality3/sarm_progress.parquet",
+            "use_rabc": true
+          },
+          {
+            "action_span_ratio_limit": 3.0,
+            "max_arm_span_ratio_postprocessor_over_sampled_relative": 9.036028861999512,
+            "max_post_vs_absolute_q01_error_deg": 60.81137466430664,
+            "max_post_vs_absolute_q99_error_deg": 74.8038330078125,
+            "max_post_vs_relative_q01_error_deg": 35.88037872314453,
+            "max_post_vs_relative_q99_error_deg": 34.926082611083984,
+            "name": "postprocessor_action_stats_are_relative_for_arm_joints",
+            "passed": false,
+            "relative_stats_tolerance_deg": 2.0,
+            "sample_rows": 5000,
+            "worst_span_ratio_key": "left_joint_1.pos"
+          }
+        ],
+        "expected_runtime": {
+          "action_dim": 16,
+          "action_interpolation_multiplier": 3,
+          "action_representation": "relative trajectory; grippers excluded",
+          "camera_keys": [
+            "observation.images.left_wrist",
+            "observation.images.right_wrist",
+            "observation.images.base"
+          ],
+          "chunk_size": 30,
+          "model": "pi05",
+          "robot": "bimanual OpenArm",
+          "rtc_execution_horizon": 20,
+          "training_techniques": [
+            "SARM",
+            "RABC",
+            "DAgger/HIL",
+            "high-quality data fine-tuning"
+          ]
+        },
+        "locked_recipe": {
+          "action_interpolation_multiplier": 3,
+          "action_representation": "relative trajectory",
+          "camera_keys": [
+            "observation.images.left_wrist",
+            "observation.images.right_wrist",
+            "observation.images.base"
+          ],
+          "camera_shapes": {
+            "observation.images.base": [
+              480,
+              640,
+              3
+            ],
+            "observation.images.left_wrist": [
+              720,
+              1280,
+              3
+            ],
+            "observation.images.right_wrist": [
+              720,
+              1280,
+              3
+            ]
+          },
+          "chunk_size": 30,
+          "hardware": "+5 cm upper arm extension and larger gripper jaws expected for final deployment",
+          "model": "pi05",
+          "n_action_steps": 30,
+          "relative_exclude_joints": [
+            "gripper"
+          ],
+          "robot": "bimanual OpenArm / openarms_follower",
+          "rtc_execution_horizon": 20,
+          "state_action_order": [
+            "right_joint_1.pos",
+            "right_joint_2.pos",
+            "right_joint_3.pos",
+            "right_joint_4.pos",
+            "right_joint_5.pos",
+            "right_joint_6.pos",
+            "right_joint_7.pos",
+            "right_gripper.pos",
+            "left_joint_1.pos",
+            "left_joint_2.pos",
+            "left_joint_3.pos",
+            "left_joint_4.pos",
+            "left_joint_5.pos",
+            "left_joint_6.pos",
+            "left_joint_7.pos",
+            "left_gripper.pos"
+          ],
+          "training_techniques": [
+            "SARM",
+            "RABC"
+          ]
+        },
+        "source": "https://huggingface.co/spaces/lerobot/robot-folding#hardware",
+        "source_map": {
+          "action_interpolation": "src/lerobot/utils/action_interpolator.py",
+          "openarm_docs": "docs/source/openarm.mdx",
+          "pi05_processor_contract": "src/lerobot/policies/pi05/processor_pi05.py",
+          "pi05_relative_actions_docs": "docs/source/policy_pi0_README.md",
+          "relative_action_processor": "src/lerobot/processor/relative_action_processor.py",
+          "robot_folding_space": "https://huggingface.co/spaces/lerobot/robot-folding#hardware",
+          "rtc_inference": "src/lerobot/rollout/inference/rtc.py",
+          "sarm_rabc": "src/lerobot/rewards/sarm/rabc.py"
+        },
+        "summary": {
+          "failed_checks": [
+            "model_training_dataset_matches_replay_dataset",
+            "postprocessor_action_stats_are_relative_for_arm_joints"
+          ],
+          "passed": false
+        }
+      },
+      "name": "lerobot-data-collection/ablation2-5_0",
+      "path": "/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/candidate_recipe_gate_cache/lerobot-data-collection__ablation2-5_0",
+      "policy_type": "pi05",
+      "relative_exclude_joints": [
+        "gripper"
+      ],
+      "revision": null,
+      "source": "hub",
+      "use_relative_actions": true
+    }
+  ],
+  "safety": {
+    "model_weights_loaded": false,
+    "robot_io": false,
+    "send_action": false,
+    "videos_loaded": false
+  },
+  "source_map": {
+    "action_interpolation": "src/lerobot/utils/action_interpolator.py",
+    "openarm_docs": "docs/source/openarm.mdx",
+    "pi05_processor_contract": "src/lerobot/policies/pi05/processor_pi05.py",
+    "pi05_relative_actions_docs": "docs/source/policy_pi0_README.md",
+    "relative_action_processor": "src/lerobot/processor/relative_action_processor.py",
+    "robot_folding_space": "https://huggingface.co/spaces/lerobot/robot-folding#hardware",
+    "rtc_inference": "src/lerobot/rollout/inference/rtc.py",
+    "sarm_rabc": "src/lerobot/rewards/sarm/rabc.py"
+  }
+}

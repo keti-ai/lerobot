@@ -520,3 +520,39 @@ max_arm_span_ratio_postprocessor_over_sampled_relative: 14.230
 
 The script now returns exit code `2` when the recipe gate fails, while still
 writing JSON/Markdown diagnostics. Robot motion remains blocked.
+
+## 2026-05-11 Stage 28-30 Update
+
+Stage 28 locked the recovery runbook and source map for the folding recipe.
+The canonical gate source remains
+`audits/openarm_folding/stage22_dataset_replay_and_ablation.py`; bypassing the
+recipe gate is reserved only for forensics.
+
+Stage 29 ran the lightweight candidate recipe gate on A6000. The expanded
+search checked 37 public folding/level/ablation checkpoint candidates and found
+zero deploy candidates. The two direct target-dataset candidates,
+`lerobot/folding_latest` and `lerobot-data-collection/folding_final10`, both
+failed only the relative-action postprocessor stats check:
+
+```text
+postprocessor_action_stats_are_relative_for_arm_joints: FAIL
+max_post_vs_relative_q01_error_deg: 69.973
+max_post_vs_relative_q99_error_deg: 110.695
+max_arm_span_ratio_postprocessor_over_sampled_relative: 14.230
+```
+
+Stage 30 computed the target dataset relative-action reference over all
+`3414338` rows:
+
+```text
+dataset: lerobot-data-collection/level2_final_quality3_t_0_hil_data_c
+robot_type: openarms_follower
+arm mean abs relative delta: 1.722 deg
+arm p99 abs relative delta: 19.789 deg
+arm max abs relative delta: 116.352 deg at left_joint_4.pos
+```
+
+Current conclusion: no currently checked public checkpoint can advance to robot
+deployment. The next required work is corrected relative-action dataset stats
+followed by retrain or re-export, then Stage 29 gate and Stage 31 dataset
+replay. Robot motion remains blocked.

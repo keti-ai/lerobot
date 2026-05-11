@@ -17,6 +17,10 @@ Scope: metadata audit and no-motion/shadow-readiness prep for `lerobot/folding_l
 9. `syhlabtop_agent_ready_prompt_2026-05-11.md`
 10. `syhlabtop_stage_guides_2026-05-11.md`
 11. `syhlabtop_no_nas_fallback_2026-05-11.md`
+12. `stage28_to_stage32_recovery_runbook_2026-05-11.md`
+13. `stage29_candidate_recipe_gate_expanded_2026-05-11.md`
+14. `stage30_relative_recipe_reference_2026-05-11.md`
+15. `stage30_gap_and_execution_plan_2026-05-11.md`
 
 ## Storage Policy
 

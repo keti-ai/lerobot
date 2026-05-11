@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import pyarrow.parquet as pq
 import torch
 from huggingface_hub import snapshot_download
 from PIL import Image
@@ -53,6 +52,32 @@ EXPECTED_IMAGE_SHAPES = {
     "observation.images.right_wrist": [720, 1280, 3],
     "observation.images.base": [480, 640, 3],
 }
+FOLDING_RECIPE_SOURCE_MAP = {
+    "robot_folding_space": "https://huggingface.co/spaces/lerobot/robot-folding#hardware",
+    "pi05_docs": "docs/source/policy_pi05_README.md",
+    "relative_actions_docs": "docs/source/action_representations.mdx",
+    "pi05_processor_contract": "src/lerobot/policies/pi05/processor_pi05.py",
+    "relative_action_processor": "src/lerobot/processor/relative_action_processor.py",
+    "rtc_inference": "src/lerobot/rollout/inference/rtc.py",
+    "action_interpolation": "src/lerobot/utils/action_interpolator.py",
+    "sarm_rabc": "src/lerobot/rewards/sarm/rabc.py",
+    "openarm_docs": "docs/source/openarm.mdx",
+}
+LOCKED_FOLDING_RECIPE = {
+    "robot": "bimanual OpenArm / openarms_follower",
+    "hardware": "+5 cm upper arm extension and larger gripper jaws expected for final deployment",
+    "state_action_order": ACTION_NAMES,
+    "camera_keys": IMAGE_KEYS,
+    "camera_shapes": EXPECTED_IMAGE_SHAPES,
+    "model": "pi05",
+    "chunk_size": 30,
+    "n_action_steps": 30,
+    "action_representation": "relative trajectory",
+    "relative_exclude_joints": ["gripper"],
+    "training_techniques": ["SARM", "RABC"],
+    "rtc_execution_horizon": 20,
+    "action_interpolation_multiplier": 3,
+}
 
 
 @dataclass(frozen=True)
@@ -85,6 +110,8 @@ def read_info(dataset_root: Path) -> dict[str, Any]:
 
 
 def parquet_rows(path: Path) -> list[dict[str, Any]]:
+    import pyarrow.parquet as pq
+
     return pq.read_table(path).to_pylist()
 
 
@@ -161,6 +188,8 @@ def sample_relative_action_stats(
     states: list[np.ndarray] = []
     actions: list[np.ndarray] = []
     for path in sorted((dataset_root / "data").glob("**/*.parquet")):
+        import pyarrow.parquet as pq
+
         table = pq.read_table(path, columns=["observation.state", "action"])
         for row in table.to_pylist():
             states.append(vector(row["observation.state"]))
@@ -294,7 +323,9 @@ def validate_folding_recipe(
     )
 
     return {
-        "source": "https://huggingface.co/spaces/lerobot/robot-folding#hardware",
+        "source": FOLDING_RECIPE_SOURCE_MAP["robot_folding_space"],
+        "source_map": FOLDING_RECIPE_SOURCE_MAP,
+        "locked_recipe": LOCKED_FOLDING_RECIPE,
         "summary": {
             "passed": all(check["passed"] for check in checks),
             "failed_checks": [check["name"] for check in checks if not check["passed"]],
@@ -574,6 +605,25 @@ def write_markdown(path: Path, payload: dict[str, Any]) -> None:
             lines.append(f"- `{check['name']}`: {mark}")
     else:
         lines.append("- Not requested.")
+    if payload.get("recipe_gate_only"):
+        lines.extend(
+            [
+                "",
+                "## Decision Inputs",
+                "",
+                f"- Dataset: `{payload['dataset_repo']}`",
+                f"- Model: `{payload['model_dir']}`",
+                f"- Mode: `recipe_gate_only`",
+                "",
+                "## Safety",
+                "",
+                "- No model weights, videos, robot connection, motor initialization, torque enable, "
+                "zeroing, or action send is performed by this mode.",
+                "- This is an offline recipe/artifact contract gate only.",
+            ]
+        )
+        path.write_text("\n".join(lines) + "\n")
+        return
     lines.extend([
         "",
         "## Decision Inputs",
@@ -626,6 +676,11 @@ def main() -> int:
     parser.add_argument("--ablation-frame", type=int, default=0)
     parser.add_argument("--robot-type", default="openarms_follower")
     parser.add_argument("--no-recipe-gate", action="store_true")
+    parser.add_argument(
+        "--recipe-gate-only",
+        action="store_true",
+        help="Run only the offline recipe gate. Does not load model weights, videos, snapshots, or robot IO.",
+    )
     parser.add_argument("--recipe-gate-max-rows", type=int, default=5000)
     parser.add_argument("--recipe-gate-relative-stats-tolerance-deg", type=float, default=2.0)
     parser.add_argument("--recipe-gate-action-span-ratio-limit", type=float, default=3.0)
@@ -635,12 +690,7 @@ def main() -> int:
 
     dataset_root = resolve_dataset_root(args.dataset_repo, args.dataset_root, args.dataset_revision)
     info = read_info(dataset_root)
-    episode_row = load_episode_row(dataset_root, args.episode_index)
-    ensure_episode_videos(args.dataset_repo, dataset_root, args.dataset_revision, info, episode_row)
-    frame_indices = parse_frame_indices(args.frames, int(episode_row["length"]))
-    samples = load_dataset_samples(dataset_root, info, episode_row, frame_indices, args.video_backend)
-
-    cfg, policy, preprocessor, postprocessor = load_model(args.model_dir, args.device)
+    cfg = PreTrainedConfig.from_pretrained(args.model_dir)
     recipe_gate = None
     if not args.no_recipe_gate:
         recipe_gate = validate_folding_recipe(
@@ -653,6 +703,47 @@ def main() -> int:
             relative_stats_tolerance_deg=args.recipe_gate_relative_stats_tolerance_deg,
             action_span_ratio_limit=args.recipe_gate_action_span_ratio_limit,
         )
+    if args.recipe_gate_only:
+        payload = {
+            "dataset_repo": args.dataset_repo,
+            "dataset_root": str(dataset_root),
+            "model_dir": str(args.model_dir),
+            "policy_type": cfg.type,
+            "use_relative_actions": bool(getattr(cfg, "use_relative_actions", False)),
+            "relative_exclude_joints": list(getattr(cfg, "relative_exclude_joints", [])),
+            "recipe_gate": recipe_gate,
+            "recipe_gate_only": True,
+            "safety": {
+                "model_weights_loaded": False,
+                "videos_loaded": False,
+                "robot_io": False,
+                "motor_initialization": False,
+                "torque_enable": False,
+                "zeroing": False,
+                "send_action": False,
+            },
+        }
+        args.json_out.parent.mkdir(parents=True, exist_ok=True)
+        args.md_out.parent.mkdir(parents=True, exist_ok=True)
+        args.json_out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+        write_markdown(args.md_out, payload)
+        if recipe_gate is not None and not recipe_gate["summary"]["passed"]:
+            print(
+                json.dumps(
+                    {"json_out": str(args.json_out), "md_out": str(args.md_out), "recipe_gate": "FAIL"},
+                    indent=2,
+                )
+            )
+            return 2
+        print(json.dumps({"json_out": str(args.json_out), "md_out": str(args.md_out)}, indent=2))
+        return 0
+
+    episode_row = load_episode_row(dataset_root, args.episode_index)
+    ensure_episode_videos(args.dataset_repo, dataset_root, args.dataset_revision, info, episode_row)
+    frame_indices = parse_frame_indices(args.frames, int(episode_row["length"]))
+    samples = load_dataset_samples(dataset_root, info, episode_row, frame_indices, args.video_backend)
+
+    cfg, policy, preprocessor, postprocessor = load_model(args.model_dir, args.device)
     payload: dict[str, Any] = {
         "dataset_repo": args.dataset_repo,
         "dataset_root": str(dataset_root),
