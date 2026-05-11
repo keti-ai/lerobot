@@ -191,6 +191,19 @@ sha256: c2c53b2545ab3122d82602b4c1adc8c775db46eebc5ddeaf431f607da8e1b06f
 Human review of camera orientation and proposed action deltas is still required
 before any later motion gate.
 
+The A6000 review artifacts were also copied back to syhlabtop for Stage 10:
+
+```text
+/home/syhlabtop/openarm_folding_20260511/shadow_reviews/snapshot_20260511_135634_action_review.csv
+/home/syhlabtop/openarm_folding_20260511/shadow_reviews/snapshot_20260511_135634_action_review.json
+```
+
+Received-review note:
+
+```text
+audits/openarm_folding/syhlabtop_shadow_action_review_received_2026-05-11.md
+```
+
 ## Motion Gate
 
 Motion remains blocked. A6000 has produced an offline action proposal only; no
