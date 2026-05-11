@@ -103,7 +103,7 @@ Stage 11 summary and next blocker list               DONE
 Stage 12 syhlabtop gripper-only zero adjustment      DONE
 Stage 13 refreshed no-send snapshot after gripper    DONE
 Stage 14 refreshed A6000 snapshot action review      DONE
-Stage 15 guarded first-motion command path spec      NEXT
+Stage 15 guarded first-motion command path spec      DONE FOR DRY-RUN
 Stage 16 guarded first-motion execution              BLOCKED
 ```
 
@@ -123,12 +123,14 @@ approved as an actuator command.
 
 ## Required Next Work
 
-1. Design, but do not execute, a guarded first-motion path.
+1. Add a runtime command path, but do not execute it without a separate gate.
 
-   The design should be separate from rollout/record/replay and should consume
-   a reviewed action artifact rather than directly streaming policy output.
+   Stage 15 only created the dry-run target table. Stage 16 requires a separate
+   command implementation with fresh readback verification, explicit operator
+   approval, and an abort procedure before any actuator command is considered.
 
-2. Bind the design to the refreshed post-gripper-zero review artifact.
+2. Keep the runtime path bound to the refreshed post-gripper-zero review
+   artifact.
 
    The default candidate artifact for review is:
 
@@ -139,7 +141,7 @@ approved as an actuator command.
    The tool must reject old `snapshot_20260511_135634` artifacts and any review
    whose metadata or checksum does not match the selected snapshot.
 
-3. Decide whether `left_joint_7` is allowed in the first guarded command.
+3. Decide whether `left_joint_7` is allowed in any first guarded command.
 
    Until the mirrored wrist-flap direction/range is explicitly accepted,
    `left_joint_7` should be held at current readback or excluded from the first
@@ -185,7 +187,7 @@ The following remain out of scope until a separate explicit motion gate:
 
 ## Open Blockers
 
-- A guarded first-motion spec/tool does not exist yet.
+- A guarded dry-run target table exists, but a runtime command path does not.
 - The refreshed A6000 action review has large deltas and four clamped rows; it
   is not a motion candidate without a guarded cap/selection path.
 - `left_joint_7` wrist-flap direction/range needs explicit handling before any
@@ -194,9 +196,9 @@ The following remain out of scope until a separate explicit motion gate:
 
 ## Acceptance Criteria for the Next Milestone
 
-Stage 15 is complete only when a guarded first-motion spec or dry-run tool
-exists, rejects stale snapshots, prints raw/clamped/capped targets, applies
-explicit small per-joint caps, and still defaults to no-send.
+Stage 15 is complete for dry-run only. Stage 16 requires a separate runtime
+command path with fresh current readback, exact target-table approval, and
+operator abort procedure.
 
 Motion remains blocked unless Stage 15 separately defines and approves a guarded
 first-motion path and the operator approves the exact target table.

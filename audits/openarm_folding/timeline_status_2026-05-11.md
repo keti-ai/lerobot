@@ -27,19 +27,21 @@ Stage 11 summary and next blocker list               DONE
 Stage 12 syhlabtop gripper-only zero adjustment      DONE
 Stage 13 refreshed no-send snapshot after gripper    DONE
 Stage 14 refreshed A6000 snapshot action review      DONE
-Stage 15 guarded first-motion command path spec      NEXT
+Stage 15 guarded first-motion command path spec      DONE FOR DRY-RUN
 Stage 16 guarded first-motion execution              BLOCKED
 ```
 
-The next real-machine work is on `syhlabtop`. The objective is still not
-motion. The objective is to specify and review a guarded first-motion path,
-without sending policy output to motors.
+The next real-machine work is on `syhlabtop`. The objective is still not motion.
+Stage 15 produced a guarded dry-run target table only. Stage 16 remains blocked
+until a separate runtime command path, fresh readback check, operator gate, and
+abort procedure exist.
 
 Current renewed work spec:
 
 ```text
 audits/openarm_folding/renewed_bringup_plan_2026-05-11.md
 audits/openarm_folding/post_gripper_zero_snapshot_review_2026-05-11.md
+audits/openarm_folding/stage15_guarded_first_motion_spec_2026-05-11.md
 ```
 
 ## A6000 Status
@@ -307,10 +309,26 @@ max_abs_delta: 67.930 deg at right_joint_4.pos
 
 The refreshed action proposal is not approved as an actuator command.
 
+Stage 15 guarded dry-run completed:
+
+```text
+tool: audits/openarm_folding/guarded_first_motion_dry_run.py
+spec: audits/openarm_folding/stage15_guarded_first_motion_spec_2026-05-11.md
+dry-run json: /home/syhlabtop/openarm_folding_20260511/shadow_reviews/snapshot_20260511_154554_guarded_first_motion_dry_run.json
+dry-run json sha256: ce6c6efb2d6b2d7532500cb7b4ca61273993358ccd1ef437e4ae25781ee2cef3
+arm cap: 2 deg
+gripper cap: 5 deg
+held key: left_joint_7.pos
+max final delta: 5 deg
+send_allowed: false
+motion_allowed: false
+```
+
 ## Motion Gate
 
 Motion remains blocked. A6000 has produced offline action proposals only; no
 policy output has been sent to robot actuators. The only hardware write after
 the original no-send pipeline was the operator-approved gripper-only zero on
-motor ID `008` for `can0` and `can1`. Stage 15 must define the guarded
-first-motion path before any actuator command is considered.
+motor ID `008` for `can0` and `can1`. Stage 15 defined a dry-run target table
+only. Stage 16 remains blocked until a separate runtime command path, fresh
+readback check, operator approval, and abort procedure are implemented.
