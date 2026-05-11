@@ -83,8 +83,9 @@ initial review limit: [-65, 0]
 
 ## Current Stage
 
-The original no-send two-machine pipeline reached Stage 11, and the gripper-only
-zero correction has now been completed after that pipeline:
+The original no-send two-machine pipeline reached Stage 11, the gripper-only
+zero correction completed after that pipeline, and the refreshed
+post-gripper-zero no-send/A6000 review has now completed:
 
 ```text
 Stage 0  Goal/safety framing                         DONE
@@ -100,61 +101,49 @@ Stage 9  A6000 snapshot action review                DONE
 Stage 10 syhlabtop human/safety review               DONE FOR NO-SEND
 Stage 11 summary and next blocker list               DONE
 Stage 12 syhlabtop gripper-only zero adjustment      DONE
-Stage 13 refreshed no-send snapshot after gripper    NEXT
-Stage 14 refreshed A6000 snapshot action review      BLOCKED BY STAGE 13
-Stage 15 guarded first-motion command path spec      NOT STARTED
+Stage 13 refreshed no-send snapshot after gripper    DONE
+Stage 14 refreshed A6000 snapshot action review      DONE
+Stage 15 guarded first-motion command path spec      NEXT
 Stage 16 guarded first-motion execution              BLOCKED
 ```
 
-The previous A6000 action review remains useful as a pipeline validation, but it
-is stale as a motion candidate because it was generated from the pre-gripper-zero
-hardware state.
+The previous A6000 action review for `snapshot_20260511_135634` remains useful
+as an initial pipeline validation, but it is stale as a motion candidate because
+it was generated from the pre-gripper-zero hardware state.
+
+The refreshed post-gripper-zero review is:
+
+```text
+audits/openarm_folding/post_gripper_zero_snapshot_review_2026-05-11.md
+```
+
+It produced finite `[1, 30, 16]` actions with `send_allowed=false`, but the
+first-step proposal still has large arm deltas and four clamped rows. It is not
+approved as an actuator command.
 
 ## Required Next Work
 
-1. Capture a refreshed no-send snapshot on `syhlabtop`.
-
-   The snapshot must be captured after gripper zero correction and must include:
-
-   ```text
-   left_wrist.png
-   right_wrist.png
-   base.png
-   state_16.csv
-   metadata.json
-   ```
-
-   The metadata should record that gripper-only zero was completed on
-   2026-05-11 and that `[-65, 0]` is the active initial gripper review range.
-
-2. Transfer the refreshed snapshot to A6000 and NAS.
-
-   Use the same manually approved transfer path as before. Do not assume NAS is
-   mounted on `syhlabtop`.
-
-3. Run A6000 offline snapshot action review again.
-
-   The review must produce fresh CSV/JSON artifacts and keep `send_allowed=false`.
-   The old `snapshot_20260511_135634` review must not be used as a command
-   candidate for the current hardware state.
-
-4. Review the refreshed first-step proposal.
-
-   Required checks:
-
-   - action shape remains `[1, 30, 16]`;
-   - all values are finite;
-   - gripper values now make sense under the corrected `0=closed`,
-     negative-open convention;
-   - `right_joint_2` and `left_joint_2` mirror behavior is respected;
-   - `joint_4` elbow-flex positive direction is respected;
-   - `left_joint_7` sign/range is explicitly handled before any wrist command;
-   - every clamped row is explained before motion.
-
-5. Design, but do not execute, a guarded first-motion path.
+1. Design, but do not execute, a guarded first-motion path.
 
    The design should be separate from rollout/record/replay and should consume
    a reviewed action artifact rather than directly streaming policy output.
+
+2. Bind the design to the refreshed post-gripper-zero review artifact.
+
+   The default candidate artifact for review is:
+
+   ```text
+   /home/syhlabtop/openarm_folding_20260511/shadow_reviews/snapshot_20260511_154554_action_review.csv
+   ```
+
+   The tool must reject old `snapshot_20260511_135634` artifacts and any review
+   whose metadata or checksum does not match the selected snapshot.
+
+3. Decide whether `left_joint_7` is allowed in the first guarded command.
+
+   Until the mirrored wrist-flap direction/range is explicitly accepted,
+   `left_joint_7` should be held at current readback or excluded from the first
+   motion candidate.
 
 ## Guarded Motion Path Requirements
 
@@ -196,24 +185,18 @@ The following remain out of scope until a separate explicit motion gate:
 
 ## Open Blockers
 
-- A refreshed post-gripper-zero no-send snapshot does not exist yet.
-- A refreshed A6000 action review does not exist yet.
-- The previous action review had large deltas and four clamped rows; it is not a
-  motion candidate.
+- A guarded first-motion spec/tool does not exist yet.
+- The refreshed A6000 action review has large deltas and four clamped rows; it
+  is not a motion candidate without a guarded cap/selection path.
 - `left_joint_7` wrist-flap direction/range needs explicit handling before any
   wrist motion.
 - There is no audited live split-host inference bridge from A6000 to syhlabtop.
-- There is no guarded first-motion script/spec approved for execution.
 
 ## Acceptance Criteria for the Next Milestone
 
-Stage 13 is complete only when a new post-gripper-zero snapshot exists locally
-on `syhlabtop`, includes all three policy camera images and `state_16.csv`, and
-its metadata records the corrected gripper convention.
+Stage 15 is complete only when a guarded first-motion spec or dry-run tool
+exists, rejects stale snapshots, prints raw/clamped/capped targets, applies
+explicit small per-joint caps, and still defaults to no-send.
 
-Stage 14 is complete only when A6000 produces a fresh offline review from that
-new snapshot, stores CSV/JSON artifacts, and the review is copied back or made
-available for syhlabtop human inspection.
-
-Motion remains blocked after Stage 14 unless Stage 15 separately defines and
-approves a guarded first-motion path.
+Motion remains blocked unless Stage 15 separately defines and approves a guarded
+first-motion path and the operator approves the exact target table.

@@ -7,8 +7,9 @@ post-gripper-zero bringup.
 ## Current Position in the Timeline
 
 The original no-send two-machine pipeline reached Stage 11. A gripper-only zero
-adjustment was then completed on `syhlabtop`, so the next required milestone is
-a refreshed post-gripper-zero no-send snapshot and A6000 offline review.
+adjustment was then completed on `syhlabtop`. A refreshed post-gripper-zero
+snapshot and A6000 offline review have now completed; the next milestone is a
+guarded first-motion command path specification only.
 
 ```text
 Stage 0  Goal/safety framing                         DONE
@@ -24,21 +25,21 @@ Stage 9  A6000 snapshot action review                DONE
 Stage 10 syhlabtop human/safety review               DONE FOR NO-SEND
 Stage 11 summary and next blocker list               DONE
 Stage 12 syhlabtop gripper-only zero adjustment      DONE
-Stage 13 refreshed no-send snapshot after gripper    NEXT
-Stage 14 refreshed A6000 snapshot action review      BLOCKED BY STAGE 13
-Stage 15 guarded first-motion command path spec      NOT STARTED
+Stage 13 refreshed no-send snapshot after gripper    DONE
+Stage 14 refreshed A6000 snapshot action review      DONE
+Stage 15 guarded first-motion command path spec      NEXT
 Stage 16 guarded first-motion execution              BLOCKED
 ```
 
 The next real-machine work is on `syhlabtop`. The objective is still not
-motion. The objective is to prove the current hardware state after gripper-only
-zero adjustment by collecting a correctly ordered observation snapshot without
-sending policy output to motors.
+motion. The objective is to specify and review a guarded first-motion path,
+without sending policy output to motors.
 
 Current renewed work spec:
 
 ```text
 audits/openarm_folding/renewed_bringup_plan_2026-05-11.md
+audits/openarm_folding/post_gripper_zero_snapshot_review_2026-05-11.md
 ```
 
 ## A6000 Status
@@ -281,9 +282,35 @@ Impact of the gripper-only zero adjustment:
 - The next required output is a refreshed post-gripper-zero no-send snapshot,
   followed by a refreshed A6000 offline action review.
 
+Post-gripper-zero snapshot and A6000 review completed:
+
+```text
+snapshot: /home/syhlabtop/openarm_folding_20260511/shadow_snapshots/snapshot_20260511_154554
+snapshot tar sha256: b47804f7e29821fc7c0714cdd6ded02a87f4c8c9b1f2bc184310a2e43931df8b
+
+A6000 csv: /data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/shadow_replays/snapshot_20260511_154554_action_review.csv
+A6000 json: /data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/shadow_replays/snapshot_20260511_154554_action_review.json
+csv sha256: ae203f49bca1d05ea01f9cd43affec69b45750d843c1809fde2bc7d64f8d1fb6
+json sha256: 75a2136cb6eba5d3870d4d23a516d9b3050a21d1055871562b8e839142bfb6a1
+```
+
+Review result:
+
+```text
+action_shape: [1, 30, 16]
+all_finite: true
+send_allowed: false
+rows: 16
+clamped_rows: 4
+max_abs_delta: 67.930 deg at right_joint_4.pos
+```
+
+The refreshed action proposal is not approved as an actuator command.
+
 ## Motion Gate
 
-Motion remains blocked. A6000 has produced an offline action proposal only; no
+Motion remains blocked. A6000 has produced offline action proposals only; no
 policy output has been sent to robot actuators. The only hardware write after
 the original no-send pipeline was the operator-approved gripper-only zero on
-motor ID `008` for `can0` and `can1`.
+motor ID `008` for `can0` and `can1`. Stage 15 must define the guarded
+first-motion path before any actuator command is considered.
