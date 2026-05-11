@@ -32,7 +32,7 @@ Stage 16 guarded first-motion runtime preflight      DONE FOR NO-SEND
 Stage 17 guarded first-motion execution packet       DONE FOR NO-SEND
 Stage 18 guarded first-motion actuator writer        DONE FOR DRY-RUN
 Stage 19 first actuator write execution              BLOCKED: STALE PACKET
-Stage 20 refreshed snapshot/action review loop       NEXT
+Stage 20 high-overview camera/action review loop     DONE: LARGE DELTAS REMAIN
 ```
 
 The next real-machine work is on `syhlabtop`. The objective is still not motion.
@@ -51,7 +51,26 @@ audits/openarm_folding/stage16_runtime_preflight_spec_2026-05-11.md
 audits/openarm_folding/stage17_execution_packet_spec_2026-05-11.md
 audits/openarm_folding/stage18_guarded_actuator_write_spec_2026-05-11.md
 audits/openarm_folding/stage19_first_write_blocked_2026-05-11.md
+audits/openarm_folding/stage20_high_overview_camera_trial_2026-05-11.md
 ```
+
+Stage 20 tested a raised D435I base camera on a temporary 25 cm jig. The base
+view became closer to the `full_folding` high overview framing, but the A6000
+offline review still produced large bimanual arm deltas:
+
+```text
+snapshot_20260511_175613
+action_shape: [1, 30, 16]
+all_finite: true
+send_allowed: false
+mean_abs_delta: 26.593 deg
+max_abs_delta: 72.753 deg at right_joint_4.pos
+clamped_rows: 4
+```
+
+This keeps motion blocked and shifts the likely root cause toward folding
+embodiment mismatch, wrist camera/task-signal mismatch, or action/state contract
+details rather than base camera height alone.
 
 ## A6000 Status
 
