@@ -4,8 +4,8 @@ import argparse
 import csv
 import json
 import subprocess
-from io import BytesIO
 from dataclasses import dataclass
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +14,7 @@ import pyarrow.parquet as pq
 import torch
 from huggingface_hub import snapshot_download
 from PIL import Image
+from safetensors.torch import load_file
 
 from lerobot.configs import PreTrainedConfig
 from lerobot.policies import get_policy_class, make_pre_post_processors
@@ -45,6 +46,13 @@ IMAGE_KEYS = [
     "observation.images.right_wrist",
     "observation.images.base",
 ]
+
+ARM_ACTION_MASK = np.asarray(["gripper" not in name for name in ACTION_NAMES], dtype=bool)
+EXPECTED_IMAGE_SHAPES = {
+    "observation.images.left_wrist": [720, 1280, 3],
+    "observation.images.right_wrist": [720, 1280, 3],
+    "observation.images.base": [480, 640, 3],
+}
 
 
 @dataclass(frozen=True)
@@ -133,6 +141,177 @@ def select_episode_rows(dataset_root: Path, info: dict[str, Any], episode_row: d
     rows = parquet_rows(data_file_path(dataset_root, info, episode_row))
     episode_index = int(episode_row["episode_index"])
     return [row for row in rows if int(row["episode_index"]) == episode_index]
+
+
+def load_training_config(model_dir: Path) -> dict[str, Any]:
+    path = model_dir / "train_config.json"
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def load_checkpoint_action_quantiles(model_dir: Path) -> tuple[np.ndarray, np.ndarray]:
+    path = model_dir / "policy_postprocessor_step_0_unnormalizer_processor.safetensors"
+    tensors = load_file(str(path))
+    return tensors["action.q01"].cpu().numpy(), tensors["action.q99"].cpu().numpy()
+
+
+def sample_relative_action_stats(
+    dataset_root: Path,
+    max_rows: int,
+) -> dict[str, Any]:
+    states: list[np.ndarray] = []
+    actions: list[np.ndarray] = []
+    for path in sorted((dataset_root / "data").glob("**/*.parquet")):
+        table = pq.read_table(path, columns=["observation.state", "action"])
+        for row in table.to_pylist():
+            states.append(vector(row["observation.state"]))
+            actions.append(vector(row["action"]))
+            if len(states) >= max_rows:
+                break
+        if len(states) >= max_rows:
+            break
+    if not states:
+        raise ValueError(f"No rows loaded from {dataset_root / 'data'}")
+    state_arr = np.stack(states)
+    action_arr = np.stack(actions)
+    rel = action_arr - state_arr
+    return {
+        "rows": int(rel.shape[0]),
+        "relative_q01": np.percentile(rel, 1, axis=0),
+        "relative_q99": np.percentile(rel, 99, axis=0),
+        "absolute_q01": np.percentile(action_arr, 1, axis=0),
+        "absolute_q99": np.percentile(action_arr, 99, axis=0),
+    }
+
+
+def abs_max(values: np.ndarray, mask: np.ndarray) -> float:
+    return float(np.max(np.abs(values[mask])))
+
+
+def validate_folding_recipe(
+    *,
+    cfg: PreTrainedConfig,
+    model_dir: Path,
+    dataset_repo: str,
+    dataset_root: Path,
+    info: dict[str, Any],
+    max_rows: int,
+    relative_stats_tolerance_deg: float,
+    action_span_ratio_limit: float,
+) -> dict[str, Any]:
+    train_cfg = load_training_config(model_dir)
+    train_dataset_repo = train_cfg.get("dataset", {}).get("repo_id")
+    train_policy = train_cfg.get("policy", {})
+    q01, q99 = load_checkpoint_action_quantiles(model_dir)
+    sampled = sample_relative_action_stats(dataset_root, max_rows=max_rows)
+    rel_q01 = sampled["relative_q01"]
+    rel_q99 = sampled["relative_q99"]
+    abs_q01 = sampled["absolute_q01"]
+    abs_q99 = sampled["absolute_q99"]
+    post_span = q99 - q01
+    rel_span = rel_q99 - rel_q01
+    span_ratio = post_span / np.maximum(rel_span, 1e-6)
+
+    checks = []
+
+    def add_check(name: str, passed: bool, details: dict[str, Any]) -> None:
+        checks.append({"name": name, "passed": bool(passed), **details})
+
+    features = info.get("features", {})
+    image_features = {key: features.get(key, {}) for key in IMAGE_KEYS}
+    add_check("policy_type_pi05", getattr(cfg, "type", None) == "pi05", {"actual": getattr(cfg, "type", None)})
+    add_check(
+        "model_training_dataset_matches_replay_dataset",
+        train_dataset_repo in {None, dataset_repo},
+        {"train_dataset_repo": train_dataset_repo, "replay_dataset_repo": dataset_repo},
+    )
+    add_check(
+        "dataset_robot_type_openarms_follower",
+        info.get("robot_type") == "openarms_follower",
+        {"actual": info.get("robot_type")},
+    )
+    add_check(
+        "action_names_match_folding_16d",
+        features.get("action", {}).get("names") == ACTION_NAMES,
+        {"actual": features.get("action", {}).get("names")},
+    )
+    add_check(
+        "state_names_match_folding_16d",
+        features.get("observation.state", {}).get("names") == ACTION_NAMES,
+        {"actual": features.get("observation.state", {}).get("names")},
+    )
+    add_check(
+        "camera_keys_and_shapes_match_space_recipe",
+        all(image_features[key].get("shape") == EXPECTED_IMAGE_SHAPES[key] for key in IMAGE_KEYS),
+        {"actual": {key: image_features[key].get("shape") for key in IMAGE_KEYS}},
+    )
+    add_check(
+        "use_relative_actions_enabled",
+        bool(getattr(cfg, "use_relative_actions", False)),
+        {"actual": bool(getattr(cfg, "use_relative_actions", False))},
+    )
+    add_check(
+        "relative_exclude_gripper_only",
+        list(getattr(cfg, "relative_exclude_joints", [])) == ["gripper"],
+        {"actual": list(getattr(cfg, "relative_exclude_joints", []))},
+    )
+    add_check("chunk_size_30", int(getattr(cfg, "chunk_size", -1)) == 30, {"actual": getattr(cfg, "chunk_size", None)})
+    add_check(
+        "n_action_steps_30",
+        int(getattr(cfg, "n_action_steps", -1)) == 30,
+        {"actual": getattr(cfg, "n_action_steps", None)},
+    )
+    add_check(
+        "rabc_recorded_in_train_config",
+        bool(train_cfg.get("use_rabc", False)),
+        {
+            "use_rabc": train_cfg.get("use_rabc"),
+            "rabc_kappa": train_cfg.get("rabc_kappa"),
+            "rabc_progress_path": train_cfg.get("rabc_progress_path"),
+        },
+    )
+
+    max_post_vs_rel_q01_error = abs_max(q01 - rel_q01, ARM_ACTION_MASK)
+    max_post_vs_rel_q99_error = abs_max(q99 - rel_q99, ARM_ACTION_MASK)
+    max_post_vs_abs_q01_error = abs_max(q01 - abs_q01, ARM_ACTION_MASK)
+    max_post_vs_abs_q99_error = abs_max(q99 - abs_q99, ARM_ACTION_MASK)
+    max_arm_span_ratio = float(np.max(span_ratio[ARM_ACTION_MASK]))
+    add_check(
+        "postprocessor_action_stats_are_relative_for_arm_joints",
+        max_post_vs_rel_q01_error <= relative_stats_tolerance_deg
+        and max_post_vs_rel_q99_error <= relative_stats_tolerance_deg
+        and max_arm_span_ratio <= action_span_ratio_limit,
+        {
+            "sample_rows": sampled["rows"],
+            "relative_stats_tolerance_deg": relative_stats_tolerance_deg,
+            "action_span_ratio_limit": action_span_ratio_limit,
+            "max_post_vs_relative_q01_error_deg": max_post_vs_rel_q01_error,
+            "max_post_vs_relative_q99_error_deg": max_post_vs_rel_q99_error,
+            "max_post_vs_absolute_q01_error_deg": max_post_vs_abs_q01_error,
+            "max_post_vs_absolute_q99_error_deg": max_post_vs_abs_q99_error,
+            "max_arm_span_ratio_postprocessor_over_sampled_relative": max_arm_span_ratio,
+            "worst_span_ratio_key": ACTION_NAMES[int(np.argmax(np.where(ARM_ACTION_MASK, span_ratio, -1.0)))],
+        },
+    )
+
+    return {
+        "source": "https://huggingface.co/spaces/lerobot/robot-folding#hardware",
+        "summary": {
+            "passed": all(check["passed"] for check in checks),
+            "failed_checks": [check["name"] for check in checks if not check["passed"]],
+        },
+        "expected_runtime": {
+            "robot": "bimanual OpenArm",
+            "action_dim": 16,
+            "camera_keys": IMAGE_KEYS,
+            "model": "pi05",
+            "chunk_size": 30,
+            "rtc_execution_horizon": 20,
+            "action_interpolation_multiplier": 3,
+            "action_representation": "relative trajectory; grippers excluded",
+            "training_techniques": ["SARM", "RABC", "DAgger/HIL", "high-quality data fine-tuning"],
+        },
+        "checks": checks,
+    }
 
 
 def parse_frame_indices(raw: str, episode_length: int) -> list[int]:
@@ -380,6 +559,23 @@ def write_markdown(path: Path, payload: dict[str, Any]) -> None:
     lines = [
         "# Stage 22 Dataset Replay And Stage 23 Ablation",
         "",
+        "## Recipe Gate",
+        "",
+    ]
+    recipe_gate = payload.get("recipe_gate")
+    if recipe_gate:
+        status = "PASS" if recipe_gate["summary"]["passed"] else "FAIL"
+        lines.append(f"- Status: `{status}`")
+        lines.append(f"- Source: {recipe_gate['source']}")
+        if recipe_gate["summary"]["failed_checks"]:
+            lines.append(f"- Failed checks: `{', '.join(recipe_gate['summary']['failed_checks'])}`")
+        for check in recipe_gate["checks"]:
+            mark = "PASS" if check["passed"] else "FAIL"
+            lines.append(f"- `{check['name']}`: {mark}")
+    else:
+        lines.append("- Not requested.")
+    lines.extend([
+        "",
         "## Decision Inputs",
         "",
         f"- Dataset: `{payload['dataset_repo']}` episode `{payload['episode_index']}`",
@@ -390,7 +586,7 @@ def write_markdown(path: Path, payload: dict[str, Any]) -> None:
         "",
         "## Dataset Replay",
         "",
-    ]
+    ])
     for sample in payload["dataset_replay"]:
         summary = sample["model_summary"]
         cmp_summary = sample["recorded_comparison"]
@@ -429,6 +625,10 @@ def main() -> int:
     parser.add_argument("--snapshot-dir", type=Path)
     parser.add_argument("--ablation-frame", type=int, default=0)
     parser.add_argument("--robot-type", default="openarms_follower")
+    parser.add_argument("--no-recipe-gate", action="store_true")
+    parser.add_argument("--recipe-gate-max-rows", type=int, default=5000)
+    parser.add_argument("--recipe-gate-relative-stats-tolerance-deg", type=float, default=2.0)
+    parser.add_argument("--recipe-gate-action-span-ratio-limit", type=float, default=3.0)
     parser.add_argument("--json-out", type=Path, required=True)
     parser.add_argument("--md-out", type=Path, required=True)
     args = parser.parse_args()
@@ -441,6 +641,18 @@ def main() -> int:
     samples = load_dataset_samples(dataset_root, info, episode_row, frame_indices, args.video_backend)
 
     cfg, policy, preprocessor, postprocessor = load_model(args.model_dir, args.device)
+    recipe_gate = None
+    if not args.no_recipe_gate:
+        recipe_gate = validate_folding_recipe(
+            cfg=cfg,
+            model_dir=args.model_dir,
+            dataset_repo=args.dataset_repo,
+            dataset_root=dataset_root,
+            info=info,
+            max_rows=args.recipe_gate_max_rows,
+            relative_stats_tolerance_deg=args.recipe_gate_relative_stats_tolerance_deg,
+            action_span_ratio_limit=args.recipe_gate_action_span_ratio_limit,
+        )
     payload: dict[str, Any] = {
         "dataset_repo": args.dataset_repo,
         "dataset_root": str(dataset_root),
@@ -452,6 +664,7 @@ def main() -> int:
         "video_backend": args.video_backend,
         "robot_type": args.robot_type,
         "action_names": ACTION_NAMES,
+        "recipe_gate": recipe_gate,
         "dataset_replay": [],
         "ablations": {},
         "safety": {
@@ -515,6 +728,9 @@ def main() -> int:
     args.md_out.parent.mkdir(parents=True, exist_ok=True)
     args.json_out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     write_markdown(args.md_out, payload)
+    if recipe_gate is not None and not recipe_gate["summary"]["passed"]:
+        print(json.dumps({"json_out": str(args.json_out), "md_out": str(args.md_out), "recipe_gate": "FAIL"}, indent=2))
+        return 2
     print(json.dumps({"json_out": str(args.json_out), "md_out": str(args.md_out)}, indent=2))
     return 0
 

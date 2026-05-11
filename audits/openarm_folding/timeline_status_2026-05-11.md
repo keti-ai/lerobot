@@ -502,3 +502,21 @@ LeRobot Pi05/action-representation docs require recomputing stats in relative
 action space before training with relative actions. The current recipe is
 therefore not aligned, and robot motion remains blocked until a corrected
 checkpoint/processor recipe passes dataset replay.
+
+Stage 27 added a hard folding recipe gate to
+`audits/openarm_folding/stage22_dataset_replay_and_ablation.py`. The gate is
+based on the `robot-folding` Space recipe: bimanual OpenArm, 16D state/action,
+three camera keys/shapes, Pi05, chunk 30, relative trajectory with gripper
+excluded, SARM/RABC recorded, and RTC/interpolation as deployment expectations.
+The current `folding_latest` passes structural checks but fails the critical
+relative-action stats check:
+
+```text
+postprocessor_action_stats_are_relative_for_arm_joints: FAIL
+max_post_vs_relative_q01_error_deg: 69.973
+max_post_vs_relative_q99_error_deg: 110.695
+max_arm_span_ratio_postprocessor_over_sampled_relative: 14.230
+```
+
+The script now returns exit code `2` when the recipe gate fails, while still
+writing JSON/Markdown diagnostics. Robot motion remains blocked.

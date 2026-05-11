@@ -1,0 +1,430 @@
+{
+  "ablations": {},
+  "action_names": [
+    "right_joint_1.pos",
+    "right_joint_2.pos",
+    "right_joint_3.pos",
+    "right_joint_4.pos",
+    "right_joint_5.pos",
+    "right_joint_6.pos",
+    "right_joint_7.pos",
+    "right_gripper.pos",
+    "left_joint_1.pos",
+    "left_joint_2.pos",
+    "left_joint_3.pos",
+    "left_joint_4.pos",
+    "left_joint_5.pos",
+    "left_joint_6.pos",
+    "left_joint_7.pos",
+    "left_gripper.pos"
+  ],
+  "dataset_replay": [
+    {
+      "episode_index": 0,
+      "frame_index": 0,
+      "model_summary": {
+        "action_shape": [
+          1,
+          30,
+          16
+        ],
+        "max_abs_delta_deg": 71.91801452636719,
+        "max_abs_delta_key": "right_joint_4.pos",
+        "mean_abs_delta_deg": 26.748001098632812,
+        "rows": [
+          {
+            "key": "right_joint_1.pos",
+            "predicted_abs_deg": -30.930496215820312,
+            "predicted_delta_deg": -7.292217254638672,
+            "state_deg": -23.63827896118164
+          },
+          {
+            "key": "right_joint_2.pos",
+            "predicted_abs_deg": -14.774003982543945,
+            "predicted_delta_deg": -10.588399887084961,
+            "state_deg": -4.185603618621826
+          },
+          {
+            "key": "right_joint_3.pos",
+            "predicted_abs_deg": 5.331842422485352,
+            "predicted_delta_deg": -23.50838851928711,
+            "state_deg": 28.84023094177246
+          },
+          {
+            "key": "right_joint_4.pos",
+            "predicted_abs_deg": -30.947181701660156,
+            "predicted_delta_deg": -71.91801452636719,
+            "state_deg": 40.97083282470703
+          },
+          {
+            "key": "right_joint_5.pos",
+            "predicted_abs_deg": -53.287940979003906,
+            "predicted_delta_deg": -29.584091186523438,
+            "state_deg": -23.70384979248047
+          },
+          {
+            "key": "right_joint_6.pos",
+            "predicted_abs_deg": 7.540911674499512,
+            "predicted_delta_deg": -15.944369316101074,
+            "state_deg": 23.485280990600586
+          },
+          {
+            "key": "right_joint_7.pos",
+            "predicted_abs_deg": 57.933048248291016,
+            "predicted_delta_deg": 54.665435791015625,
+            "state_deg": 3.2676124572753906
+          },
+          {
+            "key": "right_gripper.pos",
+            "predicted_abs_deg": -8.0860595703125,
+            "predicted_delta_deg": 3.727616310119629,
+            "state_deg": -11.813675880432129
+          },
+          {
+            "key": "left_joint_1.pos",
+            "predicted_abs_deg": 56.22181701660156,
+            "predicted_delta_deg": 26.944446563720703,
+            "state_deg": 29.27737045288086
+          },
+          {
+            "key": "left_joint_2.pos",
+            "predicted_abs_deg": 22.301115036010742,
+            "predicted_delta_deg": 25.197158813476562,
+            "state_deg": -2.8960444927215576
+          },
+          {
+            "key": "left_joint_3.pos",
+            "predicted_abs_deg": 16.460033416748047,
+            "predicted_delta_deg": 21.27948760986328,
+            "state_deg": -4.819455146789551
+          },
+          {
+            "key": "left_joint_4.pos",
+            "predicted_abs_deg": -16.986675262451172,
+            "predicted_delta_deg": -58.613216400146484,
+            "state_deg": 41.62654113769531
+          },
+          {
+            "key": "left_joint_5.pos",
+            "predicted_abs_deg": 33.03880310058594,
+            "predicted_delta_deg": 25.50908660888672,
+            "state_deg": 7.529715538024902
+          },
+          {
+            "key": "left_joint_6.pos",
+            "predicted_abs_deg": -4.622891902923584,
+            "predicted_delta_deg": 2.6663970947265625,
+            "state_deg": -7.2892889976501465
+          },
+          {
+            "key": "left_joint_7.pos",
+            "predicted_abs_deg": -36.80919647216797,
+            "predicted_delta_deg": -27.61835479736328,
+            "state_deg": -9.190842628479004
+          },
+          {
+            "key": "left_gripper.pos",
+            "predicted_abs_deg": -3.6120643615722656,
+            "predicted_delta_deg": 22.911331176757812,
+            "state_deg": -26.523395538330078
+          }
+        ]
+      },
+      "recorded_comparison": {
+        "model_minus_recorded_max_abs_error_deg": 75.3867416381836,
+        "model_minus_recorded_max_abs_error_key": "right_joint_4.pos",
+        "model_minus_recorded_mean_abs_error_deg": 26.90675926208496,
+        "recorded_max_abs_delta_deg": 5.362468719482422,
+        "recorded_mean_abs_delta_deg": 1.3002536296844482,
+        "rows": [
+          {
+            "key": "right_joint_1.pos",
+            "model_delta_deg": -7.292217254638672,
+            "model_minus_recorded_delta_deg": -4.952474594116211,
+            "recorded_action_deg": -25.9780216217041,
+            "recorded_delta_deg": -2.339742660522461
+          },
+          {
+            "key": "right_joint_2.pos",
+            "model_delta_deg": -10.588399887084961,
+            "model_minus_recorded_delta_deg": -9.191585540771484,
+            "recorded_action_deg": -5.5824174880981445,
+            "recorded_delta_deg": -1.3968138694763184
+          },
+          {
+            "key": "right_joint_3.pos",
+            "model_delta_deg": -23.50838851928711,
+            "model_minus_recorded_delta_deg": -23.547279357910156,
+            "recorded_action_deg": 28.879121780395508,
+            "recorded_delta_deg": 0.038890838623046875
+          },
+          {
+            "key": "right_joint_4.pos",
+            "model_delta_deg": -71.91801452636719,
+            "model_minus_recorded_delta_deg": -75.3867416381836,
+            "recorded_action_deg": 44.43955993652344,
+            "recorded_delta_deg": 3.4687271118164062
+          },
+          {
+            "key": "right_joint_5.pos",
+            "model_delta_deg": -29.584091186523438,
+            "model_minus_recorded_delta_deg": -30.035194396972656,
+            "recorded_action_deg": -23.25274658203125,
+            "recorded_delta_deg": 0.45110321044921875
+          },
+          {
+            "key": "right_joint_6.pos",
+            "model_delta_deg": -15.944369316101074,
+            "model_minus_recorded_delta_deg": -17.99755096435547,
+            "recorded_action_deg": 25.538461685180664,
+            "recorded_delta_deg": 2.053180694580078
+          },
+          {
+            "key": "right_joint_7.pos",
+            "model_delta_deg": 54.665435791015625,
+            "model_minus_recorded_delta_deg": 54.10887145996094,
+            "recorded_action_deg": 3.8241758346557617,
+            "recorded_delta_deg": 0.5565633773803711
+          },
+          {
+            "key": "right_gripper.pos",
+            "model_delta_deg": 3.727616310119629,
+            "model_minus_recorded_delta_deg": 3.6456480026245117,
+            "recorded_action_deg": -11.731707572937012,
+            "recorded_delta_deg": 0.08196830749511719
+          },
+          {
+            "key": "left_joint_1.pos",
+            "model_delta_deg": 26.944446563720703,
+            "model_minus_recorded_delta_deg": 23.29874038696289,
+            "recorded_action_deg": 32.92307662963867,
+            "recorded_delta_deg": 3.6457061767578125
+          },
+          {
+            "key": "left_joint_2.pos",
+            "model_delta_deg": 25.197158813476562,
+            "model_minus_recorded_delta_deg": 25.334081649780273,
+            "recorded_action_deg": -3.0329670906066895,
+            "recorded_delta_deg": -0.13692259788513184
+          },
+          {
+            "key": "left_joint_3.pos",
+            "model_delta_deg": 21.27948760986328,
+            "model_minus_recorded_delta_deg": 21.427064895629883,
+            "recorded_action_deg": -4.9670329093933105,
+            "recorded_delta_deg": -0.14757776260375977
+          },
+          {
+            "key": "left_joint_4.pos",
+            "model_delta_deg": -58.613216400146484,
+            "model_minus_recorded_delta_deg": -63.975685119628906,
+            "recorded_action_deg": 46.989009857177734,
+            "recorded_delta_deg": 5.362468719482422
+          },
+          {
+            "key": "left_joint_5.pos",
+            "model_delta_deg": 25.50908660888672,
+            "model_minus_recorded_delta_deg": 25.522319793701172,
+            "recorded_action_deg": 7.516483306884766,
+            "recorded_delta_deg": -0.013232231140136719
+          },
+          {
+            "key": "left_joint_6.pos",
+            "model_delta_deg": 2.6663970947265625,
+            "model_minus_recorded_delta_deg": 2.629855155944824,
+            "recorded_action_deg": -7.252747058868408,
+            "recorded_delta_deg": 0.03654193878173828
+          },
+          {
+            "key": "left_joint_7.pos",
+            "model_delta_deg": -27.61835479736328,
+            "model_minus_recorded_delta_deg": -27.094911575317383,
+            "recorded_action_deg": -9.714285850524902,
+            "recorded_delta_deg": -0.5234432220458984
+          },
+          {
+            "key": "left_gripper.pos",
+            "model_delta_deg": 22.911331176757812,
+            "model_minus_recorded_delta_deg": 22.360157012939453,
+            "recorded_action_deg": -25.97222137451172,
+            "recorded_delta_deg": 0.5511741638183594
+          }
+        ]
+      },
+      "task": "Fold the T-shirt properly",
+      "timestamp": 0.0
+    }
+  ],
+  "dataset_repo": "lerobot-data-collection/level2_final_quality3_t_0_hil_data_c",
+  "dataset_root": "/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/datasets/level2_final_quality3_t_0_hil_data_c",
+  "episode_index": 0,
+  "model_dir": "/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/models/folding_latest",
+  "policy_type": "pi05",
+  "recipe_gate": {
+    "checks": [
+      {
+        "actual": "pi05",
+        "name": "policy_type_pi05",
+        "passed": true
+      },
+      {
+        "name": "model_training_dataset_matches_replay_dataset",
+        "passed": true,
+        "replay_dataset_repo": "lerobot-data-collection/level2_final_quality3_t_0_hil_data_c",
+        "train_dataset_repo": "lerobot-data-collection/level2_final_quality3_t_0_hil_data_c"
+      },
+      {
+        "actual": "openarms_follower",
+        "name": "dataset_robot_type_openarms_follower",
+        "passed": true
+      },
+      {
+        "actual": [
+          "right_joint_1.pos",
+          "right_joint_2.pos",
+          "right_joint_3.pos",
+          "right_joint_4.pos",
+          "right_joint_5.pos",
+          "right_joint_6.pos",
+          "right_joint_7.pos",
+          "right_gripper.pos",
+          "left_joint_1.pos",
+          "left_joint_2.pos",
+          "left_joint_3.pos",
+          "left_joint_4.pos",
+          "left_joint_5.pos",
+          "left_joint_6.pos",
+          "left_joint_7.pos",
+          "left_gripper.pos"
+        ],
+        "name": "action_names_match_folding_16d",
+        "passed": true
+      },
+      {
+        "actual": [
+          "right_joint_1.pos",
+          "right_joint_2.pos",
+          "right_joint_3.pos",
+          "right_joint_4.pos",
+          "right_joint_5.pos",
+          "right_joint_6.pos",
+          "right_joint_7.pos",
+          "right_gripper.pos",
+          "left_joint_1.pos",
+          "left_joint_2.pos",
+          "left_joint_3.pos",
+          "left_joint_4.pos",
+          "left_joint_5.pos",
+          "left_joint_6.pos",
+          "left_joint_7.pos",
+          "left_gripper.pos"
+        ],
+        "name": "state_names_match_folding_16d",
+        "passed": true
+      },
+      {
+        "actual": {
+          "observation.images.base": [
+            480,
+            640,
+            3
+          ],
+          "observation.images.left_wrist": [
+            720,
+            1280,
+            3
+          ],
+          "observation.images.right_wrist": [
+            720,
+            1280,
+            3
+          ]
+        },
+        "name": "camera_keys_and_shapes_match_space_recipe",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "name": "use_relative_actions_enabled",
+        "passed": true
+      },
+      {
+        "actual": [
+          "gripper"
+        ],
+        "name": "relative_exclude_gripper_only",
+        "passed": true
+      },
+      {
+        "actual": 30,
+        "name": "chunk_size_30",
+        "passed": true
+      },
+      {
+        "actual": 30,
+        "name": "n_action_steps_30",
+        "passed": true
+      },
+      {
+        "name": "rabc_recorded_in_train_config",
+        "passed": true,
+        "rabc_kappa": 0.0265,
+        "rabc_progress_path": "hf://datasets/lerobot-data-collection/level2_final_quality3_t_0_hil_data_c/sarm_progress.parquet",
+        "use_rabc": true
+      },
+      {
+        "action_span_ratio_limit": 3.0,
+        "max_arm_span_ratio_postprocessor_over_sampled_relative": 14.22959041595459,
+        "max_post_vs_absolute_q01_error_deg": 15.007696151733398,
+        "max_post_vs_absolute_q99_error_deg": 13.373424530029297,
+        "max_post_vs_relative_q01_error_deg": 69.9730453491211,
+        "max_post_vs_relative_q99_error_deg": 110.69503784179688,
+        "name": "postprocessor_action_stats_are_relative_for_arm_joints",
+        "passed": false,
+        "relative_stats_tolerance_deg": 2.0,
+        "sample_rows": 5000,
+        "worst_span_ratio_key": "left_joint_1.pos"
+      }
+    ],
+    "expected_runtime": {
+      "action_dim": 16,
+      "action_interpolation_multiplier": 3,
+      "action_representation": "relative trajectory; grippers excluded",
+      "camera_keys": [
+        "observation.images.left_wrist",
+        "observation.images.right_wrist",
+        "observation.images.base"
+      ],
+      "chunk_size": 30,
+      "model": "pi05",
+      "robot": "bimanual OpenArm",
+      "rtc_execution_horizon": 20,
+      "training_techniques": [
+        "SARM",
+        "RABC",
+        "DAgger/HIL",
+        "high-quality data fine-tuning"
+      ]
+    },
+    "source": "https://huggingface.co/spaces/lerobot/robot-folding#hardware",
+    "summary": {
+      "failed_checks": [
+        "postprocessor_action_stats_are_relative_for_arm_joints"
+      ],
+      "passed": false
+    }
+  },
+  "relative_exclude_joints": [
+    "gripper"
+  ],
+  "robot_type": "openarms_follower",
+  "safety": {
+    "motor_initialization": false,
+    "robot_io": false,
+    "send_action": false,
+    "torque_enable": false,
+    "zeroing": false
+  },
+  "use_relative_actions": true,
+  "video_backend": "ffmpeg"
+}
