@@ -438,3 +438,48 @@ built a no-send execution packet. Stage 18 added a guarded right-arm writer and
 its dry-run validation passed. Stage 19 was operator-gated but blocked before
 torque enable or MIT batch because the packet became stale. The next step is a
 new no-send snapshot and A6000 offline review from the current hardware state.
+
+## 2026-05-11 Stage 20-23 Update
+
+Stage 20 high-overview camera trial completed. Raising/swapping the base camera
+improved the visual match to the dataset overview, but large policy deltas
+remained.
+
+Stage 21 action-contract diagnosis completed. The PI0.5 postprocessor
+relative-to-absolute reconstruction is internally consistent, and the
+`full_folding` recorded `action - observation.state` deltas are small.
+
+Stage 22 dataset replay and Stage 23 ablation completed. The loaded
+`folding_latest` checkpoint produces large deltas even on actual
+`lerobot/full_folding` episode 0 dataset images and dataset state:
+
+```text
+frame 0  model mean_abs_delta=25.055 deg, recorded mean_abs_delta=0.674 deg
+frame 1  model mean_abs_delta=25.978 deg, recorded mean_abs_delta=0.465 deg
+frame 10 model mean_abs_delta=26.492 deg, recorded mean_abs_delta=0.621 deg
+frame 30 model mean_abs_delta=24.052 deg, recorded mean_abs_delta=0.472 deg
+```
+
+State/visual ablation did not isolate the issue to syhlabtop hardware inputs;
+all combinations remained in the 24-27 deg mean absolute delta range.
+
+Current conclusion: deployment is blocked by checkpoint/runtime/processor
+contract validation, not by a first-write clamp tuning problem. The checkpoint
+postprocessor action quantiles appear to match absolute joint-angle
+distributions while `use_relative_actions=true`, which must be validated against
+the training-time normalization path before any robot motion.
+
+Stage 24 normalized target probe completed. On dataset frames `0` and `1`, the
+model's raw normalized action output does not match the normalized recorded
+relative target:
+
+```text
+frame 0 mean_abs_raw_error=0.680, max_abs_raw_error=1.518 at right_joint_4.pos
+frame 1 mean_abs_raw_error=0.673, max_abs_raw_error=1.483 at right_joint_4.pos
+```
+
+This confirms the failure exists before postprocessing and before any
+syhlabtop-specific hardware input. The next required step is to verify the
+intended checkpoint identity/training export and reproduce dataset replay with
+the exact training-time inference code or a known-good Hugging Face baseline
+script. Robot motion remains blocked.

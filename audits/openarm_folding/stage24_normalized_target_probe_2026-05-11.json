@@ -1,0 +1,272 @@
+{
+  "action_names": [
+    "right_joint_1.pos",
+    "right_joint_2.pos",
+    "right_joint_3.pos",
+    "right_joint_4.pos",
+    "right_joint_5.pos",
+    "right_joint_6.pos",
+    "right_joint_7.pos",
+    "right_gripper.pos",
+    "left_joint_1.pos",
+    "left_joint_2.pos",
+    "left_joint_3.pos",
+    "left_joint_4.pos",
+    "left_joint_5.pos",
+    "left_joint_6.pos",
+    "left_joint_7.pos",
+    "left_gripper.pos"
+  ],
+  "dataset_root": "/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/datasets/full_folding_novideo",
+  "episode_index": 0,
+  "frames": [
+    {
+      "frame_index": 0,
+      "max_abs_raw_error": 1.5178992748260498,
+      "max_abs_raw_error_key": "right_joint_4.pos",
+      "mean_abs_raw_error": 0.6795201301574707,
+      "timestamp": 0.0,
+      "worst_rows": [
+        {
+          "key": "right_joint_4.pos",
+          "model_raw_normalized": -3.055798053741455,
+          "raw_minus_target": -1.5178992748260498,
+          "recorded_delta_deg": 0.1091299057006836,
+          "target_normalized_delta": -1.5378987789154053
+        },
+        {
+          "key": "right_joint_7.pos",
+          "model_raw_normalized": 2.052732229232788,
+          "raw_minus_target": 1.2507522106170654,
+          "recorded_delta_deg": 0.010686300694942474,
+          "target_normalized_delta": 0.8019800186157227
+        },
+        {
+          "key": "left_joint_4.pos",
+          "model_raw_normalized": -2.5445656776428223,
+          "raw_minus_target": -1.178735613822937,
+          "recorded_delta_deg": 0.051308631896972656,
+          "target_normalized_delta": -1.3658300638198853
+        },
+        {
+          "key": "left_joint_2.pos",
+          "model_raw_normalized": 1.8925445079803467,
+          "raw_minus_target": 1.1696959733963013,
+          "recorded_delta_deg": -0.12287700176239014,
+          "target_normalized_delta": 0.7228485345840454
+        },
+        {
+          "key": "right_joint_5.pos",
+          "model_raw_normalized": -1.6364076137542725,
+          "raw_minus_target": -0.9012516736984253,
+          "recorded_delta_deg": -0.03544923663139343,
+          "target_normalized_delta": -0.7351559400558472
+        },
+        {
+          "key": "left_joint_5.pos",
+          "model_raw_normalized": 1.4888557195663452,
+          "raw_minus_target": 0.7980339527130127,
+          "recorded_delta_deg": 0.14231227338314056,
+          "target_normalized_delta": 0.6908217668533325
+        },
+        {
+          "key": "right_joint_3.pos",
+          "model_raw_normalized": -1.0007318258285522,
+          "raw_minus_target": -0.6882079839706421,
+          "recorded_delta_deg": -0.05488451570272446,
+          "target_normalized_delta": -0.31252384185791016
+        },
+        {
+          "key": "left_joint_7.pos",
+          "model_raw_normalized": -1.4019197225570679,
+          "raw_minus_target": -0.675147294998169,
+          "recorded_delta_deg": 0.18554182350635529,
+          "target_normalized_delta": -0.7267724275588989
+        },
+        {
+          "key": "right_joint_6.pos",
+          "model_raw_normalized": -2.0571601390838623,
+          "raw_minus_target": -0.661609411239624,
+          "recorded_delta_deg": -0.3191051185131073,
+          "target_normalized_delta": -1.3955507278442383
+        },
+        {
+          "key": "right_joint_2.pos",
+          "model_raw_normalized": -1.1446067094802856,
+          "raw_minus_target": -0.5257749557495117,
+          "recorded_delta_deg": 0.20352405309677124,
+          "target_normalized_delta": -0.6188317537307739
+        },
+        {
+          "key": "left_joint_1.pos",
+          "model_raw_normalized": 0.3498472273349762,
+          "raw_minus_target": 0.43393173813819885,
+          "recorded_delta_deg": 0.4374675750732422,
+          "target_normalized_delta": -0.08408451080322266
+        },
+        {
+          "key": "left_joint_3.pos",
+          "model_raw_normalized": 0.7036813497543335,
+          "raw_minus_target": 0.42474186420440674,
+          "recorded_delta_deg": 0.02963721752166748,
+          "target_normalized_delta": 0.27893948554992676
+        },
+        {
+          "key": "right_gripper.pos",
+          "model_raw_normalized": 0.6767868995666504,
+          "raw_minus_target": -0.2999541759490967,
+          "recorded_delta_deg": 0.33878254890441895,
+          "target_normalized_delta": 0.9767410755157471
+        },
+        {
+          "key": "right_joint_1.pos",
+          "model_raw_normalized": -0.14074990153312683,
+          "raw_minus_target": -0.15247270464897156,
+          "recorded_delta_deg": -0.39133262634277344,
+          "target_normalized_delta": 0.011722803115844727
+        },
+        {
+          "key": "left_gripper.pos",
+          "model_raw_normalized": 0.8051556944847107,
+          "raw_minus_target": 0.13552862405776978,
+          "recorded_delta_deg": -7.967994689941406,
+          "target_normalized_delta": 0.6696270704269409
+        },
+        {
+          "key": "left_joint_6.pos",
+          "model_raw_normalized": 1.0907460451126099,
+          "raw_minus_target": 0.05858409404754639,
+          "recorded_delta_deg": -0.38031694293022156,
+          "target_normalized_delta": 1.0321619510650635
+        }
+      ]
+    },
+    {
+      "frame_index": 1,
+      "max_abs_raw_error": 1.4827308654785156,
+      "max_abs_raw_error_key": "right_joint_4.pos",
+      "mean_abs_raw_error": 0.6728876233100891,
+      "timestamp": 0.03333333507180214,
+      "worst_rows": [
+        {
+          "key": "right_joint_4.pos",
+          "model_raw_normalized": -3.020629644393921,
+          "raw_minus_target": -1.4827308654785156,
+          "recorded_delta_deg": 0.1091299057006836,
+          "target_normalized_delta": -1.5378987789154053
+        },
+        {
+          "key": "right_joint_7.pos",
+          "model_raw_normalized": 2.0099689960479736,
+          "raw_minus_target": 1.2085298299789429,
+          "recorded_delta_deg": -0.011170636862516403,
+          "target_normalized_delta": 0.8014391660690308
+        },
+        {
+          "key": "left_joint_2.pos",
+          "model_raw_normalized": 1.9059438705444336,
+          "raw_minus_target": 1.1841261386871338,
+          "recorded_delta_deg": -0.14473393559455872,
+          "target_normalized_delta": 0.7218177318572998
+        },
+        {
+          "key": "left_joint_4.pos",
+          "model_raw_normalized": -2.535343647003174,
+          "raw_minus_target": -1.1695135831832886,
+          "recorded_delta_deg": 0.051308631896972656,
+          "target_normalized_delta": -1.3658300638198853
+        },
+        {
+          "key": "right_joint_5.pos",
+          "model_raw_normalized": -1.6481915712356567,
+          "raw_minus_target": -0.9130356311798096,
+          "recorded_delta_deg": -0.03544923663139343,
+          "target_normalized_delta": -0.7351559400558472
+        },
+        {
+          "key": "left_joint_5.pos",
+          "model_raw_normalized": 1.515683650970459,
+          "raw_minus_target": 0.8307288885116577,
+          "recorded_delta_deg": -0.03254323825240135,
+          "target_normalized_delta": 0.6849547624588013
+        },
+        {
+          "key": "right_joint_3.pos",
+          "model_raw_normalized": -1.0287402868270874,
+          "raw_minus_target": -0.7162164449691772,
+          "recorded_delta_deg": -0.05488451570272446,
+          "target_normalized_delta": -0.31252384185791016
+        },
+        {
+          "key": "left_joint_7.pos",
+          "model_raw_normalized": -1.4265815019607544,
+          "raw_minus_target": -0.6998090744018555,
+          "recorded_delta_deg": 0.18554182350635529,
+          "target_normalized_delta": -0.7267724275588989
+        },
+        {
+          "key": "right_joint_6.pos",
+          "model_raw_normalized": -1.998367190361023,
+          "raw_minus_target": -0.6028164625167847,
+          "recorded_delta_deg": -0.3191051185131073,
+          "target_normalized_delta": -1.3955507278442383
+        },
+        {
+          "key": "left_joint_3.pos",
+          "model_raw_normalized": 0.796822726726532,
+          "raw_minus_target": 0.5086308121681213,
+          "recorded_delta_deg": 0.3812856078147888,
+          "target_normalized_delta": 0.28819191455841064
+        },
+        {
+          "key": "right_joint_2.pos",
+          "model_raw_normalized": -1.1017898321151733,
+          "raw_minus_target": -0.4829580783843994,
+          "recorded_delta_deg": 0.20352405309677124,
+          "target_normalized_delta": -0.6188317537307739
+        },
+        {
+          "key": "left_joint_1.pos",
+          "model_raw_normalized": 0.36071330308914185,
+          "raw_minus_target": 0.4447978138923645,
+          "recorded_delta_deg": 0.4374675750732422,
+          "target_normalized_delta": -0.08408451080322266
+        },
+        {
+          "key": "right_gripper.pos",
+          "model_raw_normalized": 0.7616952061653137,
+          "raw_minus_target": -0.21504586935043335,
+          "recorded_delta_deg": 0.33878254890441895,
+          "target_normalized_delta": 0.9767410755157471
+        },
+        {
+          "key": "right_joint_1.pos",
+          "model_raw_normalized": -0.15410786867141724,
+          "raw_minus_target": -0.16619640588760376,
+          "recorded_delta_deg": -0.3694753646850586,
+          "target_normalized_delta": 0.012088537216186523
+        },
+        {
+          "key": "left_joint_6.pos",
+          "model_raw_normalized": 1.1485874652862549,
+          "raw_minus_target": 0.1164255142211914,
+          "recorded_delta_deg": -0.38031694293022156,
+          "target_normalized_delta": 1.0321619510650635
+        },
+        {
+          "key": "left_gripper.pos",
+          "model_raw_normalized": 0.7742844820022583,
+          "raw_minus_target": -0.024640560150146484,
+          "recorded_delta_deg": -4.377758026123047,
+          "target_normalized_delta": 0.7989250421524048
+        }
+      ]
+    }
+  ],
+  "model_dir": "/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/models/folding_latest",
+  "policy_type": "pi05",
+  "safety": {
+    "robot_io": false,
+    "send_action": false
+  }
+}
