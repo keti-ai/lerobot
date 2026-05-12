@@ -838,3 +838,62 @@ Use:
 audits/openarm_folding/stage34_right_joint4_limit_check_2026-05-12.md
 audits/openarm_folding/syhlabtop_stage32_refresh_snapshot_prompt_2026-05-12.md
 ```
+
+## 2026-05-12 Stage 34 Completed For Fresh Snapshot 171650
+
+syhlabtop refreshed the stale Stage 32 snapshot and transferred the new snapshot
+to A6000:
+
+```text
+snapshot_20260512_171650
+```
+
+A6000 no-send review for `snapshot_20260512_171650` passed:
+
+```text
+action_shape: [1, 30, 16]
+all_finite: true
+send_allowed: false
+```
+
+A6000 Stage 34 dry-run passed for no-send planning:
+
+```text
+max_abs_right_arm_candidate_delta_deg: 0.588154
+right_arm_candidate_targets_within_review_limits: true
+send_allowed: false
+motion_allowed: false
+```
+
+syhlabtop then reported:
+
+```text
+stage34_runtime_preflight: PASS
+stage34_execution_packet_no_send: CREATED
+send_allowed: false
+motion_allowed: false
+execution_allowed: false
+actuator_commands_sent: false
+motion_status: BLOCKED
+```
+
+Latest syhlabtop artifacts:
+
+```text
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_runtime_preflight.json
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_runtime_preflight.md
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_execution_packet_no_send.json
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_execution_packet_no_send.md
+```
+
+Stage 35 is now the next boundary, but it is actual actuator write and remains
+blocked. Before any Stage 35 approval, A6000 must receive or audit the exact
+Stage 34 packet files and checksums, then record the exact selected joints,
+target table, max delta, operator readiness, and abort/power procedure.
+
+Use:
+
+```text
+audits/openarm_folding/stage35_first_actuator_write_boundary_2026-05-12.md
+audits/openarm_folding/syhlabtop_stage35_artifact_handoff_prompt_2026-05-12.md
+```

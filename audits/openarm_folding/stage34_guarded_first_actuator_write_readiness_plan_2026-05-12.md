@@ -246,3 +246,62 @@ Use:
 audits/openarm_folding/stage34_right_joint4_limit_check_2026-05-12.md
 audits/openarm_folding/syhlabtop_stage32_refresh_snapshot_prompt_2026-05-12.md
 ```
+
+## 2026-05-12 Fresh Snapshot 171650 Update
+
+The stale `snapshot_20260512_155652` path was restarted with:
+
+```text
+snapshot_20260512_171650
+```
+
+A6000 review passed:
+
+```text
+action_shape: [1, 30, 16]
+all_finite: true
+send_allowed: false
+```
+
+Stage 34 dry-run for `snapshot_20260512_171650` also passed for no-send
+planning:
+
+```text
+max_abs_right_arm_candidate_delta_deg: 0.588154
+right_arm_candidate_targets_within_review_limits: true
+send_allowed: false
+motion_allowed: false
+```
+
+syhlabtop then completed the Stage 34 runtime preflight and no-send execution
+packet:
+
+```text
+stage34_runtime_preflight: PASS
+stage34_execution_packet_no_send: CREATED
+send_allowed: false
+motion_allowed: false
+execution_allowed: false
+actuator_commands_sent: false
+motion_status: BLOCKED
+```
+
+The reported syhlabtop packet artifacts are:
+
+```text
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_runtime_preflight.json
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_runtime_preflight.md
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_execution_packet_no_send.json
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_execution_packet_no_send.md
+```
+
+These packet files are not yet present under the A6000 work root. The next
+no-motion step is to transfer or print the packet files and checksums for A6000
+review.
+
+Use:
+
+```text
+audits/openarm_folding/stage35_first_actuator_write_boundary_2026-05-12.md
+audits/openarm_folding/syhlabtop_stage35_artifact_handoff_prompt_2026-05-12.md
+```
