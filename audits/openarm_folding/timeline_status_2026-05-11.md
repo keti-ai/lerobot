@@ -691,3 +691,60 @@ Use:
 ```text
 audits/openarm_folding/stage33_a6000_remote_serving_bridge_plan_2026-05-12.md
 ```
+
+## 2026-05-12 Stage 32 PASS And Stage 34 Boundary
+
+syhlabtop completed the corrected A6000-served snapshot handoff.
+
+Result:
+
+```text
+repo_head: 388a302df024139eb92548f859fcd48182fdf77d
+architecture: syhlabtop_snapshot__a6000_inference
+local_model_on_syhlabtop: NO
+camera_mapping: PASS
+state_order_check: PASS
+snapshot_bundle: CREATED
+snapshot_path: /home/syhlabtop/openarm_folding_20260512/shadow_snapshots/snapshot_20260512_155652
+snapshot_transfer_to_a6000: DONE
+a6000_review: PASS
+motion_status: BLOCKED
+```
+
+A6000 no-send review:
+
+```text
+action_shape: [1, 30, 16]
+all_finite: true
+send_allowed: false
+max_first_action_arm_delta_deg: 1.3073272705078125 at right_joint_1.pos
+right_joint_4_delta_deg: 0.7648124694824219
+left_joint_4_delta_deg: -0.0755462646484375
+right_joint_7_delta_deg: 0.4439506530761719
+```
+
+A6000 artifacts:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/syhlabtop_snapshots/snapshot_20260512_155652/
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/shadow_replays/snapshot_20260512_155652_action_review.csv
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/shadow_replays/snapshot_20260512_155652_action_review.json
+```
+
+No syhlabtop local model inference, rollout, record, replay, zeroing,
+calibration write, actuator write, or `send_action` was run.
+
+The next step is Stage 34: regenerate or parameterize the guarded first-motion
+dry-run/preflight gates for `snapshot_20260512_155652`. The existing Stage
+15-18 scripts are hardcoded to older `snapshot_20260511_154554` checksums and
+must not be run directly against the new snapshot.
+
+Use:
+
+```text
+audits/openarm_folding/stage32_syhlabtop_a6000_snapshot_review_2026-05-12.md
+audits/openarm_folding/stage34_guarded_first_actuator_write_readiness_plan_2026-05-12.md
+```
+
+Motion remains blocked. Stage 35 actuator write requires a separate explicit
+human approval of the exact command and target table.
