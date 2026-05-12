@@ -1,26 +1,40 @@
 # OpenArm Folding Audit Index
 
-Date: 2026-05-11
+Date: 2026-05-12
 Branch: `audit/openarm-folding-baseline`
 Scope: metadata audit and no-motion/shadow-readiness prep for `lerobot/folding_latest`.
 
+## Current Experiment Entry Point
+
+Use this compact brief first:
+
+```text
+experiment_start_brief_2026-05-12.md
+```
+
+Current boundary:
+
+```text
+Stage35 first guarded right-arm write: DONE
+Stage36 A6000 no-send serving bridge: PASS
+Stage37 A6000 served-proposal right-arm single write: DONE
+motion_status: BLOCKED_FOR_REVIEW
+next_motion_approval: NOT_GIVEN
+```
+
+The old Stage37 proposal must not be reused. Start the next experiment from a
+fresh snapshot and a new A6000 no-send proposal.
+
 ## Read Order
 
-1. `artifact_audit.md`
-2. `body_compat_matrix.md`
-3. `shared_baseline.md`
-4. `two_machine_pipeline_2026-05-11.md`
-5. `robot_test_work_spec_2026-05-11.md`
-6. `a6000_persistent_setup_2026-05-11.md`
-7. `syhlabtop_work_prompt_2026-05-11.md`
-8. `timeline_status_2026-05-11.md`
-9. `syhlabtop_agent_ready_prompt_2026-05-11.md`
-10. `syhlabtop_stage_guides_2026-05-11.md`
-11. `syhlabtop_no_nas_fallback_2026-05-11.md`
-12. `stage28_to_stage32_recovery_runbook_2026-05-11.md`
-13. `stage29_candidate_recipe_gate_expanded_2026-05-11.md`
-14. `stage30_relative_recipe_reference_2026-05-11.md`
-15. `stage30_gap_and_execution_plan_2026-05-11.md`
+1. `experiment_start_brief_2026-05-12.md`
+2. `timeline_status_2026-05-11.md`
+3. `stage37_served_proposal_actual_write_result_2026-05-12.md`
+4. `stage36_a6000_serving_bridge_result_2026-05-12.md`
+5. `stage35_actual_write_result_2026-05-12.md`
+6. Historical recipe/audit sources as needed:
+   `artifact_audit.md`, `body_compat_matrix.md`, `shared_baseline.md`,
+   `stage28_to_stage32_recovery_runbook_2026-05-11.md`.
 
 ## Storage Policy
 
