@@ -173,8 +173,11 @@ stage35_syhlabtop_no_execute_validation_handoff_to_a6000: DONE
 stage35_actual_writer: PREPARED_NOT_EXECUTED
 stage35_actual_writer_ready_no_send: PASS
 stage35_actual_writer_ready_handoff_to_a6000: DONE
-operator_motion_approval: NOT_GIVEN
-motion_status: BLOCKED
+stage35_single_write_attempt: DONE
+stage35_post_write_readback: PASS
+operator_motion_approval: CONSUMED_FOR_SINGLE_WRITE
+next_motion_approval: NOT_GIVEN
+motion_status: BLOCKED_FOR_REVIEW
 ```
 
 Use:
@@ -236,6 +239,57 @@ A6000 handoff path:
 
 The A6000 copies matched the syhlabtop checksums.
 
+Stage 35 actual write attempt:
+
+```text
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_actual_write_attempt.json
+sha256: 2b48d21086fa69da9b5d7828668b9575c7a3e12786c31716965add6982065154
+
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_actual_write_attempt.md
+sha256: fcb0fd677ffb9321ed5c0b6953dff42509eecae5d7ad4c67c003d370d24c0619
+```
+
+Result:
+
+```text
+packet_validation_passed: true
+fresh_target_validation_passed: true
+execute_requested: true
+operator_motion_approval: GIVEN
+actuator_commands_sent: true
+motion_status: SINGLE_WRITE_ATTEMPTED
+max_abs_final_target_error_deg: 0.36750044908878676
+```
+
+Post-write read-only readback:
+
+```text
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_post_write_readback.json
+sha256: cc59ed768aaa055ba885b3d2b2a3a50f7bfbd1548e554829fbcfcf0d9b5ca4d5
+
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_post_write_readback.md
+sha256: 1d35caa17a17dcf24fa581726cd36eaf18277da6c7881122cf811be32a06bfed
+```
+
+Result:
+
+```text
+fresh_target_validation_passed: true
+execute_requested: false
+actuator_commands_sent: false
+motion_status: BLOCKED
+max_abs_drift_from_packet_current_deg: 0.6119940781871565
+max_abs_target_delta_from_current_deg: 0.38935738794324726
+```
+
+A6000 handoff path:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/syhlabtop_stage35_actual_write_attempt/snapshot_20260512_171650/
+```
+
+The A6000 copies matched the syhlabtop checksums.
+
 Stage 35 actual writer readiness output:
 
 ```text
@@ -269,7 +323,7 @@ The A6000 copies matched the syhlabtop checksums.
 
 ## Stage 35 Entry Requirements
 
-Stage 35 is actual actuator write. It requires a separate explicit human
+Further actual actuator write requires a separate explicit human
 approval after all of the following are true:
 
 1. A no-execute writer validation passes on syhlabtop immediately before any
@@ -290,7 +344,7 @@ Until these conditions are met:
 
 ```text
 stage35_actuator_write: BLOCKED
-motion_status: BLOCKED
+motion_status: BLOCKED_FOR_REVIEW
 ```
 
 ## Next Work

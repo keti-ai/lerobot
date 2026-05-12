@@ -1044,3 +1044,73 @@ stage35_actual_writer_ready_no_send: PASS
 operator_motion_approval: NOT_GIVEN
 motion_status: BLOCKED
 ```
+
+## 2026-05-12 Stage 35 Single Write Attempt Completed
+
+The operator explicitly approved the exact Stage 35 command and confirmation
+phrase in the live session. syhlabtop executed one guarded right-arm joint
+write.
+
+Result:
+
+```text
+packet_validation_passed: true
+fresh_target_validation_passed: true
+execute_requested: true
+operator_motion_approval: GIVEN
+send_allowed: true
+motion_allowed: true
+execution_allowed: true
+actuator_commands_sent: true
+motion_status: SINGLE_WRITE_ATTEMPTED
+errors: []
+max_abs_final_target_error_deg: 0.36750044908878676
+```
+
+Artifacts:
+
+```text
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_actual_write_attempt.json
+sha256: 2b48d21086fa69da9b5d7828668b9575c7a3e12786c31716965add6982065154
+
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_actual_write_attempt.md
+sha256: fcb0fd677ffb9321ed5c0b6953dff42509eecae5d7ad4c67c003d370d24c0619
+```
+
+Post-write readback was then run without `--execute`, and no additional
+actuator command was sent:
+
+```text
+fresh_target_validation_passed: true
+execute_requested: false
+actuator_commands_sent: false
+motion_status: BLOCKED
+max_abs_drift_from_packet_current_deg: 0.6119940781871565
+max_abs_target_delta_from_current_deg: 0.38935738794324726
+```
+
+Post-write artifacts:
+
+```text
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_post_write_readback.json
+sha256: cc59ed768aaa055ba885b3d2b2a3a50f7bfbd1548e554829fbcfcf0d9b5ca4d5
+
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_post_write_readback.md
+sha256: 1d35caa17a17dcf24fa581726cd36eaf18277da6c7881122cf811be32a06bfed
+```
+
+The attempt and post-write readback artifacts were transferred to A6000 and
+checksums matched:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/syhlabtop_stage35_actual_write_attempt/snapshot_20260512_171650/
+```
+
+Current boundary:
+
+```text
+stage35_single_write_attempt: DONE
+stage35_post_write_readback: PASS
+next_motion_approval: NOT_GIVEN
+motion_status: BLOCKED_FOR_REVIEW
+```

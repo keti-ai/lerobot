@@ -176,3 +176,52 @@ Negative execute-gate check:
 
 The execute path remains blocked until the operator explicitly approves the
 exact command in `stage35_operator_motion_approval_draft_2026-05-12.md`.
+
+## 2026-05-12 Actual Write Result
+
+The operator gave explicit approval in the live session for the exact command
+and confirmation phrase. The guarded writer executed one right-arm joint write.
+
+Result:
+
+```text
+packet_validation_passed: true
+fresh_target_validation_passed: true
+execute_requested: true
+operator_motion_approval: GIVEN
+send_allowed: true
+motion_allowed: true
+execution_allowed: true
+actuator_commands_sent: true
+motion_status: SINGLE_WRITE_ATTEMPTED
+errors: []
+```
+
+Artifacts:
+
+```text
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_actual_write_attempt.json
+sha256: 2b48d21086fa69da9b5d7828668b9575c7a3e12786c31716965add6982065154
+
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_actual_write_attempt.md
+sha256: fcb0fd677ffb9321ed5c0b6953dff42509eecae5d7ad4c67c003d370d24c0619
+```
+
+Post-write read-only readback:
+
+```text
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_post_write_readback.json
+sha256: cc59ed768aaa055ba885b3d2b2a3a50f7bfbd1548e554829fbcfcf0d9b5ca4d5
+
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_post_write_readback.md
+sha256: 1d35caa17a17dcf24fa581726cd36eaf18277da6c7881122cf811be32a06bfed
+```
+
+The artifacts were transferred to A6000 and checksums matched:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/syhlabtop_stage35_actual_write_attempt/snapshot_20260512_171650/
+```
+
+The post-write readback passed without additional actuator commands. Further
+motion is blocked pending review.
