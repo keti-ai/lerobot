@@ -986,3 +986,61 @@ audits/openarm_folding/stage35_syhlabtop_no_execute_validation_result_2026-05-12
 Stage 35 actual actuator write remains blocked. The next allowed work is an
 A6000 audit update and a separate operator approval draft; this is not motion
 approval.
+
+## 2026-05-12 Stage 35 Actual Writer Prepared
+
+The Stage 35 guarded actual writer was created for the approved
+`snapshot_20260512_171650` packet:
+
+```text
+audits/openarm_folding/stage35_guarded_actual_actuator_write.py
+audits/openarm_folding/stage35_guarded_actual_actuator_write_2026-05-12.md
+audits/openarm_folding/stage35_operator_motion_approval_draft_2026-05-12.md
+```
+
+syhlabtop ran the writer without `--execute`.
+
+Result:
+
+```text
+packet_validation_passed: true
+fresh_target_validation_passed: true
+execute_requested: false
+operator_motion_approval: NOT_GIVEN
+send_allowed: false
+motion_allowed: false
+execution_allowed: false
+actuator_commands_sent: false
+motion_status: BLOCKED
+max_abs_fresh_drift_deg: 0.0000003661177974123575
+max_abs_target_delta_from_fresh_deg: 0.5881540488490593
+```
+
+Outputs:
+
+```text
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_actual_writer_ready_no_send.json
+sha256: 4812a9f5479ca3ae9c043a1927b299ef3a776f8ef2f4c6bed2bd0dda6a64b7c2
+
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_actual_writer_ready_no_send.md
+sha256: fca9c238457bb7d307fd17e7cd131fcb1cc1e34127a8feed3cf7bc2f3118d3d8
+```
+
+The outputs were transferred to A6000 and checksums matched:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/syhlabtop_stage35_actual_writer_ready/snapshot_20260512_171650/
+```
+
+Negative execute-gate check rejected `--execute` without the required operator
+approval, operator-at-robot, power-held, abort-ready, e-stop-ready, and exact
+confirmation phrase flags.
+
+Current boundary:
+
+```text
+stage35_actual_writer: PREPARED_NOT_EXECUTED
+stage35_actual_writer_ready_no_send: PASS
+operator_motion_approval: NOT_GIVEN
+motion_status: BLOCKED
+```

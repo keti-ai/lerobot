@@ -170,7 +170,9 @@ stage35_no_execute_validator: READY
 stage35_a6000_packet_only_validation: PASS
 stage35_syhlabtop_fresh_no_execute_validation: PASS
 stage35_syhlabtop_no_execute_validation_handoff_to_a6000: DONE
-stage35_actual_writer: NOT_READY
+stage35_actual_writer: PREPARED_NOT_EXECUTED
+stage35_actual_writer_ready_no_send: PASS
+stage35_actual_writer_ready_handoff_to_a6000: DONE
 operator_motion_approval: NOT_GIVEN
 motion_status: BLOCKED
 ```
@@ -181,6 +183,9 @@ Use:
 audits/openarm_folding/stage35_no_execute_writer_validation.py
 audits/openarm_folding/stage35_no_execute_writer_validation_2026-05-12.md
 audits/openarm_folding/syhlabtop_stage35_no_execute_validation_prompt_2026-05-12.md
+audits/openarm_folding/stage35_guarded_actual_actuator_write.py
+audits/openarm_folding/stage35_guarded_actual_actuator_write_2026-05-12.md
+audits/openarm_folding/stage35_operator_motion_approval_draft_2026-05-12.md
 ```
 
 A6000 packet-only validation output:
@@ -231,6 +236,37 @@ A6000 handoff path:
 
 The A6000 copies matched the syhlabtop checksums.
 
+Stage 35 actual writer readiness output:
+
+```text
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_actual_writer_ready_no_send.json
+sha256: 4812a9f5479ca3ae9c043a1927b299ef3a776f8ef2f4c6bed2bd0dda6a64b7c2
+
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_actual_writer_ready_no_send.md
+sha256: fca9c238457bb7d307fd17e7cd131fcb1cc1e34127a8feed3cf7bc2f3118d3d8
+```
+
+Result:
+
+```text
+packet_validation_passed: true
+fresh_target_validation_passed: true
+execute_requested: false
+operator_motion_approval: NOT_GIVEN
+actuator_commands_sent: false
+motion_status: BLOCKED
+max_abs_fresh_drift_deg: 0.0000003661177974123575
+max_abs_target_delta_from_fresh_deg: 0.5881540488490593
+```
+
+A6000 handoff path:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/syhlabtop_stage35_actual_writer_ready/snapshot_20260512_171650/
+```
+
+The A6000 copies matched the syhlabtop checksums.
+
 ## Stage 35 Entry Requirements
 
 Stage 35 is actual actuator write. It requires a separate explicit human
@@ -241,9 +277,12 @@ approval after all of the following are true:
    it must be considered stale if the robot state changes before approval.
 2. The actual actuator writer is regenerated or parameterized for the approved
    `snapshot_20260512_171650` packet. The older writer is hardcoded to
-   `snapshot_20260511_154554` and must not be reused directly.
+   `snapshot_20260511_154554` and must not be reused directly. The prepared
+   writer is `stage35_guarded_actual_actuator_write.py`.
 3. A Stage 35 operator approval draft records the exact command and target
-   table.
+   table. The current draft is
+   `stage35_operator_motion_approval_draft_2026-05-12.md`, and it is not
+   approval.
 4. Operator confirms physical presence, power/abort control, and e-stop
    readiness.
 
