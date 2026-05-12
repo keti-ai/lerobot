@@ -2,6 +2,21 @@
 
 Date: 2026-05-12
 
+## Superseded
+
+This prompt is superseded for the baseline two-machine plan.
+
+Do not use this prompt to transfer `model.safetensors` to syhlabtop or run the
+PI0.5 model locally on syhlabtop. The baseline plan is:
+
+- syhlabtop owns read-only robot/camera snapshot capture.
+- A6000 owns model weights and inference/review.
+- syhlabtop sends a no-send snapshot bundle to A6000.
+
+Use:
+
+`audits/openarm_folding/syhlabtop_a6000_served_snapshot_handoff_prompt_2026-05-12.md`
+
 Copy this whole prompt to the syhlabtop agent.
 
 ---

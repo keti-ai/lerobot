@@ -638,3 +638,56 @@ Robot motion remains blocked. The A6000 Stage 31 PASS does not authorize
 torque enable, zeroing, actuator writes, rollout, replay-to-robot, or
 `robot.send_action()`. First motion remains a separate guarded actuator-write
 gate requiring explicit human approval.
+
+## 2026-05-12 Stage 32 Architecture Correction
+
+syhlabtop Stage 32 precheck confirmed that the real robot PC does not have the
+A6000 final candidate or manifest locally. This is acceptable for the baseline
+two-machine plan.
+
+Corrected architecture:
+
+```text
+syhlabtop: robot/camera IO, read-only snapshot bundle creation
+A6000: model weights, no-send inference, action review
+```
+
+The PI0.5 `model.safetensors` should not be copied to syhlabtop for the
+baseline path. syhlabtop should create a fresh snapshot bundle:
+
+```text
+snapshot_YYYYMMDD_HHMMSS/
+  state_16.csv
+  left_wrist.png
+  right_wrist.png
+  base.png
+  metadata.json
+```
+
+That snapshot is then transferred to A6000 and reviewed with:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/tools/a6000_snapshot_action_review.py
+```
+
+Live split-host A6000 serving for robot control remains a separate architecture
+gate because the current LeRobot rollout path does not provide an audited
+remote inference transport. Until such a bridge exists and passes no-motion
+tests, the approved path is snapshot-based A6000 offline review only.
+
+Use:
+
+```text
+audits/openarm_folding/syhlabtop_a6000_served_snapshot_handoff_prompt_2026-05-12.md
+```
+
+Stage 33 is reserved for the actual remote A6000 serving bridge. The bridge is
+not considered available just because the model is on A6000; it still needs a
+standalone no-motion server/client path that round-trips one observation and
+returns an action proposal with `send_allowed=false`.
+
+Use:
+
+```text
+audits/openarm_folding/stage33_a6000_remote_serving_bridge_plan_2026-05-12.md
+```

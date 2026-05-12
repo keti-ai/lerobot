@@ -140,12 +140,13 @@ this candidate.
 
 ## Next Work Plan
 
-### 1. A6000: Package Candidate For Transfer
+### 1. A6000: Package Candidate For Serving/Review
 
 Owner: A6000 server.
 
-Goal: prepare the final candidate and audit bundle for syhlabtop without
-touching robot hardware.
+Goal: keep the final candidate on A6000 and prepare it for offline snapshot
+inference/review. The baseline two-machine plan does not require copying
+`model.safetensors` to syhlabtop.
 
 Actions:
 
@@ -159,12 +160,11 @@ Actions:
   `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/transfer/syhlabtop_pi05_openarm_relstats_full_004000_20260512/audit_artifacts.sha256`
 - Use the transfer packet:
   `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/transfer/syhlabtop_pi05_openarm_relstats_full_004000_20260512/transfer_packet.md`
-- Decide transfer route:
-  - Preferred: direct `rsync`/`scp` from A6000 to syhlabtop.
-  - Alternative: place the final checkpoint bundle on NAS if syhlabtop mounts
-    NAS later.
-- Transfer only the final `004000/pretrained_model` candidate and audit docs,
-  not all intermediate checkpoints.
+- Keep the final `004000/pretrained_model` candidate on A6000 for snapshot
+  review and future serving work.
+- Transfer only small audit docs or checksum manifests to syhlabtop if useful.
+  Do not transfer the 8.8 GB `model.safetensors` to syhlabtop for the baseline
+  path.
 
 Do not train again unless Stage 31 is invalidated.
 
@@ -172,7 +172,8 @@ Do not train again unless Stage 31 is invalidated.
 
 Owner: syhlabtop.
 
-Goal: make the real robot PC aware of the candidate and safety state.
+Goal: make the real robot PC aware of the candidate and safety state while
+leaving model weights on A6000.
 
 Actions:
 
@@ -184,8 +185,8 @@ Actions:
   - `audits/openarm_folding/two_machine_pipeline_2026-05-11.md`
 - Create or reuse syhlabtop work root:
   `/home/syhlabtop/openarm_folding_20260512`
-- Copy the final candidate into a local syhlabtop model path.
-- Verify checksum manifest after transfer.
+- Do not copy `model.safetensors` to syhlabtop for the baseline path.
+- Record that A6000 remains the model/inference owner.
 
 No robot command is needed for this stage.
 
@@ -193,14 +194,15 @@ No robot command is needed for this stage.
 
 Owner: syhlabtop.
 
-Goal: verify observation/state/camera compatibility without sending actions.
+Goal: verify observation/state/camera compatibility and create a snapshot
+bundle that A6000 can review without sending actions.
 
 Allowed after explicit local approval:
 
 - Read-only camera checks.
 - Read-only robot state snapshot.
 - Metadata and shape checks.
-- No-send policy input preparation.
+- No-send snapshot bundle creation.
 
 Still blocked:
 
@@ -222,12 +224,14 @@ Acceptance:
   - base
 - Camera shapes are compatible or explicitly transformed to the trained
   shapes.
-- No-send action output has no 60-70 degree abnormal delta.
-- Output is written as JSON/Markdown under the syhlabtop work root.
+- Snapshot bundle contains `state_16.csv`, `left_wrist.png`,
+  `right_wrist.png`, `base.png`, and `metadata.json`.
+- Output is written under the syhlabtop work root and transferred to A6000 for
+  inference/review.
 
 ### 4. syhlabtop + A6000: Shadow Review
 
-Owner: syhlabtop captures, A6000 can review offline.
+Owner: syhlabtop captures, A6000 reviews offline.
 
 Goal: compare syhlabtop no-send output against the A6000 Stage 31 replay
 contract.
@@ -236,7 +240,7 @@ Actions:
 
 - Move syhlabtop no-send snapshot JSON/images/state CSV to A6000 or shared
   storage.
-- Run offline review only.
+- Run A6000 offline review using the final checkpoint.
 - Compare:
   - state order
   - camera mapping

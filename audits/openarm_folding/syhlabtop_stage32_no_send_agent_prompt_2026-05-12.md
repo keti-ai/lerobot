@@ -2,6 +2,19 @@
 
 Date: 2026-05-12
 
+## Superseded
+
+This prompt is superseded for the baseline two-machine plan.
+
+Do not use this prompt to transfer `model.safetensors` to syhlabtop or run the
+PI0.5 model locally on syhlabtop. The baseline plan keeps model weights and
+inference on A6000. syhlabtop should capture a read-only snapshot bundle and
+send that bundle to A6000 for no-send inference/review.
+
+Use:
+
+`audits/openarm_folding/syhlabtop_a6000_served_snapshot_handoff_prompt_2026-05-12.md`
+
 Use this prompt on the real robot PC only after the A6000 final candidate has
 been transferred to syhlabtop.
 
