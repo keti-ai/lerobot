@@ -748,3 +748,45 @@ audits/openarm_folding/stage34_guarded_first_actuator_write_readiness_plan_2026-
 
 Motion remains blocked. Stage 35 actuator write requires a separate explicit
 human approval of the exact command and target table.
+
+## 2026-05-12 Stage 34 Dry-Run Blocker
+
+Stage 34 generated a new no-motion dry-run table from
+`snapshot_20260512_155652` using:
+
+```text
+audits/openarm_folding/guarded_first_motion_dry_run_v2.py
+```
+
+Output:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/shadow_replays/snapshot_20260512_155652_guarded_first_motion_dry_run.json
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/shadow_replays/snapshot_20260512_155652_guarded_first_motion_dry_run.md
+```
+
+Result:
+
+```text
+send_allowed: false
+motion_allowed: false
+stage35_candidate_ready: false
+max_abs_right_arm_candidate_delta_deg: 2.0
+blocking_first_write_keys: ["right_joint_4.pos"]
+```
+
+`right_joint_4.pos` is currently the blocker. The review current value was
+`-4.229 deg`, while the review limits are `[0, 135]`. With the 2 degree dry-run
+cap, the target becomes `-2.229 deg`, which is still outside the review limit
+range.
+
+Stage 35 actuator write remains blocked. The next required decision is whether
+the `right_joint_4.pos` limit source is correct for the current robot/readback
+convention, and if so how to handle a current readback below the limit without
+violating the step cap.
+
+Use:
+
+```text
+audits/openarm_folding/stage34_guarded_first_motion_dry_run_2026-05-12.md
+```

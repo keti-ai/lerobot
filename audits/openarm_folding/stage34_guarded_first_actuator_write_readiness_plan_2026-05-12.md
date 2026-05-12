@@ -179,9 +179,39 @@ single guarded actuator-write test.
 
 ```text
 stage32_snapshot_review: PASS
-stage34_dry_run: NOT_RUN
+stage34_dry_run: RUN_BLOCKED_BY_RIGHT_JOINT_4_LIMIT
 stage34_runtime_preflight: NOT_RUN
 stage34_execution_packet: NOT_RUN
 stage35_actuator_write: BLOCKED
 motion_status: BLOCKED
 ```
+
+## 2026-05-12 Dry-Run Update
+
+Stage 34 dry-run was generated with:
+
+```text
+audits/openarm_folding/guarded_first_motion_dry_run_v2.py
+```
+
+Output:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/shadow_replays/snapshot_20260512_155652_guarded_first_motion_dry_run.json
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/shadow_replays/snapshot_20260512_155652_guarded_first_motion_dry_run.md
+```
+
+Result:
+
+```text
+send_allowed: false
+motion_allowed: false
+stage35_candidate_ready: false
+blocking_first_write_keys: ["right_joint_4.pos"]
+```
+
+The blocker is that `right_joint_4.pos` current value was below the review
+limit min. Applying the 2 degree cap did not bring the proposed target into the
+review limit range.
+
+Do not run Stage 35 from this dry-run table.
