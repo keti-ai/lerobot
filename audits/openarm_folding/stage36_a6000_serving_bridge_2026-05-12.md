@@ -11,11 +11,11 @@ and syhlabtop logs them, but syhlabtop does not send actions to the robot.
 ## Boundary
 
 ```text
-a6000_model_server: PREPARED
-syhlabtop_client: PREPARED
+a6000_model_server: RUNNING
+syhlabtop_client: PASS
 robot_write: FORBIDDEN
 send_action: false
-motion_status: BLOCKED
+motion_status: BLOCKED_PENDING_EXACT_TARGET_CONFIRMATION
 ```
 
 The bridge must pass a single-frame proposal check before any new actuator
@@ -72,3 +72,39 @@ http://10.252.205.103:8765/predict_snapshot
 ```
 
 The client never imports or calls a robot write path.
+
+## 2026-05-12 Result
+
+The bridge returned one no-send action proposal for
+`snapshot_20260512_194042`.
+
+```text
+all_finite: true
+action_shape: [1, 30, 16]
+max_abs_arm_delta_deg: 2.1111412048339844
+send_allowed: false
+motion_allowed: false
+actuator_commands_sent: false
+```
+
+Artifacts:
+
+```text
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_194042_a6000_served_action_proposal.json
+sha256: 498fef8a4467e04ad7a5e01279f484dee7c76a17365e0c5ee12dd3d4e21eb5da
+
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_194042_a6000_served_action_proposal.md
+sha256: 3159601cf434dd6e0299ca24ae66180ff64d637d8adb59c8cb8db11085afe04e
+```
+
+The artifacts were copied to A6000 and checksums matched:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/syhlabtop_stage36_served_proposals/snapshot_20260512_194042/
+```
+
+The next motion target table is drafted in:
+
+```text
+audits/openarm_folding/stage37_served_proposal_motion_approval_draft_2026-05-12.md
+```

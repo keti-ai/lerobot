@@ -1114,3 +1114,67 @@ stage35_post_write_readback: PASS
 next_motion_approval: NOT_GIVEN
 motion_status: BLOCKED_FOR_REVIEW
 ```
+
+## 2026-05-12 Stage 36 A6000 Serving Bridge
+
+A no-send HTTP bridge was added and started on A6000. The server loads the
+corrected trained checkpoint and accepts snapshot directory references under
+the A6000 snapshot root.
+
+```text
+server_url: http://10.252.205.103:8765/predict_snapshot
+server_pid: 2702819
+model_dir: /data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/train/pi05_openarm_relstats_full_nocompile_bsz4_20260512/checkpoints/004000/pretrained_model
+health: ok
+```
+
+syhlabtop captured a fresh post-Stage35 snapshot:
+
+```text
+snapshot: snapshot_20260512_194042
+local_path: /home/syhlabtop/openarm_folding_20260512/shadow_snapshots/snapshot_20260512_194042/
+a6000_path: /data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/syhlabtop_snapshots/snapshot_20260512_194042/
+```
+
+The A6000 service returned one no-send action proposal:
+
+```text
+all_finite: true
+action_shape: [1, 30, 16]
+max_abs_arm_delta_deg: 2.1111412048339844
+right_joint_4_delta_deg: 1.211517333984375
+left_joint_4_delta_deg: -1.4297370910644531
+right_joint_7_delta_deg: 2.1111412048339844
+send_allowed: false
+motion_allowed: false
+actuator_commands_sent: false
+```
+
+Artifacts:
+
+```text
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_194042_a6000_served_action_proposal.json
+sha256: 498fef8a4467e04ad7a5e01279f484dee7c76a17365e0c5ee12dd3d4e21eb5da
+
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_194042_a6000_served_action_proposal.md
+sha256: 3159601cf434dd6e0299ca24ae66180ff64d637d8adb59c8cb8db11085afe04e
+```
+
+The proposal artifacts were copied to A6000 and checksums matched:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/syhlabtop_stage36_served_proposals/snapshot_20260512_194042/
+```
+
+The operator stated that robot movement is approved, but the exact proposal
+target table was generated after that statement. A separate exact-table
+confirmation is still required before any next actuator write.
+
+Current boundary:
+
+```text
+stage36_a6000_serving_bridge: PASS
+stage37_motion_approval: NOT_GIVEN_FOR_EXACT_TABLE
+stage37_actual_writer: NOT_CREATED
+motion_status: BLOCKED_PENDING_EXACT_TARGET_CONFIRMATION
+```
