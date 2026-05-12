@@ -937,3 +937,52 @@ Next no-motion step:
 ```text
 audits/openarm_folding/syhlabtop_stage35_no_execute_validation_prompt_2026-05-12.md
 ```
+
+## 2026-05-12 Stage 35 No-Execute Validation Completed
+
+syhlabtop ran the Stage 35 no-execute validator with fresh read-only right-arm
+CAN readback for `snapshot_20260512_171650`.
+
+Result:
+
+```text
+packet_validation_passed: true
+fresh_readback_validation_passed: true
+max_abs_right_arm_candidate_delta_deg: 0.5881538391113281
+max_abs_fresh_drift_deg: 0.02185693518331755
+max_abs_target_delta_from_fresh_deg: 0.5881540488490593
+send_allowed: false
+motion_allowed: false
+execution_allowed: false
+actuator_commands_sent: false
+execute_path_available: false
+operator_motion_approval: NOT_GIVEN
+actual_writer_status: NOT_READY
+motion_status: BLOCKED
+```
+
+Outputs:
+
+```text
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_no_execute_validation.json
+sha256: f16c0262cc7f028caa8a6a552015d4ff7e691b9bec57a509b33ef585be4bcd4d
+
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_no_execute_validation.md
+sha256: 772033040723eb488c58ab6249c022e3e96f7a8479bdf0fde730ad7cb0f8f0d5
+```
+
+The outputs were transferred to A6000 and checksums matched:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/syhlabtop_stage35_no_execute_validation/snapshot_20260512_171650/
+```
+
+New audit record:
+
+```text
+audits/openarm_folding/stage35_syhlabtop_no_execute_validation_result_2026-05-12.md
+```
+
+Stage 35 actual actuator write remains blocked. The next allowed work is an
+A6000 audit update and a separate operator approval draft; this is not motion
+approval.

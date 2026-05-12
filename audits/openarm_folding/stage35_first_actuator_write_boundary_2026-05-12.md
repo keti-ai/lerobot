@@ -168,6 +168,8 @@ Exact right-arm target table:
 ```text
 stage35_no_execute_validator: READY
 stage35_a6000_packet_only_validation: PASS
+stage35_syhlabtop_fresh_no_execute_validation: PASS
+stage35_syhlabtop_no_execute_validation_handoff_to_a6000: DONE
 stage35_actual_writer: NOT_READY
 operator_motion_approval: NOT_GIVEN
 motion_status: BLOCKED
@@ -200,13 +202,43 @@ actual_writer_status: NOT_READY
 The validator also rejected an intentionally wrong packet checksum with
 non-zero exit status.
 
+syhlabtop fresh readback validation output:
+
+```text
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_no_execute_validation.json
+sha256: f16c0262cc7f028caa8a6a552015d4ff7e691b9bec57a509b33ef585be4bcd4d
+
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_stage35_no_execute_validation.md
+sha256: 772033040723eb488c58ab6249c022e3e96f7a8479bdf0fde730ad7cb0f8f0d5
+```
+
+Result:
+
+```text
+packet_validation_passed: true
+fresh_readback_validation_passed: true
+max_abs_fresh_drift_deg: 0.02185693518331755
+max_abs_target_delta_from_fresh_deg: 0.5881540488490593
+execute_path_available: false
+actual_writer_status: NOT_READY
+```
+
+A6000 handoff path:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/syhlabtop_stage35_no_execute_validation/snapshot_20260512_171650/
+```
+
+The A6000 copies matched the syhlabtop checksums.
+
 ## Stage 35 Entry Requirements
 
 Stage 35 is actual actuator write. It requires a separate explicit human
 approval after all of the following are true:
 
 1. A no-execute writer validation passes on syhlabtop immediately before any
-   motion approval.
+   motion approval. The latest run passed for `snapshot_20260512_171650`, but
+   it must be considered stale if the robot state changes before approval.
 2. The actual actuator writer is regenerated or parameterized for the approved
    `snapshot_20260512_171650` packet. The older writer is hardcoded to
    `snapshot_20260511_154554` and must not be reused directly.
@@ -224,7 +256,9 @@ motion_status: BLOCKED
 
 ## Next Work
 
-Run syhlabtop no-execute writer validation with fresh read-only right-arm CAN
-readback. This is not actuator execution.
+A6000 may update the audit record and draft a separate Stage 35 operator
+approval document. The draft must record the exact command, selected joints,
+target table, expected maximum delta, physical operator readiness,
+power/abort procedure, and e-stop readiness.
 
 Do not run Stage 35 actual actuator write from this boundary document.
