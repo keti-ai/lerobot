@@ -897,3 +897,43 @@ Use:
 audits/openarm_folding/stage35_first_actuator_write_boundary_2026-05-12.md
 audits/openarm_folding/syhlabtop_stage35_artifact_handoff_prompt_2026-05-12.md
 ```
+
+## 2026-05-12 Stage 35 Artifact Handoff Completed
+
+syhlabtop transferred the Stage 34 packet artifacts to A6000:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/syhlabtop_stage34_packets/snapshot_20260512_171650/
+```
+
+Checksum verification matched:
+
+```text
+runtime_preflight_json_sha256: 8b3d8df7db88eb8bdfaa9975e08cef3d91e9c0769312312cd2d969666b36d920
+runtime_preflight_md_sha256: 1858e09841a6b62f9d58ccba15f59ed913eb3339fe67939d14da000f972a6c59
+execution_packet_json_sha256: c5411331665ea5b31a9d85de4adf27ce74f0c9596630c4cc8481e6afd58ec259
+execution_packet_md_sha256: 43c4ec4464caaaf31b0c6a92e0e4d7446f8edd0fb56c6596c509de2fd2aaa6ee
+```
+
+Exact selected joints are the seven right-arm joints only. Expected maximum
+delta is:
+
+```text
+0.5881538391113281 deg
+```
+
+Stage 35 remains blocked:
+
+```text
+stage35_no_execute_validator: READY
+stage35_a6000_packet_only_validation: PASS
+stage35_actual_writer: NOT_READY
+operator_motion_approval: NOT_GIVEN
+motion_status: BLOCKED
+```
+
+Next no-motion step:
+
+```text
+audits/openarm_folding/syhlabtop_stage35_no_execute_validation_prompt_2026-05-12.md
+```

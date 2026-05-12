@@ -299,9 +299,14 @@ These packet files are not yet present under the A6000 work root. The next
 no-motion step is to transfer or print the packet files and checksums for A6000
 review.
 
+Follow-up: the packet files were transferred to A6000 and checksum verification
+matched. The next no-motion gate is Stage 35 no-execute writer validation with
+fresh syhlabtop right-arm readback.
+
 Use:
 
 ```text
 audits/openarm_folding/stage35_first_actuator_write_boundary_2026-05-12.md
-audits/openarm_folding/syhlabtop_stage35_artifact_handoff_prompt_2026-05-12.md
+audits/openarm_folding/stage35_no_execute_writer_validation_2026-05-12.md
+audits/openarm_folding/syhlabtop_stage35_no_execute_validation_prompt_2026-05-12.md
 ```

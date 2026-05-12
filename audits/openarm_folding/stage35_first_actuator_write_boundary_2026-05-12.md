@@ -101,38 +101,118 @@ Right-arm candidate table from the A6000 dry-run:
 | `right_joint_6.pos` | -0.470 | -0.612 | -0.142 | [-40, 40] | true |
 | `right_joint_7.pos` | -4.229 | -3.922 | 0.308 | [-80, 80] | true |
 
-## Missing Before Stage 35
+## Artifact Handoff
 
-The syhlabtop session reports that these artifacts were created locally:
+The syhlabtop Stage 34 packet artifacts were transferred to A6000 and their
+checksums matched the syhlabtop report.
+
+A6000 packet root:
 
 ```text
-/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_runtime_preflight.json
-/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_runtime_preflight.md
-/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_execution_packet_no_send.json
-/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_171650_execution_packet_no_send.md
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/syhlabtop_stage34_packets/snapshot_20260512_171650/
 ```
 
-They are not yet present under the A6000 work root. Stage 35 cannot be approved
-until A6000 receives or audits those packet artifacts and records their
-checksums.
+Checksums:
+
+```text
+runtime_preflight_json_sha256: 8b3d8df7db88eb8bdfaa9975e08cef3d91e9c0769312312cd2d969666b36d920
+runtime_preflight_md_sha256: 1858e09841a6b62f9d58ccba15f59ed913eb3339fe67939d14da000f972a6c59
+execution_packet_json_sha256: c5411331665ea5b31a9d85de4adf27ce74f0c9596630c4cc8481e6afd58ec259
+execution_packet_md_sha256: 43c4ec4464caaaf31b0c6a92e0e4d7446f8edd0fb56c6596c509de2fd2aaa6ee
+```
+
+The execution packet still says:
+
+```text
+send_allowed: false
+motion_allowed: false
+execution_allowed: false
+actuator_commands_sent: false
+motion_status: BLOCKED
+```
+
+## Exact Stage 35 Candidate
+
+Selected joints:
+
+```text
+right_joint_1.pos
+right_joint_2.pos
+right_joint_3.pos
+right_joint_4.pos
+right_joint_5.pos
+right_joint_6.pos
+right_joint_7.pos
+```
+
+Expected max delta:
+
+```text
+0.5881538391113281 deg
+```
+
+Exact right-arm target table:
+
+| Key | Current deg | Target deg | Delta deg |
+| --- | ---: | ---: | ---: |
+| `right_joint_1.pos` | -4.469744 | -5.057898 | -0.588154 |
+| `right_joint_2.pos` | -1.868768 | -1.801383 | 0.067385 |
+| `right_joint_3.pos` | 14.611363 | 15.022029 | 0.410666 |
+| `right_joint_4.pos` | 8.272851 | 8.502065 | 0.229214 |
+| `right_joint_5.pos` | -3.092757 | -2.528544 | 0.564213 |
+| `right_joint_6.pos` | -0.469924 | -0.612096 | -0.142172 |
+| `right_joint_7.pos` | -4.229318 | -3.921798 | 0.307520 |
+
+## Stage 35 Writer Status
+
+```text
+stage35_no_execute_validator: READY
+stage35_a6000_packet_only_validation: PASS
+stage35_actual_writer: NOT_READY
+operator_motion_approval: NOT_GIVEN
+motion_status: BLOCKED
+```
+
+Use:
+
+```text
+audits/openarm_folding/stage35_no_execute_writer_validation.py
+audits/openarm_folding/stage35_no_execute_writer_validation_2026-05-12.md
+audits/openarm_folding/syhlabtop_stage35_no_execute_validation_prompt_2026-05-12.md
+```
+
+A6000 packet-only validation output:
+
+```text
+/tmp/snapshot_20260512_171650_stage35_no_execute_packet_only.json
+/tmp/snapshot_20260512_171650_stage35_no_execute_packet_only.md
+```
+
+Result:
+
+```text
+packet_validation_passed: true
+fresh_readback_validation_passed: null
+execute_path_available: false
+actual_writer_status: NOT_READY
+```
+
+The validator also rejected an intentionally wrong packet checksum with
+non-zero exit status.
 
 ## Stage 35 Entry Requirements
 
 Stage 35 is actual actuator write. It requires a separate explicit human
 approval after all of the following are true:
 
-1. A6000 has the exact Stage 34 runtime preflight JSON/Markdown.
-2. A6000 has the exact Stage 34 execution packet JSON/Markdown.
-3. The packet checksum is recorded in repo/audit docs.
-4. The exact selected joint set is recorded.
-5. The exact target table is recorded.
-6. The expected maximum delta is recorded.
-7. The actuator writer is regenerated or parameterized for the approved
+1. A no-execute writer validation passes on syhlabtop immediately before any
+   motion approval.
+2. The actual actuator writer is regenerated or parameterized for the approved
    `snapshot_20260512_171650` packet. The older writer is hardcoded to
    `snapshot_20260511_154554` and must not be reused directly.
-8. A no-execute writer validation passes on syhlabtop immediately before any
-   motion approval.
-9. Operator confirms physical presence, power/abort control, and e-stop
+3. A Stage 35 operator approval draft records the exact command and target
+   table.
+4. Operator confirms physical presence, power/abort control, and e-stop
    readiness.
 
 Until these conditions are met:
@@ -144,16 +224,7 @@ motion_status: BLOCKED
 
 ## Next Work
 
-Transfer or print the syhlabtop Stage 34 runtime preflight and execution packet
-artifacts, then update this boundary with:
+Run syhlabtop no-execute writer validation with fresh read-only right-arm CAN
+readback. This is not actuator execution.
 
-```text
-runtime_preflight_sha256:
-execution_packet_sha256:
-exact_selected_joints:
-exact_target_table:
-expected_max_delta_deg:
-stage35_writer_status:
-```
-
-Do not run Stage 35 from the A6000 dry-run table alone.
+Do not run Stage 35 actual actuator write from this boundary document.
