@@ -556,3 +556,85 @@ Current conclusion: no currently checked public checkpoint can advance to robot
 deployment. The next required work is corrected relative-action dataset stats
 followed by retrain or re-export, then Stage 29 gate and Stage 31 dataset
 replay. Robot motion remains blocked.
+
+## 2026-05-12 Stage 31-32 Update
+
+A6000 offline recovery training completed. The training used a new chunk-size
+30 relative-stats dataset root derived from
+`lerobot-data-collection/level2_final_quality3_t_0_hil_data_c`, with arm joints
+converted to relative actions and grippers excluded from relative conversion.
+
+Final checkpoint:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/train/pi05_openarm_relstats_full_nocompile_bsz4_20260512/checkpoints/004000/pretrained_model
+```
+
+Training outcome:
+
+```text
+steps: 4000/4000
+exit_status: 0
+final logged loss: 0.066
+final logged grad norm: 0.443
+```
+
+The corrected Stage 29 metadata gate passed for the final checkpoint:
+
+```text
+deploy_candidate: true
+policy_type_pi05: PASS
+model_training_dataset_matches_replay_dataset: PASS
+dataset_robot_type_openarms_follower: PASS
+action_names_match_folding_16d: PASS
+state_names_match_folding_16d: PASS
+camera_keys_and_shapes_match_space_recipe: PASS
+use_relative_actions_enabled: PASS
+relative_exclude_gripper_only: PASS
+chunk_size_30: PASS
+n_action_steps_30: PASS
+rabc_recorded_in_train_config: PASS
+postprocessor_action_stats_match_chunk30_relative_stats: PASS
+```
+
+Stage 31 dataset replay acceptance also passed on frames `0,1,10,30`:
+
+```text
+frame 0  model mean_abs_delta=0.408 deg, recorded mean_abs_delta=1.300 deg
+frame 1  model mean_abs_delta=0.631 deg, recorded mean_abs_delta=1.156 deg
+frame 10 model mean_abs_delta=2.077 deg, recorded mean_abs_delta=1.424 deg
+frame 30 model mean_abs_delta=1.236 deg, recorded mean_abs_delta=1.325 deg
+```
+
+No 60-70 degree abnormal delta was observed on `right_joint_4.pos`,
+`left_joint_4.pos`, `right_joint_7.pos`, or any global action dimension in the
+checked replay frames. Raw normalized arm outputs were close to the normalized
+recorded relative arm targets; grippers were evaluated as absolute targets
+because the recipe excludes grippers from relative conversion.
+
+Stage 31 artifacts:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/audits/stage29_full_nocompile_bsz4_corrected_relstats_gate_2026-05-12.md
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/audits/stage31_full_nocompile_bsz4_acceptance_gate_2026-05-12.md
+```
+
+A syhlabtop transfer packet and checksums were prepared:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/transfer/syhlabtop_pi05_openarm_relstats_full_004000_20260512/
+```
+
+The next required work is Stage 32 on syhlabtop:
+
+1. Transfer only the final `004000/pretrained_model` checkpoint and audit
+   packet to `/home/syhlabtop/openarm_folding_20260512`.
+2. Verify the transferred checkpoint with `sha256sum -c`.
+3. Run metadata and read-only hardware/camera checks.
+4. Run a no-send policy snapshot only.
+5. Run shadow review against the Stage 31 acceptance contract.
+
+Robot motion remains blocked. The A6000 Stage 31 PASS does not authorize
+torque enable, zeroing, actuator writes, rollout, replay-to-robot, or
+`robot.send_action()`. First motion remains a separate guarded actuator-write
+gate requiring explicit human approval.
