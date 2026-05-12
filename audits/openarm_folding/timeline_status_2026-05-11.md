@@ -1178,3 +1178,97 @@ stage37_motion_approval: NOT_GIVEN_FOR_EXACT_TABLE
 stage37_actual_writer: NOT_CREATED
 motion_status: BLOCKED_PENDING_EXACT_TARGET_CONFIRMATION
 ```
+
+## 2026-05-12 Stage 37 Served Proposal Single Write
+
+The operator gave explicit approval for the exact Stage 37 target table and
+confirmation phrase:
+
+```text
+operator_at_robot: true
+power_abort_control_held: true
+estop_ready: true
+right_arm_workspace_clear: true
+human_body_clear_of_arm: true
+approval_applies_to_exact_stage37_target_table: true
+approval_phrase: SEND_STAGE37_RIGHT_ARM_SERVED_PROPOSAL_ONCE_20260512_194042
+```
+
+The Stage 37 guarded writer was added and validated the A6000 served proposal
+checksum before any actuator command:
+
+```text
+writer: audits/openarm_folding/stage37_guarded_served_proposal_write.py
+proposal_sha256: 498fef8a4467e04ad7a5e01279f484dee7c76a17365e0c5ee12dd3d4e21eb5da
+no_execute_validation: PASS
+fresh_target_validation_passed: true
+```
+
+One right-arm-only guarded write was executed. Left arm, right gripper, and left
+gripper remained excluded. No rollout, recording, replay-to-robot,
+`send_action`, local PI0.5 inference, zeroing, or calibration write was run.
+
+```text
+proposal_validation_passed: true
+fresh_target_validation_passed: true
+execute_requested: true
+operator_motion_approval: GIVEN
+send_allowed: true
+motion_allowed: true
+execution_allowed: true
+actuator_commands_sent: true
+motion_status: SINGLE_WRITE_ATTEMPTED
+errors: []
+```
+
+Artifacts:
+
+```text
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_194042_stage37_ready_no_send.json
+sha256: f34a0a1d9c4f805b8aeb0c702678f3a24738f5513545cbebc0dae3f0d41ff5f8
+
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_194042_stage37_actual_write_attempt.json
+sha256: f30e19372e6195cb2b0cee36f8c7eddb4e457098968a7cb2e1f436530e8e20b0
+
+/home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260512_194042_stage37_post_write_readback.json
+sha256: 138114716c25002c23cb18cdf39ce54b40140995b41e311dd16c5ff12ace09f6
+```
+
+A6000 handoff path:
+
+```text
+/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/syhlabtop_stage37_served_proposal_write/snapshot_20260512_194042/
+```
+
+The A6000 copies matched syhlabtop checksums.
+
+Actual write final readback:
+
+```text
+max_abs_target_delta_from_fresh_deg: 2.0
+max_abs_final_target_error_deg: 0.36498359171830963
+```
+
+Independent post-write no-execute readback:
+
+```text
+execute_requested: false
+actuator_commands_sent: false
+motion_status: BLOCKED
+fresh_target_validation_passed: false
+errors: ["fresh_target_validation_failed: ['right_joint_5.pos', 'right_joint_7.pos']"]
+max_abs_remaining_to_target_deg: 0.8836636219154279
+max_abs_drift_from_proposal_current_deg: 1.48627162345538
+```
+
+The post-write readback failed the pre-write freshness gate because the arm had
+moved from the proposal-current pose. This blocks reuse of the same proposal.
+
+Current boundary:
+
+```text
+stage37_single_write_attempt: DONE
+stage37_post_write_readback: RECORDED_PREWRITE_GATE_EXPECTED_FAIL
+next_motion_approval: NOT_GIVEN
+motion_status: BLOCKED_FOR_REVIEW
+```

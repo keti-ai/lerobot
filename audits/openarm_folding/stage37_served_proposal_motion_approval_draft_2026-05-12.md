@@ -78,7 +78,8 @@ approval_phrase: SEND_STAGE37_RIGHT_ARM_SERVED_PROPOSAL_ONCE_20260512_194042
 ## Boundary
 
 ```text
-stage37_motion_approval: NOT_GIVEN_FOR_EXACT_TABLE
-stage37_actual_writer: NOT_CREATED
-motion_status: BLOCKED_PENDING_EXACT_TARGET_CONFIRMATION
+stage37_motion_approval: GIVEN_FOR_EXACT_TABLE
+stage37_actual_writer: CREATED_AND_EXECUTED_ONCE
+stage37_result: audits/openarm_folding/stage37_served_proposal_actual_write_result_2026-05-12.md
+motion_status: BLOCKED_FOR_REVIEW
 ```
