@@ -178,8 +178,9 @@ single guarded actuator-write test.
 ## Current Status
 
 ```text
-stage32_snapshot_review: PASS
-stage34_dry_run: RUN_BLOCKED_BY_RIGHT_JOINT_4_LIMIT
+stage32_snapshot_review: STALE_RECAPTURE_REQUIRED
+stage34_right_joint4_limit_check: FRESH_READ_WITHIN_LIMIT
+stage34_dry_run: STALE_BLOCKED
 stage34_runtime_preflight: NOT_RUN
 stage34_execution_packet: NOT_RUN
 stage35_actuator_write: BLOCKED
@@ -215,3 +216,33 @@ limit min. Applying the 2 degree cap did not bring the proposed target into the
 review limit range.
 
 Do not run Stage 35 from this dry-run table.
+
+## 2026-05-12 Right Joint 4 Fresh Read Update
+
+syhlabtop ran the no-motion Stage 34 right-joint-4 read-only check:
+
+```text
+repo_head: 3420dfb3563ce8ae313464cb618107f1588232dc
+snapshot_right_joint_4_deg: -4.2293176683380596
+fresh_right_joint_4_deg: 8.272851356413208
+right_joint_4_review_limit: [0, 135]
+fresh_within_limit: true
+drift_from_snapshot_deg: 12.502169024751267
+read_path: DamiaoMotorsBus.connect(handshake=False) + sync_read_all_states() on can1 right arm; no OpenArmFollower.connect()
+torque_enabled: false
+actuator_commands_sent: false
+send_action_called: false
+motion_status: BLOCKED
+```
+
+This means `right_joint_4.pos` is currently within the review limit, but the
+accepted Stage 32 snapshot and the Stage 34 dry-run table are stale. The next
+step is to capture a fresh Stage 32 snapshot and rerun the A6000 no-send review
+before regenerating Stage 34 artifacts.
+
+Use:
+
+```text
+audits/openarm_folding/stage34_right_joint4_limit_check_2026-05-12.md
+audits/openarm_folding/syhlabtop_stage32_refresh_snapshot_prompt_2026-05-12.md
+```

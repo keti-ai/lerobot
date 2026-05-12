@@ -790,3 +790,51 @@ Use:
 ```text
 audits/openarm_folding/stage34_guarded_first_motion_dry_run_2026-05-12.md
 ```
+
+## 2026-05-12 Stage 34 Right Joint 4 Fresh Read
+
+syhlabtop completed the read-only right-joint-4 limit check using:
+
+```text
+DamiaoMotorsBus.connect(handshake=False) + sync_read_all_states() on can1 right arm
+```
+
+Reported result:
+
+```text
+repo_head: 3420dfb3563ce8ae313464cb618107f1588232dc
+snapshot_right_joint_4_deg: -4.2293176683380596
+fresh_right_joint_4_deg: 8.272851356413208
+right_joint_4_review_limit: [0, 135]
+fresh_within_limit: true
+drift_from_snapshot_deg: 12.502169024751267
+torque_enabled: false
+actuator_commands_sent: false
+send_action_called: false
+motion_status: BLOCKED
+```
+
+Interpretation:
+
+```text
+right_joint_4.pos is currently inside the [0, 135] review limit.
+snapshot_20260512_155652 is stale.
+snapshot_20260512_155652_action_review.* is stale.
+snapshot_20260512_155652_guarded_first_motion_dry_run.* is stale.
+Stage 35 actuator write remains blocked.
+```
+
+Next step:
+
+```text
+Capture a fresh Stage 32 syhlabtop snapshot, transfer it to A6000, rerun A6000
+no-send review, then regenerate Stage 34 dry-run artifacts from the fresh
+review outputs.
+```
+
+Use:
+
+```text
+audits/openarm_folding/stage34_right_joint4_limit_check_2026-05-12.md
+audits/openarm_folding/syhlabtop_stage32_refresh_snapshot_prompt_2026-05-12.md
+```
