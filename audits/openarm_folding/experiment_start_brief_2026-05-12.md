@@ -9,9 +9,9 @@ Repo head at Stage38 start: `3d28e3d1eb7ddbecaf44fbbcb5f0075ed60d9260`
 Stage35 first guarded right-arm write: DONE
 Stage36 A6000 no-send serving bridge: PASS
 Stage37 A6000 served-proposal right-arm single write: DONE
-Stage38 fresh snapshot and no-execute validation: PASS
-stage38_actual_write: NOT_RUN
-motion_status: BLOCKED_PENDING_EXACT_TARGET_CONFIRMATION
+Stage38 A6000 served-proposal right-arm single write: DONE
+stage38_post_write_readback: RECORDED_PREWRITE_GATE_EXPECTED_FAIL
+motion_status: BLOCKED_FOR_REVIEW
 next_motion_approval: NOT_GIVEN
 ```
 
@@ -21,7 +21,8 @@ Completed results only:
 - Stage36 served one no-send A6000 proposal from the corrected checkpoint.
 - Stage37 wrote one guarded right-arm served proposal. Final readback max target error was `0.3649835917 deg`.
 - Stage37 post-write no-execute readback recorded the new pose and blocked reuse of the old proposal.
-- Stage38 captured a fresh snapshot, received a no-send A6000 proposal, and passed final no-execute validation. Actual write has not run.
+- Stage38 wrote one guarded right-arm served proposal. Final readback max target error was `0.2170156177 deg`.
+- Stage38 post-write no-execute readback recorded the new pose and blocked reuse of the old proposal.
 
 Do not reuse:
 
@@ -31,14 +32,12 @@ proposal_sha256: 498fef8a4467e04ad7a5e01279f484dee7c76a17365e0c5ee12dd3d4e21eb5d
 reason: post-write freshness gate failed after motion, as expected
 ```
 
-Current Stage38 candidate:
+Do not reuse:
 
 ```text
 snapshot: snapshot_20260513_130926
 proposal_sha256: b8c6843dd3e9fde8e397f2c6f3917cdca512d4dc2c9d151da983c5d73295e182
-no_execute_validation: PASS
-max_abs_target_delta_from_fresh_deg: 1.9218568483768954
-approval_phrase: SEND_STAGE38_RIGHT_ARM_SERVED_PROPOSAL_ONCE_20260513_130926
+reason: post-write freshness gate failed after motion, as expected
 ```
 
 ## Fixed Boundaries
@@ -58,17 +57,22 @@ zeroing: forbidden
 calibration_write: forbidden
 ```
 
-The next actuator write, if approved, is the Stage38 served-proposal motion
-packet. It still requires exact-table operator approval.
+Any next actuator write must be a new stage with a fresh snapshot, fresh A6000
+proposal, new exact target table, no-execute validation, and operator approval.
 
 ## Next Experiment Loop
 
 Run only this loop for the next attempt:
 
-1. Get explicit operator approval for the Stage38 exact target table and phrase.
-2. Execute one guarded right-arm write only if fresh validation and approval both pass.
-3. Capture post-write readback without `--execute`.
-4. Return to `motion_status: BLOCKED_FOR_REVIEW`.
+1. Capture a fresh syhlabtop snapshot.
+2. Transfer the snapshot to A6000.
+3. Request an A6000 no-send proposal.
+4. Build a new exact target table from that proposal.
+5. Run no-execute validation against fresh current state.
+6. Get explicit operator approval for that exact table and phrase.
+7. Execute one guarded right-arm write only if validation and approval both pass.
+8. Capture post-write readback without `--execute`.
+9. Return to `motion_status: BLOCKED_FOR_REVIEW`.
 
 Minimum acceptance before any write:
 
@@ -80,7 +84,7 @@ proposal_motion_allowed: false
 proposal_actuator_commands_sent: false
 no_execute_validation: PASS
 fresh_target_validation_passed: true
-max_abs_target_delta_from_fresh_deg: 1.9218568483768954
+max_abs_target_delta_from_fresh_deg: <= 2.0
 ```
 
 ## Working Commands
@@ -119,14 +123,9 @@ uv run python audits/openarm_folding/syhlabtop_snapshot_policy_client.py \
   --timeout-s 180
 ```
 
-Stage38 guarded writer:
-
-```bash
-PYTHONPATH=/home/syhlabtop/workspace/lerobot:/home/syhlabtop/workspace/lerobot/src \
-/home/syhlabtop/workspace/openarm_lerobot/.venv312/bin/python \
-  audits/openarm_folding/stage38_guarded_served_proposal_write.py \
-  --proposal-json /home/syhlabtop/openarm_folding_20260512/shadow_reviews/snapshot_20260513_130926_a6000_served_action_proposal.json
-```
+For any next actuator packet, copy the latest guarded writer pattern but do not
+reuse Stage38's hardcoded snapshot ID, proposal checksum, target table, or
+confirmation phrase.
 
 ## Source Pointers
 
@@ -138,6 +137,7 @@ Stage36 result: audits/openarm_folding/stage36_a6000_serving_bridge_result_2026-
 Stage37 result: audits/openarm_folding/stage37_served_proposal_actual_write_result_2026-05-12.md
 Stage38 readiness: audits/openarm_folding/stage38_no_send_readiness_2026-05-13.md
 Stage38 approval draft: audits/openarm_folding/stage38_operator_motion_approval_draft_2026-05-13.md
+Stage38 result: audits/openarm_folding/stage38_actual_write_result_2026-05-13.md
 Full timeline: audits/openarm_folding/timeline_status_2026-05-11.md
 ```
 

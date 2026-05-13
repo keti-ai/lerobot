@@ -63,7 +63,8 @@ approval_phrase: SEND_STAGE38_RIGHT_ARM_SERVED_PROPOSAL_ONCE_20260513_130926
 
 ```text
 stage38_no_execute_validation: PASS
-stage38_motion_approval: NOT_GIVEN_FOR_EXACT_TABLE
-stage38_actual_write: NOT_RUN
-motion_status: BLOCKED_PENDING_EXACT_TARGET_CONFIRMATION
+stage38_motion_approval: GIVEN_FOR_EXACT_TABLE
+stage38_actual_write: DONE
+stage38_result: audits/openarm_folding/stage38_actual_write_result_2026-05-13.md
+motion_status: BLOCKED_FOR_REVIEW
 ```
