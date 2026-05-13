@@ -575,7 +575,9 @@ def execute_plan(
     left_port: str,
     action_period_s: float,
     selected_features: list[str],
-) -> list[dict[str, Any]]:
+    readback_soft_error_deg: float,
+    readback_hard_error_deg: float,
+) -> tuple[list[dict[str, Any]], list[str], list[str]]:
     selected_by_side = {
         "right": [key for key in selected_features if FEATURE_SIDE[key] == "right"],
         "left": [key for key in selected_features if FEATURE_SIDE[key] == "left"],
@@ -589,6 +591,9 @@ def execute_plan(
         if selected_by_side[side]
     }
     readbacks: list[dict[str, Any]] = []
+    hard_errors: list[str] = []
+    soft_warnings: list[str] = []
+    hard_streak = 0
     torque_enabled: set[str] = set()
     connected: set[str] = set()
     try:
@@ -617,19 +622,29 @@ def execute_plan(
                     "target_deg": float(row["target_deg"]),
                     "error_deg": error,
                 }
-            readbacks.append(
-                {
-                    "step_id": step["step_id"],
-                    "model_action_index": step["model_action_index"],
-                    "derived_from_model_action": step["derived_from_model_action"],
-                    "per_joint": per_joint,
-                    "max_abs_error_deg": max(abs(item["error_deg"]) for item in per_joint.values()),
-                }
-            )
+            max_abs_error = max(abs(item["error_deg"]) for item in per_joint.values())
+            readback = {
+                "step_id": step["step_id"],
+                "model_action_index": step["model_action_index"],
+                "derived_from_model_action": step["derived_from_model_action"],
+                "per_joint": per_joint,
+                "max_abs_error_deg": max_abs_error,
+            }
+            readbacks.append(readback)
+            if max_abs_error > readback_soft_error_deg:
+                soft_warnings.append(f"soft readback warning at step {step['step_id']}: {max_abs_error:.6f} deg")
+            if max_abs_error > readback_hard_error_deg:
+                hard_streak += 1
+                if hard_streak >= 2:
+                    hard_errors.append(f"repeated hard readback error at step {step['step_id']}: {max_abs_error:.6f} deg")
+                    readback["abort_after_step"] = True
+                    break
+            else:
+                hard_streak = 0
         for side, bus in buses.items():
             bus.disable_torque(selected_motors[side], num_retry=2)
             torque_enabled.discard(side)
-        return readbacks
+        return readbacks, hard_errors, soft_warnings
     finally:
         for side, bus in buses.items():
             if side in connected and side in torque_enabled:
@@ -876,19 +891,16 @@ def main() -> int:
     elif args.execute:
         try:
             motion_status = "ROLLOUT_SESSION_ACTIVE"
-            readbacks = execute_plan(
+            readbacks, rb_hard, rb_soft = execute_plan(
                 planned_steps,
                 right_port=args.right_port,
                 left_port=args.left_port,
                 action_period_s=args.action_period_s,
                 selected_features=selected_features,
+                readback_soft_error_deg=readback_soft_error_deg,
+                readback_hard_error_deg=readback_hard_error_deg,
             )
             actuator_commands_sent = bool(planned_steps)
-            rb_hard, rb_soft = summarize_readback(
-                readbacks,
-                soft_threshold=readback_soft_error_deg,
-                hard_threshold=readback_hard_error_deg,
-            )
             hard_errors.extend(rb_hard)
             soft_warnings.extend(rb_soft)
             if hard_errors:
@@ -963,6 +975,7 @@ def main() -> int:
         "promotion_recommended": bool(args.execute and not hard_errors and not soft_warnings and args.risk_level < 4),
         "promotion_recommended_to_level": args.risk_level + 1 if args.execute and not hard_errors and not soft_warnings and args.risk_level < 4 else None,
         "actions_executed": len(readbacks),
+        "execution_stopped_early": bool(args.execute and len(readbacks) < len(planned_steps)),
         "chunks_executed": 1 if actuator_commands_sent else 0,
         "interpolated_steps": interpolated_steps,
         "rejected_actions": len([warning for warning in soft_warnings if "cap exceeded" in warning]),
