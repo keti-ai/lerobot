@@ -20,30 +20,34 @@ Stage36 A6000 no-send serving bridge: PASS
 Stage37 A6000 served-proposal right-arm single write: DONE
 Stage38 A6000 served-proposal right-arm single write: DONE
 Stage39 A6000 served-proposal right-arm single write: DONE
-motion_status: BLOCKED_FOR_REVIEW
+Stage40 A6000 served-proposal no-execute validation: PASS
+Stage40 A6000 served-proposal right-arm single write: NOT_RUN
+motion_status: BLOCKED
 next_motion_approval: NOT_GIVEN
 ```
 
-The old Stage37 proposal must not be reused. Start the next experiment from a
-fresh snapshot and a new A6000 no-send proposal. The Stage38 proposal must not
-be reused after its post-write freshness gate failed as expected. The current
-Stage39 proposal must not be reused after its post-write freshness gate failed
-as expected.
+The old Stage37 proposal must not be reused. The Stage38 and Stage39 proposals
+must not be reused after their post-write freshness gates failed as expected.
+The current Stage40 target table is only a no-execute validated draft until
+explicit operator motion approval is given. Any new experiment after Stage40
+must start from a fresh snapshot and a new A6000 no-send proposal.
 
 ## Read Order
 
 1. `experiment_start_brief_2026-05-12.md`
-2. `stage39_no_send_readiness_2026-05-13.md`
-3. `stage39_actual_write_result_2026-05-13.md`
-4. `stage39_operator_motion_approval_draft_2026-05-13.md`
-5. `stage38_no_send_readiness_2026-05-13.md`
-6. `stage38_actual_write_result_2026-05-13.md`
-7. `stage38_operator_motion_approval_draft_2026-05-13.md`
-8. `timeline_status_2026-05-11.md`
-9. `stage37_served_proposal_actual_write_result_2026-05-12.md`
-10. `stage36_a6000_serving_bridge_result_2026-05-12.md`
-11. `stage35_actual_write_result_2026-05-12.md`
-12. Historical recipe/audit sources as needed:
+2. `stage40_no_send_readiness_2026-05-13.md`
+3. `stage40_operator_motion_approval_draft_2026-05-13.md`
+4. `stage39_no_send_readiness_2026-05-13.md`
+5. `stage39_actual_write_result_2026-05-13.md`
+6. `stage39_operator_motion_approval_draft_2026-05-13.md`
+7. `stage38_no_send_readiness_2026-05-13.md`
+8. `stage38_actual_write_result_2026-05-13.md`
+9. `stage38_operator_motion_approval_draft_2026-05-13.md`
+10. `timeline_status_2026-05-11.md`
+11. `stage37_served_proposal_actual_write_result_2026-05-12.md`
+12. `stage36_a6000_serving_bridge_result_2026-05-12.md`
+13. `stage35_actual_write_result_2026-05-12.md`
+14. Historical recipe/audit sources as needed:
    `artifact_audit.md`, `body_compat_matrix.md`, `shared_baseline.md`,
    `stage28_to_stage32_recovery_runbook_2026-05-11.md`.
 

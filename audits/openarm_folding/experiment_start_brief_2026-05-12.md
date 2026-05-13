@@ -1,7 +1,7 @@
 # OpenArm Folding Experiment Start Brief
 
 Date: 2026-05-13
-Repo head before Stage39 readiness commit: `c8e188e13ed66c8cc44f5e5c9b853505241be714`
+Repo head before Stage40 readiness commit: `dbab4fa2975b2be7f8aa159975556dde51cb462b`
 
 ## Current Position
 
@@ -12,7 +12,9 @@ Stage37 A6000 served-proposal right-arm single write: DONE
 Stage38 A6000 served-proposal right-arm single write: DONE
 Stage39 A6000 served-proposal right-arm single write: DONE
 stage39_post_write_readback: RECORDED_PREWRITE_GATE_EXPECTED_FAIL
-motion_status: BLOCKED_FOR_REVIEW
+Stage40 A6000 served-proposal no-execute validation: PASS
+Stage40 A6000 served-proposal right-arm single write: NOT_RUN
+motion_status: BLOCKED
 next_motion_approval: NOT_GIVEN
 ```
 
@@ -26,14 +28,8 @@ Completed results only:
 - Stage38 post-write no-execute readback recorded the new pose and blocked reuse of the old proposal.
 - Stage39 wrote one guarded right-arm served proposal. Final readback max target error was `0.3152584209 deg`.
 - Stage39 post-write no-execute readback recorded the new pose and blocked reuse of the old proposal.
-
-Do not reuse:
-
-```text
-snapshot: snapshot_20260512_194042
-proposal_sha256: 498fef8a4467e04ad7a5e01279f484dee7c76a17365e0c5ee12dd3d4e21eb5da
-reason: post-write freshness gate failed after motion, as expected
-```
+- Stage40 captured a fresh snapshot and received an A6000 no-send served proposal.
+- Stage40 no-execute validation passed with max draft delta `1.4891547268 deg`; no actuator command was sent.
 
 Do not reuse:
 
@@ -51,9 +47,26 @@ proposal_sha256: b8c6843dd3e9fde8e397f2c6f3917cdca512d4dc2c9d151da983c5d73295e18
 reason: post-write freshness gate failed after motion, as expected
 ```
 
+Do not reuse:
+
+```text
+snapshot: snapshot_20260512_194042
+proposal_sha256: 498fef8a4467e04ad7a5e01279f484dee7c76a17365e0c5ee12dd3d4e21eb5da
+reason: post-write freshness gate failed after motion, as expected
+```
+
+Current no-execute validated draft, not approved for motion:
+
+```text
+snapshot: snapshot_20260513_152125
+proposal_sha256: b600f8380260c21f101453a499325409a460ad9129c5ca38d986df92af86efab
+approval_phrase: SEND_STAGE40_RIGHT_ARM_SERVED_PROPOSAL_ONCE_20260513_152125
+status: stage40_no_execute_validation PASS, stage40_actual_write NOT_RUN
+```
+
 ## Fixed Boundaries
 
-Until a new exact target table and explicit operator approval exist:
+Until explicit operator approval exists for the Stage40 exact target table:
 
 ```text
 robot motion: BLOCKED
@@ -68,12 +81,14 @@ zeroing: forbidden
 calibration_write: forbidden
 ```
 
-Any next actuator write must be a new stage with a fresh snapshot, fresh A6000
-proposal, new exact target table, no-execute validation, and operator approval.
+The next actuator write may only be the Stage40 exact target table if the
+operator gives the exact approval phrase recorded below. Otherwise, start a new
+stage with a fresh snapshot, fresh A6000 proposal, new exact target table,
+no-execute validation, and operator approval.
 
 ## Next Experiment Loop
 
-Run only this loop for the next attempt:
+Run this loop for any new attempt after Stage40:
 
 1. Capture a fresh syhlabtop snapshot.
 2. Transfer the snapshot to A6000.
@@ -134,9 +149,9 @@ uv run python audits/openarm_folding/syhlabtop_snapshot_policy_client.py \
   --timeout-s 180
 ```
 
-For any next actuator packet, copy the latest guarded writer pattern but do not
-reuse Stage39's hardcoded snapshot ID, proposal checksum, target table, or
-confirmation phrase.
+For any new actuator packet after Stage40, copy the latest guarded writer
+pattern but do not reuse Stage40's hardcoded snapshot ID, proposal checksum,
+target table, or confirmation phrase.
 
 ## Source Pointers
 
@@ -152,6 +167,8 @@ Stage38 result: audits/openarm_folding/stage38_actual_write_result_2026-05-13.md
 Stage39 readiness: audits/openarm_folding/stage39_no_send_readiness_2026-05-13.md
 Stage39 approval draft: audits/openarm_folding/stage39_operator_motion_approval_draft_2026-05-13.md
 Stage39 result: audits/openarm_folding/stage39_actual_write_result_2026-05-13.md
+Stage40 readiness: audits/openarm_folding/stage40_no_send_readiness_2026-05-13.md
+Stage40 approval draft: audits/openarm_folding/stage40_operator_motion_approval_draft_2026-05-13.md
 Full timeline: audits/openarm_folding/timeline_status_2026-05-11.md
 ```
 
