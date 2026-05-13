@@ -1,6 +1,6 @@
 # OpenArm Folding Audit Index
 
-Date: 2026-05-12
+Date: 2026-05-13
 Branch: `audit/openarm-folding-baseline`
 Scope: metadata audit and no-motion/shadow-readiness prep for `lerobot/folding_latest`.
 
@@ -18,21 +18,26 @@ Current boundary:
 Stage35 first guarded right-arm write: DONE
 Stage36 A6000 no-send serving bridge: PASS
 Stage37 A6000 served-proposal right-arm single write: DONE
-motion_status: BLOCKED_FOR_REVIEW
+Stage38 fresh snapshot and no-execute validation: PASS
+stage38_actual_write: NOT_RUN
+motion_status: BLOCKED_PENDING_EXACT_TARGET_CONFIRMATION
 next_motion_approval: NOT_GIVEN
 ```
 
 The old Stage37 proposal must not be reused. Start the next experiment from a
-fresh snapshot and a new A6000 no-send proposal.
+fresh snapshot and a new A6000 no-send proposal. The current Stage38 candidate
+requires exact-table operator approval before any actuator write.
 
 ## Read Order
 
 1. `experiment_start_brief_2026-05-12.md`
-2. `timeline_status_2026-05-11.md`
-3. `stage37_served_proposal_actual_write_result_2026-05-12.md`
-4. `stage36_a6000_serving_bridge_result_2026-05-12.md`
-5. `stage35_actual_write_result_2026-05-12.md`
-6. Historical recipe/audit sources as needed:
+2. `stage38_no_send_readiness_2026-05-13.md`
+3. `stage38_operator_motion_approval_draft_2026-05-13.md`
+4. `timeline_status_2026-05-11.md`
+5. `stage37_served_proposal_actual_write_result_2026-05-12.md`
+6. `stage36_a6000_serving_bridge_result_2026-05-12.md`
+7. `stage35_actual_write_result_2026-05-12.md`
+8. Historical recipe/audit sources as needed:
    `artifact_audit.md`, `body_compat_matrix.md`, `shared_baseline.md`,
    `stage28_to_stage32_recovery_runbook_2026-05-11.md`.
 
