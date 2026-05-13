@@ -103,6 +103,13 @@ Known syhlabtop repo path from the live robot PC session:
 /home/syhlabtop/workspace/lerobot
 ```
 
+For syhlabtop RealSense capture scripts, use the checked-in wrapper so the
+RSUSB `pyrealsense2` path is not lost by nested shell quoting:
+
+```bash
+bash audits/openarm_folding/run_rsusb_py312.sh audits/openarm_folding/create_no_send_snapshot_trial.py ...
+```
+
 Known syhlabtop storage state from the live robot PC session:
 
 ```text
