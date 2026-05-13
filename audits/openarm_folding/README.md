@@ -19,31 +19,31 @@ Stage35 first guarded right-arm write: DONE
 Stage36 A6000 no-send serving bridge: PASS
 Stage37 A6000 served-proposal right-arm single write: DONE
 Stage38 A6000 served-proposal right-arm single write: DONE
-Stage39 fresh snapshot and no-execute validation: PASS
-stage39_actual_write: NOT_RUN
-motion_status: BLOCKED_PENDING_EXACT_TARGET_CONFIRMATION
+Stage39 A6000 served-proposal right-arm single write: DONE
+motion_status: BLOCKED_FOR_REVIEW
 next_motion_approval: NOT_GIVEN
 ```
 
 The old Stage37 proposal must not be reused. Start the next experiment from a
 fresh snapshot and a new A6000 no-send proposal. The Stage38 proposal must not
 be reused after its post-write freshness gate failed as expected. The current
-Stage39 candidate requires exact-table operator approval before any actuator
-write.
+Stage39 proposal must not be reused after its post-write freshness gate failed
+as expected.
 
 ## Read Order
 
 1. `experiment_start_brief_2026-05-12.md`
 2. `stage39_no_send_readiness_2026-05-13.md`
-3. `stage39_operator_motion_approval_draft_2026-05-13.md`
-4. `stage38_no_send_readiness_2026-05-13.md`
-5. `stage38_actual_write_result_2026-05-13.md`
-6. `stage38_operator_motion_approval_draft_2026-05-13.md`
-7. `timeline_status_2026-05-11.md`
-8. `stage37_served_proposal_actual_write_result_2026-05-12.md`
-9. `stage36_a6000_serving_bridge_result_2026-05-12.md`
-10. `stage35_actual_write_result_2026-05-12.md`
-11. Historical recipe/audit sources as needed:
+3. `stage39_actual_write_result_2026-05-13.md`
+4. `stage39_operator_motion_approval_draft_2026-05-13.md`
+5. `stage38_no_send_readiness_2026-05-13.md`
+6. `stage38_actual_write_result_2026-05-13.md`
+7. `stage38_operator_motion_approval_draft_2026-05-13.md`
+8. `timeline_status_2026-05-11.md`
+9. `stage37_served_proposal_actual_write_result_2026-05-12.md`
+10. `stage36_a6000_serving_bridge_result_2026-05-12.md`
+11. `stage35_actual_write_result_2026-05-12.md`
+12. Historical recipe/audit sources as needed:
    `artifact_audit.md`, `body_compat_matrix.md`, `shared_baseline.md`,
    `stage28_to_stage32_recovery_runbook_2026-05-11.md`.
 

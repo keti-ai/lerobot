@@ -8,8 +8,9 @@ Date: 2026-05-13
 stage39_fresh_snapshot: DONE
 stage39_a6000_no_send_proposal: PASS
 stage39_no_execute_validation: PASS
-stage39_actual_write: NOT_RUN
-motion_status: BLOCKED_PENDING_EXACT_TARGET_CONFIRMATION
+stage39_actual_write: DONE
+stage39_result: audits/openarm_folding/stage39_actual_write_result_2026-05-13.md
+motion_status: BLOCKED_FOR_REVIEW
 ```
 
 No rollout, recording, replay-to-robot, `send_action`, local PI0.5 inference,
@@ -106,7 +107,8 @@ The A6000 copies matched the syhlabtop checksums.
 
 ```text
 stage39_no_execute_validation: PASS
-stage39_actual_write: NOT_RUN
+stage39_actual_write: DONE
+stage39_result: audits/openarm_folding/stage39_actual_write_result_2026-05-13.md
 next_motion_approval: NOT_GIVEN
-motion_status: BLOCKED_PENDING_EXACT_TARGET_CONFIRMATION
+motion_status: BLOCKED_FOR_REVIEW
 ```
