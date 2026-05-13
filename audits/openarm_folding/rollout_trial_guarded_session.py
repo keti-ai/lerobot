@@ -357,6 +357,38 @@ def within_limits(key: str, value: float) -> bool:
     return lo <= value <= hi
 
 
+def clamp(value: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, value))
+
+
+def feature_delta_cap(
+    key: str,
+    *,
+    base_cap_deg: float,
+    arm_delta_cap_deg: float | None,
+    gripper_delta_cap_deg: float | None,
+) -> float:
+    if key in GRIPPER_FEATURES and gripper_delta_cap_deg is not None:
+        return gripper_delta_cap_deg
+    if key not in GRIPPER_FEATURES and arm_delta_cap_deg is not None:
+        return arm_delta_cap_deg
+    return base_cap_deg
+
+
+def feature_readback_threshold(
+    key: str,
+    *,
+    default_deg: float,
+    arm_deg: float | None,
+    gripper_deg: float | None,
+) -> float:
+    if key in GRIPPER_FEATURES and gripper_deg is not None:
+        return gripper_deg
+    if key not in GRIPPER_FEATURES and arm_deg is not None:
+        return arm_deg
+    return default_deg
+
+
 def make_step(
     *,
     step_id: int,
@@ -364,12 +396,14 @@ def make_step(
     previous: dict[str, float],
     target: dict[str, float],
     cap_deg: float,
+    feature_caps: dict[str, float],
     derived: bool,
     selected_features: list[str],
 ) -> dict[str, Any]:
     rows = []
     for key in selected_features:
         delta = target[key] - previous[key]
+        feature_cap = feature_caps[key]
         lo, hi = FEATURE_LIMITS[key]
         rows.append(
             {
@@ -379,9 +413,10 @@ def make_step(
                 "previous_deg": previous[key],
                 "target_deg": target[key],
                 "delta_deg": delta,
+                "delta_cap_deg": feature_cap,
                 "limit_min_deg": lo,
                 "limit_max_deg": hi,
-                "within_delta_cap": abs(delta) <= cap_deg + 1e-6,
+                "within_delta_cap": abs(delta) <= feature_cap + 1e-6,
                 "within_joint_limits": lo <= target[key] <= hi,
             }
         )
@@ -401,6 +436,9 @@ def build_plan(
     risk_level: int,
     envelope: dict[str, Any] | None,
     selected_features: list[str],
+    clip_to_delta_cap: bool,
+    arm_delta_cap_deg: float | None,
+    gripper_delta_cap_deg: float | None,
 ) -> tuple[list[dict[str, Any]], list[str], list[str]]:
     hard_errors: list[str] = []
     soft_warnings: list[str] = []
@@ -412,18 +450,28 @@ def build_plan(
     if envelope is not None:
         max_commands = min(max_commands, int(envelope.get("max_actions_per_chunk", max_commands)))
         cap_deg = min(cap_deg, float(envelope.get("max_per_step_delta_cap_deg", cap_deg)))
+    feature_caps = {
+        key: feature_delta_cap(
+            key,
+            base_cap_deg=cap_deg,
+            arm_delta_cap_deg=arm_delta_cap_deg,
+            gripper_delta_cap_deg=gripper_delta_cap_deg,
+        )
+        for key in selected_features
+    }
     previous = {key: float(fresh_current[key]) for key in selected_features}
     session_start = previous.copy()
     plan: list[dict[str, Any]] = []
     for model_idx, action in enumerate(actions):
         target = {key: float(action[ACTION_NAMES.index(key)]) for key in selected_features}
-        invalid_limits = [key for key, value in target.items() if not within_limits(key, value)]
-        if invalid_limits:
-            hard_errors.append(f"joint limit violation at model action {model_idx}: {invalid_limits}")
-            break
         deltas = {key: target[key] - previous[key] for key in selected_features}
+        max_cap_ratio = max(abs(deltas[key]) / feature_caps[key] for key in selected_features if feature_caps[key] > 0)
         max_abs_delta = max(abs(value) for value in deltas.values())
-        if max_abs_delta <= cap_deg + 1e-6:
+        if max_cap_ratio <= 1.0 + 1e-6:
+            invalid_limits = [key for key, value in target.items() if not within_limits(key, value)]
+            if invalid_limits:
+                hard_errors.append(f"joint limit violation at model action {model_idx}: {invalid_limits}")
+                break
             if len(plan) >= max_commands:
                 break
             plan.append(
@@ -433,13 +481,39 @@ def build_plan(
                     previous=previous,
                     target=target,
                     cap_deg=cap_deg,
+                    feature_caps=feature_caps,
                     derived=False,
                     selected_features=selected_features,
                 )
             )
             previous = target
+        elif clip_to_delta_cap:
+            if len(plan) >= max_commands:
+                break
+            clipped_target = {}
+            for key in selected_features:
+                lo, hi = FEATURE_LIMITS[key]
+                clipped_delta = clamp(deltas[key], -feature_caps[key], feature_caps[key])
+                clipped_target[key] = clamp(previous[key] + clipped_delta, lo, hi)
+            plan.append(
+                make_step(
+                    step_id=len(plan),
+                    model_action_index=model_idx,
+                    previous=previous,
+                    target=clipped_target,
+                    cap_deg=cap_deg,
+                    feature_caps=feature_caps,
+                    derived=True,
+                    selected_features=selected_features,
+                )
+            )
+            previous = clipped_target
         elif bool(level["interpolate"]):
-            segments = max(2, math.ceil(max_abs_delta / cap_deg))
+            invalid_limits = [key for key, value in target.items() if not within_limits(key, value)]
+            if invalid_limits:
+                hard_errors.append(f"joint limit violation at model action {model_idx}: {invalid_limits}")
+                break
+            segments = max(2, math.ceil(max_cap_ratio))
             for segment in range(1, segments + 1):
                 if len(plan) >= max_commands:
                     soft_warnings.append(f"interpolation truncated at action budget before model action {model_idx}")
@@ -453,6 +527,7 @@ def build_plan(
                         previous={key: previous[key] + deltas[key] * ((segment - 1) / segments) for key in selected_features},
                         target=interpolated,
                         cap_deg=cap_deg,
+                        feature_caps=feature_caps,
                         derived=True,
                         selected_features=selected_features,
                     )
@@ -577,6 +652,10 @@ def execute_plan(
     selected_features: list[str],
     readback_soft_error_deg: float,
     readback_hard_error_deg: float,
+    arm_readback_soft_error_deg: float | None,
+    arm_readback_hard_error_deg: float | None,
+    gripper_readback_soft_error_deg: float | None,
+    gripper_readback_hard_error_deg: float | None,
 ) -> tuple[list[dict[str, Any]], list[str], list[str]]:
     selected_by_side = {
         "right": [key for key in selected_features if FEATURE_SIDE[key] == "right"],
@@ -617,26 +696,60 @@ def execute_plan(
             for row in step["rows"]:
                 key = row["key"]
                 error = float(current_by_feature[key]) - float(row["target_deg"])
+                soft_threshold = feature_readback_threshold(
+                    key,
+                    default_deg=readback_soft_error_deg,
+                    arm_deg=arm_readback_soft_error_deg,
+                    gripper_deg=gripper_readback_soft_error_deg,
+                )
+                hard_threshold = feature_readback_threshold(
+                    key,
+                    default_deg=readback_hard_error_deg,
+                    arm_deg=arm_readback_hard_error_deg,
+                    gripper_deg=gripper_readback_hard_error_deg,
+                )
                 per_joint[row["key"]] = {
                     "readback_deg": float(current_by_feature[key]),
                     "target_deg": float(row["target_deg"]),
                     "error_deg": error,
+                    "soft_threshold_deg": soft_threshold,
+                    "hard_threshold_deg": hard_threshold,
                 }
             max_abs_error = max(abs(item["error_deg"]) for item in per_joint.values())
+            soft_exceeded = [
+                {"key": key, "abs_error_deg": abs(item["error_deg"]), "threshold_deg": item["soft_threshold_deg"]}
+                for key, item in per_joint.items()
+                if abs(item["error_deg"]) > float(item["soft_threshold_deg"])
+            ]
+            hard_exceeded = [
+                {"key": key, "abs_error_deg": abs(item["error_deg"]), "threshold_deg": item["hard_threshold_deg"]}
+                for key, item in per_joint.items()
+                if abs(item["error_deg"]) > float(item["hard_threshold_deg"])
+            ]
             readback = {
                 "step_id": step["step_id"],
                 "model_action_index": step["model_action_index"],
                 "derived_from_model_action": step["derived_from_model_action"],
                 "per_joint": per_joint,
                 "max_abs_error_deg": max_abs_error,
+                "soft_threshold_exceeded": soft_exceeded,
+                "hard_threshold_exceeded": hard_exceeded,
             }
             readbacks.append(readback)
-            if max_abs_error > readback_soft_error_deg:
-                soft_warnings.append(f"soft readback warning at step {step['step_id']}: {max_abs_error:.6f} deg")
-            if max_abs_error > readback_hard_error_deg:
+            if soft_exceeded:
+                worst = max(soft_exceeded, key=lambda item: item["abs_error_deg"] - item["threshold_deg"])
+                soft_warnings.append(
+                    f"soft readback warning at step {step['step_id']}: "
+                    f"{worst['key']} {worst['abs_error_deg']:.6f} deg > {worst['threshold_deg']:.6f} deg"
+                )
+            if hard_exceeded:
                 hard_streak += 1
                 if hard_streak >= 2:
-                    hard_errors.append(f"repeated hard readback error at step {step['step_id']}: {max_abs_error:.6f} deg")
+                    worst = max(hard_exceeded, key=lambda item: item["abs_error_deg"] - item["threshold_deg"])
+                    hard_errors.append(
+                        f"repeated hard readback error at step {step['step_id']}: "
+                        f"{worst['key']} {worst['abs_error_deg']:.6f} deg > {worst['threshold_deg']:.6f} deg"
+                    )
                     readback["abort_after_step"] = True
                     break
             else:
@@ -752,6 +865,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--health-timeout-s", type=float, default=10.0)
     parser.add_argument("--readback-soft-error-deg", type=float)
     parser.add_argument("--readback-hard-error-deg", type=float)
+    parser.add_argument("--arm-readback-soft-error-deg", type=float)
+    parser.add_argument("--arm-readback-hard-error-deg", type=float)
+    parser.add_argument("--gripper-readback-soft-error-deg", type=float)
+    parser.add_argument("--gripper-readback-hard-error-deg", type=float)
+    parser.add_argument("--clip-to-delta-cap", action="store_true")
+    parser.add_argument("--arm-delta-cap-deg", type=float)
+    parser.add_argument("--gripper-delta-cap-deg", type=float)
     parser.add_argument("--json-out", type=Path, required=True)
     parser.add_argument("--md-out", type=Path, required=True)
     parser.add_argument("--execute", action="store_true")
@@ -859,6 +979,9 @@ def main() -> int:
             risk_level=args.risk_level,
             envelope=envelope,
             selected_features=selected_features,
+            clip_to_delta_cap=args.clip_to_delta_cap,
+            arm_delta_cap_deg=args.arm_delta_cap_deg,
+            gripper_delta_cap_deg=args.gripper_delta_cap_deg,
         )
         hard_errors.extend(plan_hard)
         soft_warnings.extend(plan_soft)
@@ -899,6 +1022,10 @@ def main() -> int:
                 selected_features=selected_features,
                 readback_soft_error_deg=readback_soft_error_deg,
                 readback_hard_error_deg=readback_hard_error_deg,
+                arm_readback_soft_error_deg=args.arm_readback_soft_error_deg,
+                arm_readback_hard_error_deg=args.arm_readback_hard_error_deg,
+                gripper_readback_soft_error_deg=args.gripper_readback_soft_error_deg,
+                gripper_readback_hard_error_deg=args.gripper_readback_hard_error_deg,
             )
             actuator_commands_sent = bool(planned_steps)
             hard_errors.extend(rb_hard)
@@ -964,6 +1091,13 @@ def main() -> int:
         "state_freshness_ttl_s": STATE_FRESHNESS_TTL_S,
         "readback_soft_error_deg": readback_soft_error_deg,
         "readback_hard_error_deg": readback_hard_error_deg,
+        "arm_readback_soft_error_deg": args.arm_readback_soft_error_deg,
+        "arm_readback_hard_error_deg": args.arm_readback_hard_error_deg,
+        "gripper_readback_soft_error_deg": args.gripper_readback_soft_error_deg,
+        "gripper_readback_hard_error_deg": args.gripper_readback_hard_error_deg,
+        "clip_to_delta_cap": bool(args.clip_to_delta_cap),
+        "arm_delta_cap_deg": args.arm_delta_cap_deg,
+        "gripper_delta_cap_deg": args.gripper_delta_cap_deg,
         "fresh_state_age_s": state_age_s,
         "fresh_current_deg": fresh_current,
         "health_result": health_result,
