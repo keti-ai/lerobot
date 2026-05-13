@@ -17,6 +17,8 @@ Stage40 A6000 served-proposal right-arm single write: DONE
 stage40_post_write_readback: RECORDED_NO_EXECUTE_PASS
 motion_status: BLOCKED_FOR_REVIEW
 next_motion_approval: NOT_GIVEN
+next_axis: rollout_trial_<timestamp>
+new_stage_numbers: forbidden
 ```
 
 Completed results only:
@@ -83,22 +85,22 @@ zeroing: forbidden
 calibration_write: forbidden
 ```
 
-Any next actuator write must be a new stage with a fresh snapshot, fresh A6000
-proposal, new exact target table, no-execute validation, and operator approval.
+Any next actuator write must use a fresh snapshot, fresh A6000 proposal,
+no-execute validation, and operator approval. For rollout entry, that work must
+be recorded as `rollout_trial_<timestamp>/` rather than a new Stage number.
 
-## Next Experiment Loop
+## Next Rollout Trial Loop
 
 Run only this loop for the next attempt:
 
-1. Capture a fresh syhlabtop snapshot.
-2. Transfer the snapshot to A6000.
-3. Request an A6000 no-send proposal.
-4. Build a new exact target table from that proposal.
-5. Run no-execute validation against fresh current state.
-6. Get explicit operator approval for that exact table and phrase.
-7. Execute one guarded right-arm write only if validation and approval both pass.
-8. Capture post-write readback without `--execute`.
-9. Return to `motion_status: BLOCKED_FOR_REVIEW`.
+1. Create `rollout_trial_<timestamp>/`.
+2. Capture a fresh syhlabtop snapshot and transfer it to A6000.
+3. Request an A6000 no-send full-chunk proposal.
+4. Run no-execute chunk validation and write the session envelope draft.
+5. Get explicit operator approval for the rollout session envelope.
+6. Execute guarded right-arm-only chunks inside the approved envelope.
+7. Promote risk level only when readback and health checks remain stable.
+8. Pause for soft recoverable issues or block for hard safety/integrity violations.
 
 Minimum acceptance before any write:
 
@@ -110,7 +112,9 @@ proposal_motion_allowed: false
 proposal_actuator_commands_sent: false
 no_execute_validation: PASS
 fresh_target_validation_passed: true
-max_abs_target_delta_from_fresh_deg: <= 2.0
+metadata_sanity: PASS
+right_arm_only: true
+session_envelope_approval: GIVEN
 ```
 
 ## Working Commands
@@ -149,9 +153,9 @@ uv run python audits/openarm_folding/syhlabtop_snapshot_policy_client.py \
   --timeout-s 180
 ```
 
-For any next actuator packet, copy the latest guarded writer pattern but do not
-reuse Stage40's hardcoded snapshot ID, proposal checksum, target table, or
-confirmation phrase.
+For rollout entry, use `audits/openarm_folding/rollout_trial_guarded_session.py`.
+Do not reuse Stage40's hardcoded snapshot ID, proposal checksum, target table,
+or confirmation phrase.
 
 ## Source Pointers
 
@@ -170,6 +174,7 @@ Stage39 result: audits/openarm_folding/stage39_actual_write_result_2026-05-13.md
 Stage40 readiness: audits/openarm_folding/stage40_no_send_readiness_2026-05-13.md
 Stage40 approval draft: audits/openarm_folding/stage40_operator_motion_approval_draft_2026-05-13.md
 Stage40 result: audits/openarm_folding/stage40_actual_write_result_2026-05-13.md
+Rollout trial plan: audits/openarm_folding/rollout_trial_progressive_session_2026-05-13.md
 Full timeline: audits/openarm_folding/timeline_status_2026-05-11.md
 ```
 

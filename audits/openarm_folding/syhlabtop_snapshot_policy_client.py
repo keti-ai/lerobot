@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import time
 import urllib.error
@@ -29,6 +30,28 @@ STATE_NAMES = [
     "left_joint_7.pos",
     "left_gripper.pos",
 ]
+SNAPSHOT_CHECKSUM_FILES = ["state_16.csv", "left_wrist.png", "right_wrist.png", "base.png", "metadata.json"]
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def snapshot_checksum(snapshot_dir: Path) -> str:
+    digest = hashlib.sha256()
+    for name in SNAPSHOT_CHECKSUM_FILES:
+        path = snapshot_dir / name
+        if not path.exists():
+            continue
+        digest.update(name.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(file_sha256(path).encode("ascii"))
+        digest.update(b"\n")
+    return digest.hexdigest()
 
 
 def read_state_csv(path: Path) -> list[float]:
@@ -71,6 +94,12 @@ def write_markdown(path: Path, payload: dict[str, Any]) -> None:
         f"- Server URL: `{payload['server_url']}`",
         f"- Proposal schema: `{proposal.get('schema')}`",
         f"- All finite: `{proposal.get('all_finite')}`",
+        f"- Model id: `{proposal.get('model_id')}`",
+        f"- Checkpoint id: `{proposal.get('checkpoint_id')}`",
+        f"- Robot config id: `{proposal.get('robot_config_id')}`",
+        f"- Action normalization id: `{proposal.get('action_normalization_id')}`",
+        f"- Action shape: `{proposal.get('action_shape')}`",
+        f"- Snapshot checksum: `{proposal.get('snapshot_checksum')}`",
         f"- Max abs arm delta deg: `{proposal.get('max_abs_arm_delta_deg')}`",
         "- Send allowed: `false`",
         "- Motion allowed: `false`",
@@ -112,6 +141,7 @@ def main() -> int:
     metadata_path = args.local_snapshot_dir / "metadata.json"
     metadata = json.loads(metadata_path.read_text()) if metadata_path.exists() else {}
     obs_id = str(metadata.get("obs_id") or args.local_snapshot_dir.name)
+    checksum = snapshot_checksum(args.local_snapshot_dir)
     request_payload = {
         "schema": "openarm_folding_observation_ref_v1",
         "obs_id": obs_id,
@@ -121,6 +151,8 @@ def main() -> int:
         "state_names": STATE_NAMES,
         "state": read_state_csv(args.local_snapshot_dir / "state_16.csv"),
         "snapshot_dir": args.a6000_snapshot_dir,
+        "snapshot_checksum": checksum,
+        "snapshot_checksum_algorithm": "sha256(file-name + file-sha256 list)",
         "image_keys": ["left_wrist", "right_wrist", "base"],
         "send_action": False,
     }

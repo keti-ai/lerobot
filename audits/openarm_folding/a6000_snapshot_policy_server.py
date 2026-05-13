@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import time
 import traceback
@@ -38,6 +39,10 @@ ACTION_NAMES = [
     "left_gripper.pos",
 ]
 ARM_ACTION_NAMES = [name for name in ACTION_NAMES if "gripper" not in name]
+ROBOT_CONFIG_ID = "openarms_follower:16d:3cam:v1"
+ACTION_SPACE_VERSION = "openarm_folding_abs_16d_deg_v1"
+ACTION_UNITS = "degrees"
+SNAPSHOT_CHECKSUM_FILES = ["state_16.csv", "left_wrist.png", "right_wrist.png", "base.png", "metadata.json"]
 LIMITS = {
     "right_joint_1.pos": (-75.0, 75.0),
     "right_joint_2.pos": (-9.0, 90.0),
@@ -56,6 +61,27 @@ LIMITS = {
     "left_joint_7.pos": (-80.0, 80.0),
     "left_gripper.pos": (-65.0, 0.0),
 }
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def combined_files_sha256(root: Path, names: list[str]) -> str:
+    digest = hashlib.sha256()
+    for name in names:
+        path = root / name
+        if not path.exists():
+            continue
+        digest.update(name.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(file_sha256(path).encode("ascii"))
+        digest.update(b"\n")
+    return digest.hexdigest()
 
 
 def read_state_csv(path: Path) -> np.ndarray:
@@ -95,6 +121,23 @@ class SnapshotPolicyService:
         )
         self.policy = policy_cls.from_pretrained(str(self.model_dir), config=cfg, local_files_only=True)
         self.policy.eval()
+        self.model_id = f"{cfg.type}:{self.model_dir.name}"
+        self.checkpoint_id = self._checkpoint_id()
+        self.action_normalization_id = self._action_normalization_id()
+
+    def _checkpoint_id(self) -> str:
+        if self.model_dir.name == "pretrained_model":
+            return self.model_dir.parent.name
+        return self.model_dir.name
+
+    def _action_normalization_id(self) -> str:
+        names = [
+            "policy_preprocessor.json",
+            "policy_postprocessor.json",
+            "policy_preprocessor_step_3_normalizer_processor.safetensors",
+            "policy_postprocessor_step_0_unnormalizer_processor.safetensors",
+        ]
+        return f"processor_sha256:{combined_files_sha256(self.model_dir, names)}"
 
     def resolve_snapshot_dir(self, raw: str) -> Path:
         snapshot_dir = Path(raw).resolve()
@@ -115,6 +158,12 @@ class SnapshotPolicyService:
         obs_id = str(request.get("obs_id") or metadata.get("obs_id") or snapshot_dir.name)
         task = str(request.get("task") or metadata.get("task") or "Fold the T-shirt properly")
         robot_type = str(request.get("robot_type") or metadata.get("robot_type") or "openarms_follower")
+        snapshot_checksum = combined_files_sha256(snapshot_dir, SNAPSHOT_CHECKSUM_FILES)
+        request_checksum = request.get("snapshot_checksum")
+        if request_checksum is not None and str(request_checksum) != snapshot_checksum:
+            raise ValueError(
+                f"snapshot_checksum mismatch: request={request_checksum!r} server={snapshot_checksum!r}"
+            )
 
         state = read_state_csv(snapshot_dir / "state_16.csv")
         observation = {
@@ -137,6 +186,7 @@ class SnapshotPolicyService:
         latency_ms = (time.time() - started) * 1000.0
 
         first = postprocessed[0, 0].numpy()
+        chunk = postprocessed.numpy()
         deltas = first - state
         rows = []
         for idx, key in enumerate(ACTION_NAMES):
@@ -163,12 +213,23 @@ class SnapshotPolicyService:
             "schema": "openarm_folding_action_proposal_v1",
             "obs_id": obs_id,
             "snapshot_dir": str(snapshot_dir),
+            "snapshot_checksum": snapshot_checksum,
+            "snapshot_checksum_algorithm": "sha256(file-name + file-sha256 list)",
             "model_dir": str(self.model_dir),
+            "model_id": self.model_id,
+            "checkpoint_id": self.checkpoint_id,
+            "robot_config_id": ROBOT_CONFIG_ID,
+            "action_normalization_id": self.action_normalization_id,
+            "action_space_version": ACTION_SPACE_VERSION,
+            "joint_order": ACTION_NAMES,
+            "action_units": ACTION_UNITS,
+            "is_absolute_action": True,
             "device": self.device,
             "action_names": ACTION_NAMES,
             "action_shape": list(postprocessed.shape),
             "all_finite": bool(torch.isfinite(postprocessed).all().item()),
             "predicted_abs_action": [float(value) for value in first],
+            "predicted_abs_action_chunk": chunk.tolist(),
             "delta_deg": [float(value) for value in deltas],
             "max_abs_arm_delta_deg": max(arm_delta) if arm_delta else None,
             "watched_deltas": {
@@ -181,6 +242,7 @@ class SnapshotPolicyService:
             "motion_allowed": False,
             "actuator_commands_sent": False,
             "server_latency_ms": latency_ms,
+            "inference_timestamp": time.strftime("%Y%m%d_%H%M%S"),
             "timestamp": time.strftime("%Y%m%d_%H%M%S"),
         }
 
