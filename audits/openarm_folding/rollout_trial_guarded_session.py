@@ -39,9 +39,73 @@ ACTION_NAMES = [
     "left_joint_7.pos",
     "left_gripper.pos",
 ]
-RIGHT_ARM_FEATURES = shared.RIGHT_ARM_FEATURES
-RIGHT_ARM_INDEXES = [ACTION_NAMES.index(key) for key in RIGHT_ARM_FEATURES]
-EXCLUDED_FEATURES = [key for key in ACTION_NAMES if key not in RIGHT_ARM_FEATURES]
+RIGHT_ARM_FEATURES = [
+    "right_joint_1.pos",
+    "right_joint_2.pos",
+    "right_joint_3.pos",
+    "right_joint_4.pos",
+    "right_joint_5.pos",
+    "right_joint_6.pos",
+    "right_joint_7.pos",
+]
+LEFT_ARM_FEATURES = [
+    "left_joint_1.pos",
+    "left_joint_2.pos",
+    "left_joint_3.pos",
+    "left_joint_4.pos",
+    "left_joint_5.pos",
+    "left_joint_6.pos",
+    "left_joint_7.pos",
+]
+GRIPPER_FEATURES = ["right_gripper.pos", "left_gripper.pos"]
+FULL_16_FEATURES = ACTION_NAMES.copy()
+FEATURE_TO_MOTOR = {
+    "right_joint_1.pos": "joint_1",
+    "right_joint_2.pos": "joint_2",
+    "right_joint_3.pos": "joint_3",
+    "right_joint_4.pos": "joint_4",
+    "right_joint_5.pos": "joint_5",
+    "right_joint_6.pos": "joint_6",
+    "right_joint_7.pos": "joint_7",
+    "right_gripper.pos": "gripper",
+    "left_joint_1.pos": "joint_1",
+    "left_joint_2.pos": "joint_2",
+    "left_joint_3.pos": "joint_3",
+    "left_joint_4.pos": "joint_4",
+    "left_joint_5.pos": "joint_5",
+    "left_joint_6.pos": "joint_6",
+    "left_joint_7.pos": "joint_7",
+    "left_gripper.pos": "gripper",
+}
+FEATURE_SIDE = {
+    **{key: "right" for key in RIGHT_ARM_FEATURES},
+    "right_gripper.pos": "right",
+    **{key: "left" for key in LEFT_ARM_FEATURES},
+    "left_gripper.pos": "left",
+}
+FEATURE_LIMITS = {
+    "right_joint_1.pos": (-75.0, 75.0),
+    "right_joint_2.pos": (-9.0, 90.0),
+    "right_joint_3.pos": (-85.0, 85.0),
+    "right_joint_4.pos": (0.0, 135.0),
+    "right_joint_5.pos": (-85.0, 85.0),
+    "right_joint_6.pos": (-40.0, 40.0),
+    "right_joint_7.pos": (-80.0, 80.0),
+    "right_gripper.pos": (-65.0, 0.0),
+    "left_joint_1.pos": (-75.0, 75.0),
+    "left_joint_2.pos": (-90.0, 9.0),
+    "left_joint_3.pos": (-85.0, 85.0),
+    "left_joint_4.pos": (0.0, 135.0),
+    "left_joint_5.pos": (-85.0, 85.0),
+    "left_joint_6.pos": (-40.0, 40.0),
+    "left_joint_7.pos": (-80.0, 80.0),
+    "left_gripper.pos": (-65.0, 0.0),
+}
+SELECTED_SCOPE_FEATURES = {
+    "right-arm": RIGHT_ARM_FEATURES,
+    "both-arms": RIGHT_ARM_FEATURES + LEFT_ARM_FEATURES,
+    "full-16": FULL_16_FEATURES,
+}
 ROBOT_CONFIG_ID = "openarms_follower:16d:3cam:v1"
 ACTION_SPACE_VERSION = "openarm_folding_abs_16d_deg_v1"
 ACTION_UNITS = "degrees"
@@ -85,27 +149,62 @@ def approval_phrase(trial_id: str) -> str:
     return f"APPROVE_ROLLOUT_SESSION_{normalized}"
 
 
-def read_fresh_current(path: Path | None, right_port: str) -> dict[str, float]:
+def selected_features_for_scope(scope: str) -> list[str]:
+    return SELECTED_SCOPE_FEATURES[scope].copy()
+
+
+def excluded_features_for(selected_features: list[str]) -> list[str]:
+    selected = set(selected_features)
+    return [key for key in ACTION_NAMES if key not in selected]
+
+
+def make_bus(port: str):
+    return shared.make_right_bus(port)
+
+
+def read_features_from_bus(port: str, features: list[str]) -> dict[str, float]:
+    if not features:
+        return {}
+    motors = [FEATURE_TO_MOTOR[key] for key in features]
+    bus = make_bus(port)
+    bus.connect(handshake=False)
+    try:
+        states = shared.read_selected(bus, motors)
+        return {key: float(states[FEATURE_TO_MOTOR[key]]) for key in features}
+    finally:
+        bus.disconnect(disable_torque=False)
+
+
+def read_fresh_current(
+    path: Path | None,
+    *,
+    right_port: str,
+    left_port: str,
+    selected_features: list[str],
+) -> dict[str, float]:
     if path is not None:
         data = load_json(path)
         if "fresh_current_deg" in data:
             data = data["fresh_current_deg"]
         result = {}
-        for key in RIGHT_ARM_FEATURES:
-            motor = shared.FEATURE_TO_MOTOR[key]
+        for key in selected_features:
+            motor = FEATURE_TO_MOTOR[key]
+            side_motor = f"{FEATURE_SIDE[key]}.{motor}"
             if key in data:
-                result[motor] = float(data[key])
+                result[key] = float(data[key])
+            elif side_motor in data:
+                result[key] = float(data[side_motor])
             elif motor in data:
-                result[motor] = float(data[motor])
+                result[key] = float(data[motor])
             else:
-                raise KeyError(f"fresh-current JSON missing {key}/{motor}")
+                raise KeyError(f"fresh-current JSON missing {key}/{side_motor}/{motor}")
         return result
-    bus = shared.make_right_bus(right_port)
-    bus.connect(handshake=False)
-    try:
-        return shared.read_selected(bus, [shared.FEATURE_TO_MOTOR[key] for key in RIGHT_ARM_FEATURES])
-    finally:
-        bus.disconnect(disable_torque=False)
+    result: dict[str, float] = {}
+    right_features = [key for key in selected_features if FEATURE_SIDE[key] == "right"]
+    left_features = [key for key in selected_features if FEATURE_SIDE[key] == "left"]
+    result.update(read_features_from_bus(right_port, right_features))
+    result.update(read_features_from_bus(left_port, left_features))
+    return result
 
 
 def proposal_payload(path: Path) -> tuple[dict[str, Any], dict[str, Any], str]:
@@ -135,6 +234,7 @@ def validate_proposal_metadata(
     proposal: dict[str, Any],
     *,
     expected_obs_id: str | None,
+    excluded_features: list[str],
 ) -> list[str]:
     errors: list[str] = []
     request = client_payload.get("request", {})
@@ -164,12 +264,20 @@ def validate_proposal_metadata(
     require(proposal.get("is_absolute_action") is True, "proposal is_absolute_action is not true", errors)
     rows = proposal.get("rows", [])
     for row in rows:
-        if row.get("key") in EXCLUDED_FEATURES:
+        if row.get("key") in excluded_features:
             require(row.get("send_allowed") is False, f"excluded row send_allowed true: {row.get('key')}", errors)
     return errors
 
 
-def default_envelope(trial_id: str, proposal: dict[str, Any], *, max_chunks: int = 3) -> dict[str, Any]:
+def default_envelope(
+    trial_id: str,
+    proposal: dict[str, Any],
+    *,
+    selected_features: list[str],
+    max_chunks: int = 3,
+) -> dict[str, Any]:
+    includes_left = any(FEATURE_SIDE[key] == "left" for key in selected_features)
+    includes_gripper = any(key in GRIPPER_FEATURES for key in selected_features)
     return {
         "schema": "openarm_folding_rollout_session_envelope_v1",
         "rollout_trial_id": trial_id,
@@ -182,7 +290,7 @@ def default_envelope(trial_id: str, proposal: dict[str, Any], *, max_chunks: int
         "joint_order": proposal.get("joint_order"),
         "action_units": proposal.get("action_units"),
         "is_absolute_action": proposal.get("is_absolute_action"),
-        "selected_features": RIGHT_ARM_FEATURES,
+        "selected_features": selected_features,
         "max_risk_level": 4,
         "max_session_duration_s": 60.0,
         "max_chunks": max_chunks,
@@ -192,8 +300,8 @@ def default_envelope(trial_id: str, proposal: dict[str, Any], *, max_chunks: int
         "max_total_joint_delta_per_session_deg": MAX_TOTAL_JOINT_DELTA_DEG,
         "readback_soft_error_deg": READBACK_SOFT_ERROR_DEG,
         "readback_hard_error_deg": READBACK_HARD_ERROR_DEG,
-        "forbid_left_arm": True,
-        "forbid_gripper": True,
+        "forbid_left_arm": not includes_left,
+        "forbid_gripper": not includes_gripper,
         "forbid_send_action_path": True,
         "forbid_lerobot_rollout_actual_path": True,
         "forbid_openarm_follower_connect_actual_path": True,
@@ -208,6 +316,7 @@ def validate_envelope(
     trial_id: str,
     risk_level: int,
     chunk_index: int,
+    selected_features: list[str],
 ) -> list[str]:
     errors: list[str] = []
     level = RISK_LEVELS[risk_level]
@@ -224,13 +333,19 @@ def validate_envelope(
         "is_absolute_action",
     ]:
         require(envelope.get(key) == proposal.get(key), f"envelope {key} mismatch", errors)
-    require(envelope.get("selected_features") == RIGHT_ARM_FEATURES, "envelope selected_features mismatch", errors)
+    require(envelope.get("selected_features") == selected_features, "envelope selected_features mismatch", errors)
     require(int(envelope.get("max_risk_level", -1)) >= risk_level, "risk level exceeds envelope", errors)
     require(int(envelope.get("max_chunks", -1)) > chunk_index, "chunk index exceeds envelope", errors)
     require(int(envelope.get("max_actions_per_chunk", -1)) >= int(level["max_actions"]), "max_actions exceeds envelope", errors)
     require(float(envelope.get("max_per_step_delta_cap_deg", -1.0)) >= float(level["cap_deg"]), "per-step cap exceeds envelope", errors)
-    require(envelope.get("forbid_left_arm") is True, "left arm is not forbidden by envelope", errors)
-    require(envelope.get("forbid_gripper") is True, "gripper is not forbidden by envelope", errors)
+    if any(FEATURE_SIDE[key] == "left" for key in selected_features):
+        require(envelope.get("forbid_left_arm") is False, "left arm is selected but forbidden by envelope", errors)
+    else:
+        require(envelope.get("forbid_left_arm") is True, "left arm is not forbidden by envelope", errors)
+    if any(key in GRIPPER_FEATURES for key in selected_features):
+        require(envelope.get("forbid_gripper") is False, "gripper is selected but forbidden by envelope", errors)
+    else:
+        require(envelope.get("forbid_gripper") is True, "gripper is not forbidden by envelope", errors)
     require(envelope.get("forbid_send_action_path") is True, "send_action path is not forbidden by envelope", errors)
     require(envelope.get("forbid_lerobot_rollout_actual_path") is True, "lerobot rollout path is not forbidden by envelope", errors)
     require(envelope.get("forbid_openarm_follower_connect_actual_path") is True, "OpenArm follower path is not forbidden by envelope", errors)
@@ -238,7 +353,7 @@ def validate_envelope(
 
 
 def within_limits(key: str, value: float) -> bool:
-    lo, hi = shared.RIGHT_LIMITS[key]
+    lo, hi = FEATURE_LIMITS[key]
     return lo <= value <= hi
 
 
@@ -250,15 +365,17 @@ def make_step(
     target: dict[str, float],
     cap_deg: float,
     derived: bool,
+    selected_features: list[str],
 ) -> dict[str, Any]:
     rows = []
-    for key in RIGHT_ARM_FEATURES:
+    for key in selected_features:
         delta = target[key] - previous[key]
-        lo, hi = shared.RIGHT_LIMITS[key]
+        lo, hi = FEATURE_LIMITS[key]
         rows.append(
             {
                 "key": key,
-                "motor": shared.FEATURE_TO_MOTOR[key],
+                "side": FEATURE_SIDE[key],
+                "motor": FEATURE_TO_MOTOR[key],
                 "previous_deg": previous[key],
                 "target_deg": target[key],
                 "delta_deg": delta,
@@ -283,6 +400,7 @@ def build_plan(
     *,
     risk_level: int,
     envelope: dict[str, Any] | None,
+    selected_features: list[str],
 ) -> tuple[list[dict[str, Any]], list[str], list[str]]:
     hard_errors: list[str] = []
     soft_warnings: list[str] = []
@@ -294,16 +412,16 @@ def build_plan(
     if envelope is not None:
         max_commands = min(max_commands, int(envelope.get("max_actions_per_chunk", max_commands)))
         cap_deg = min(cap_deg, float(envelope.get("max_per_step_delta_cap_deg", cap_deg)))
-    previous = {key: float(fresh_current[shared.FEATURE_TO_MOTOR[key]]) for key in RIGHT_ARM_FEATURES}
+    previous = {key: float(fresh_current[key]) for key in selected_features}
     session_start = previous.copy()
     plan: list[dict[str, Any]] = []
     for model_idx, action in enumerate(actions):
-        target = {key: float(action[ACTION_NAMES.index(key)]) for key in RIGHT_ARM_FEATURES}
+        target = {key: float(action[ACTION_NAMES.index(key)]) for key in selected_features}
         invalid_limits = [key for key, value in target.items() if not within_limits(key, value)]
         if invalid_limits:
             hard_errors.append(f"joint limit violation at model action {model_idx}: {invalid_limits}")
             break
-        deltas = {key: target[key] - previous[key] for key in RIGHT_ARM_FEATURES}
+        deltas = {key: target[key] - previous[key] for key in selected_features}
         max_abs_delta = max(abs(value) for value in deltas.values())
         if max_abs_delta <= cap_deg + 1e-6:
             if len(plan) >= max_commands:
@@ -316,6 +434,7 @@ def build_plan(
                     target=target,
                     cap_deg=cap_deg,
                     derived=False,
+                    selected_features=selected_features,
                 )
             )
             previous = target
@@ -326,24 +445,25 @@ def build_plan(
                     soft_warnings.append(f"interpolation truncated at action budget before model action {model_idx}")
                     break
                 ratio = segment / segments
-                interpolated = {key: previous[key] + deltas[key] * ratio for key in RIGHT_ARM_FEATURES}
+                interpolated = {key: previous[key] + deltas[key] * ratio for key in selected_features}
                 plan.append(
                     make_step(
                         step_id=len(plan),
                         model_action_index=model_idx,
-                        previous={key: previous[key] + deltas[key] * ((segment - 1) / segments) for key in RIGHT_ARM_FEATURES},
+                        previous={key: previous[key] + deltas[key] * ((segment - 1) / segments) for key in selected_features},
                         target=interpolated,
                         cap_deg=cap_deg,
                         derived=True,
+                        selected_features=selected_features,
                     )
                 )
             previous = target if len(plan) < max_commands else {
-                key: plan[-1]["rows"][idx]["target_deg"] for idx, key in enumerate(RIGHT_ARM_FEATURES)
+                key: plan[-1]["rows"][idx]["target_deg"] for idx, key in enumerate(selected_features)
             }
         else:
             soft_warnings.append(f"per-step cap exceeded at level {risk_level} model action {model_idx}: {max_abs_delta:.6f} deg")
             break
-        total_delta = {key: abs(previous[key] - session_start[key]) for key in RIGHT_ARM_FEATURES}
+        total_delta = {key: abs(previous[key] - session_start[key]) for key in selected_features}
         max_total = float(envelope.get("max_total_joint_delta_per_session_deg", MAX_TOTAL_JOINT_DELTA_DEG)) if envelope else MAX_TOTAL_JOINT_DELTA_DEG
         if max(total_delta.values()) > max_total + 1e-6:
             hard_errors.append(f"max total joint delta exceeded: {max(total_delta.values()):.6f} deg")
@@ -353,17 +473,27 @@ def build_plan(
     return plan, hard_errors, soft_warnings
 
 
-def build_commands(step: dict[str, Any]) -> dict[str, tuple[float, float, float, float, float]]:
+def build_commands_by_side(
+    step: dict[str, Any],
+    *,
+    right_port: str,
+    left_port: str,
+) -> dict[str, dict[str, tuple[float, float, float, float, float]]]:
     from lerobot.robots.openarm_follower.config_openarm_follower import OpenArmFollowerConfigBase
 
-    config = OpenArmFollowerConfigBase(port=shared.RIGHT_PORT, side="right")
-    commands = {}
+    configs = {
+        "right": OpenArmFollowerConfigBase(port=right_port, side="right"),
+        "left": OpenArmFollowerConfigBase(port=left_port, side="left"),
+    }
+    commands: dict[str, dict[str, tuple[float, float, float, float, float]]] = {"right": {}, "left": {}}
     for row in step["rows"]:
+        side = str(row["side"])
         motor = str(row["motor"])
         idx = shared.MOTOR_INDEX[motor]
+        config = configs[side]
         kp = config.position_kp[idx] if isinstance(config.position_kp, list) else config.position_kp
         kd = config.position_kd[idx] if isinstance(config.position_kd, list) else config.position_kd
-        commands[motor] = (float(kp), float(kd), float(row["target_deg"]), 0.0, 0.0)
+        commands[side][motor] = (float(kp), float(kd), float(row["target_deg"]), 0.0, 0.0)
     return commands
 
 
@@ -381,7 +511,12 @@ def check_health(url: str, timeout_s: float) -> tuple[bool, dict[str, Any] | str
         return False, repr(exc)
 
 
-def summarize_readback(readbacks: list[dict[str, Any]], hard_threshold: float) -> tuple[list[str], list[str]]:
+def summarize_readback(
+    readbacks: list[dict[str, Any]],
+    *,
+    soft_threshold: float,
+    hard_threshold: float,
+) -> tuple[list[str], list[str]]:
     hard_errors: list[str] = []
     soft_warnings: list[str] = []
     hard_streak = 0
@@ -393,14 +528,19 @@ def summarize_readback(readbacks: list[dict[str, Any]], hard_threshold: float) -
                 hard_errors.append(f"repeated hard readback error: {max_error:.6f} deg")
         else:
             hard_streak = 0
-        if max_error > READBACK_SOFT_ERROR_DEG:
+        if max_error > soft_threshold:
             soft_warnings.append(f"soft readback warning at step {item['step_id']}: {max_error:.6f} deg")
     return hard_errors, soft_warnings
 
 
-def build_metrics(planned_steps: list[dict[str, Any]], readbacks: list[dict[str, Any]]) -> dict[str, Any]:
-    commanded: dict[str, list[float]] = {key: [] for key in RIGHT_ARM_FEATURES}
-    errors: dict[str, list[float]] = {key: [] for key in RIGHT_ARM_FEATURES}
+def build_metrics(
+    planned_steps: list[dict[str, Any]],
+    readbacks: list[dict[str, Any]],
+    *,
+    selected_features: list[str],
+) -> dict[str, Any]:
+    commanded: dict[str, list[float]] = {key: [] for key in selected_features}
+    errors: dict[str, list[float]] = {key: [] for key in selected_features}
     for step in planned_steps:
         for row in step["rows"]:
             commanded[row["key"]].append(abs(float(row["delta_deg"])))
@@ -428,27 +568,52 @@ def build_metrics(planned_steps: list[dict[str, Any]], readbacks: list[dict[str,
     }
 
 
-def execute_plan(plan: list[dict[str, Any]], *, right_port: str, action_period_s: float) -> list[dict[str, Any]]:
-    selected_motors = [shared.FEATURE_TO_MOTOR[key] for key in RIGHT_ARM_FEATURES]
-    bus = shared.make_right_bus(right_port)
+def execute_plan(
+    plan: list[dict[str, Any]],
+    *,
+    right_port: str,
+    left_port: str,
+    action_period_s: float,
+    selected_features: list[str],
+) -> list[dict[str, Any]]:
+    selected_by_side = {
+        "right": [key for key in selected_features if FEATURE_SIDE[key] == "right"],
+        "left": [key for key in selected_features if FEATURE_SIDE[key] == "left"],
+    }
+    selected_motors = {
+        side: [FEATURE_TO_MOTOR[key] for key in features] for side, features in selected_by_side.items()
+    }
+    buses = {
+        side: make_bus(port)
+        for side, port in {"right": right_port, "left": left_port}.items()
+        if selected_by_side[side]
+    }
     readbacks: list[dict[str, Any]] = []
-    torque_enabled = False
-    connected = False
+    torque_enabled: set[str] = set()
+    connected: set[str] = set()
     try:
-        bus.connect(handshake=False)
-        connected = True
-        bus.enable_torque(selected_motors)
-        torque_enabled = True
+        for side, bus in buses.items():
+            bus.connect(handshake=False)
+            connected.add(side)
+            bus.enable_torque(selected_motors[side])
+            torque_enabled.add(side)
         for step in plan:
-            bus._mit_control_batch(build_commands(step))
+            commands = build_commands_by_side(step, right_port=right_port, left_port=left_port)
+            for side, bus in buses.items():
+                if commands[side]:
+                    bus._mit_control_batch(commands[side])
             time.sleep(action_period_s)
-            current = shared.read_selected(bus, selected_motors)
+            current_by_feature: dict[str, float] = {}
+            for side, bus in buses.items():
+                current = shared.read_selected(bus, selected_motors[side])
+                for key in selected_by_side[side]:
+                    current_by_feature[key] = float(current[FEATURE_TO_MOTOR[key]])
             per_joint = {}
             for row in step["rows"]:
-                motor = row["motor"]
-                error = float(current[motor]) - float(row["target_deg"])
+                key = row["key"]
+                error = float(current_by_feature[key]) - float(row["target_deg"])
                 per_joint[row["key"]] = {
-                    "readback_deg": float(current[motor]),
+                    "readback_deg": float(current_by_feature[key]),
                     "target_deg": float(row["target_deg"]),
                     "error_deg": error,
                 }
@@ -461,14 +626,16 @@ def execute_plan(plan: list[dict[str, Any]], *, right_port: str, action_period_s
                     "max_abs_error_deg": max(abs(item["error_deg"]) for item in per_joint.values()),
                 }
             )
-        bus.disable_torque(selected_motors, num_retry=2)
-        torque_enabled = False
+        for side, bus in buses.items():
+            bus.disable_torque(selected_motors[side], num_retry=2)
+            torque_enabled.discard(side)
         return readbacks
     finally:
-        if connected and torque_enabled:
-            bus.disable_torque(selected_motors, num_retry=2)
-        if connected:
-            bus.disconnect(disable_torque=False)
+        for side, bus in buses.items():
+            if side in connected and side in torque_enabled:
+                bus.disable_torque(selected_motors[side], num_retry=2)
+            if side in connected:
+                bus.disconnect(disable_torque=False)
 
 
 def write_approval_draft(json_path: Path | None, md_path: Path | None, envelope: dict[str, Any]) -> None:
@@ -476,6 +643,15 @@ def write_approval_draft(json_path: Path | None, md_path: Path | None, envelope:
         json_path.parent.mkdir(parents=True, exist_ok=True)
         json_path.write_text(json.dumps(envelope, indent=2, sort_keys=True) + "\n")
     if md_path is not None:
+        selected_features = envelope.get("selected_features", [])
+        clearance_lines = [
+            "right_arm_workspace_clear: true",
+        ]
+        if any(FEATURE_SIDE[key] == "left" for key in selected_features):
+            clearance_lines.append("left_arm_workspace_clear: true")
+        if any(key in GRIPPER_FEATURES for key in selected_features):
+            clearance_lines.append("gripper_workspace_clear: true")
+        clearance_lines.append("human_body_clear_of_arm: true")
         lines = [
             "# Rollout Trial Session Envelope Approval Draft",
             "",
@@ -487,8 +663,7 @@ def write_approval_draft(json_path: Path | None, md_path: Path | None, envelope:
             "operator_at_robot: true",
             "power_abort_control_held: true",
             "estop_ready: true",
-            "right_arm_workspace_clear: true",
-            "human_body_clear_of_arm: true",
+            *clearance_lines,
             "approval_applies_to_rollout_session_envelope: true",
             f"approval_phrase: {envelope['approval_phrase']}",
             "```",
@@ -538,7 +713,7 @@ def write_markdown(path: Path, payload: dict[str, Any]) -> None:
         lines.extend(["", "## Soft Warnings", ""])
         lines.extend(f"- `{warning}`" for warning in payload["soft_warnings"])
     lines.extend(["", "## Boundary", ""])
-    lines.append("No left-arm, gripper, or LeRobot rollout command path is allowed by this harness.")
+    lines.append("Only selected envelope features may be commanded; LeRobot rollout/send_action paths are forbidden.")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n")
 
@@ -555,9 +730,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--approval-draft-md", type=Path)
     parser.add_argument("--fresh-current-json", type=Path)
     parser.add_argument("--right-port", default="can1")
+    parser.add_argument("--left-port", default="can0")
+    parser.add_argument("--selected-scope", choices=sorted(SELECTED_SCOPE_FEATURES), default="right-arm")
     parser.add_argument("--action-period-s", type=float, default=0.25)
     parser.add_argument("--health-url")
     parser.add_argument("--health-timeout-s", type=float, default=10.0)
+    parser.add_argument("--readback-soft-error-deg", type=float)
+    parser.add_argument("--readback-hard-error-deg", type=float)
     parser.add_argument("--json-out", type=Path, required=True)
     parser.add_argument("--md-out", type=Path, required=True)
     parser.add_argument("--execute", action="store_true")
@@ -566,6 +745,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--power-held", action="store_true")
     parser.add_argument("--abort-ready", action="store_true")
     parser.add_argument("--estop-ready", action="store_true")
+    parser.add_argument("--right-arm-workspace-clear", action="store_true")
+    parser.add_argument("--left-arm-workspace-clear", action="store_true")
+    parser.add_argument("--gripper-workspace-clear", action="store_true")
+    parser.add_argument("--human-body-clear-of-arm", action="store_true")
     parser.add_argument("--operator-stop-file", type=Path)
     parser.add_argument("--confirm", default="")
     return parser.parse_args()
@@ -574,8 +757,15 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     trial_id = trial_id_from_root(args.trial_root)
+    selected_features = selected_features_for_scope(args.selected_scope)
+    excluded_features = excluded_features_for(selected_features)
     client_payload, proposal, proposal_digest = proposal_payload(args.proposal_json)
-    hard_errors = validate_proposal_metadata(client_payload, proposal, expected_obs_id=args.expected_obs_id)
+    hard_errors = validate_proposal_metadata(
+        client_payload,
+        proposal,
+        expected_obs_id=args.expected_obs_id,
+        excluded_features=excluded_features,
+    )
     soft_warnings: list[str] = []
     try:
         actions = chunk_array(proposal)
@@ -584,7 +774,17 @@ def main() -> int:
         hard_errors.append(repr(exc))
 
     envelope = load_json(args.session_envelope_json) if args.session_envelope_json else None
-    draft = default_envelope(trial_id, proposal)
+    readback_soft_error_deg = (
+        float(args.readback_soft_error_deg)
+        if args.readback_soft_error_deg is not None
+        else float(envelope.get("readback_soft_error_deg", READBACK_SOFT_ERROR_DEG)) if envelope else READBACK_SOFT_ERROR_DEG
+    )
+    readback_hard_error_deg = (
+        float(args.readback_hard_error_deg)
+        if args.readback_hard_error_deg is not None
+        else float(envelope.get("readback_hard_error_deg", READBACK_HARD_ERROR_DEG)) if envelope else READBACK_HARD_ERROR_DEG
+    )
+    draft = default_envelope(trial_id, proposal, selected_features=selected_features)
     write_approval_draft(args.approval_draft_json, args.approval_draft_md, draft)
     if envelope is not None:
         hard_errors.extend(
@@ -594,6 +794,7 @@ def main() -> int:
                 trial_id=trial_id,
                 risk_level=args.risk_level,
                 chunk_index=args.chunk_index,
+                selected_features=selected_features,
             )
         )
 
@@ -604,6 +805,12 @@ def main() -> int:
         require(args.power_held, "--power-held is required", hard_errors)
         require(args.abort_ready, "--abort-ready is required", hard_errors)
         require(args.estop_ready, "--estop-ready is required", hard_errors)
+        require(args.right_arm_workspace_clear, "--right-arm-workspace-clear is required", hard_errors)
+        if any(FEATURE_SIDE[key] == "left" for key in selected_features):
+            require(args.left_arm_workspace_clear, "--left-arm-workspace-clear is required", hard_errors)
+        if any(key in GRIPPER_FEATURES for key in selected_features):
+            require(args.gripper_workspace_clear, "--gripper-workspace-clear is required", hard_errors)
+        require(args.human_body_clear_of_arm, "--human-body-clear-of-arm is required", hard_errors)
         require(envelope is not None and args.confirm == envelope.get("approval_phrase"), "approval phrase mismatch", hard_errors)
         if args.operator_stop_file is not None and args.operator_stop_file.exists():
             hard_errors.append("operator stop file exists before execution")
@@ -616,7 +823,12 @@ def main() -> int:
 
     read_time = time.time()
     try:
-        fresh_current = read_fresh_current(args.fresh_current_json, args.right_port)
+        fresh_current = read_fresh_current(
+            args.fresh_current_json,
+            right_port=args.right_port,
+            left_port=args.left_port,
+            selected_features=selected_features,
+        )
     except Exception as exc:
         fresh_current = {}
         hard_errors.append(f"fresh motor state read failed: {exc!r}")
@@ -631,6 +843,7 @@ def main() -> int:
             fresh_current,
             risk_level=args.risk_level,
             envelope=envelope,
+            selected_features=selected_features,
         )
         hard_errors.extend(plan_hard)
         soft_warnings.extend(plan_soft)
@@ -663,9 +876,19 @@ def main() -> int:
     elif args.execute:
         try:
             motion_status = "ROLLOUT_SESSION_ACTIVE"
-            readbacks = execute_plan(planned_steps, right_port=args.right_port, action_period_s=args.action_period_s)
+            readbacks = execute_plan(
+                planned_steps,
+                right_port=args.right_port,
+                left_port=args.left_port,
+                action_period_s=args.action_period_s,
+                selected_features=selected_features,
+            )
             actuator_commands_sent = bool(planned_steps)
-            rb_hard, rb_soft = summarize_readback(readbacks, READBACK_HARD_ERROR_DEG)
+            rb_hard, rb_soft = summarize_readback(
+                readbacks,
+                soft_threshold=readback_soft_error_deg,
+                hard_threshold=readback_hard_error_deg,
+            )
             hard_errors.extend(rb_hard)
             soft_warnings.extend(rb_soft)
             if hard_errors:
@@ -685,7 +908,7 @@ def main() -> int:
         motion_status = "PAUSED_SOFT_REVIEW"
 
     interpolated_steps = sum(1 for step in planned_steps if step["derived_from_model_action"])
-    metrics = build_metrics(planned_steps, readbacks)
+    metrics = build_metrics(planned_steps, readbacks, selected_features=selected_features)
     payload: dict[str, Any] = {
         "schema": "openarm_folding_rollout_trial_chunk_result_v1",
         "timestamp": time.strftime("%Y%m%d_%H%M%S"),
@@ -695,6 +918,7 @@ def main() -> int:
         "chunk_index": args.chunk_index,
         "risk_level": args.risk_level,
         "risk_level_name": RISK_LEVELS[args.risk_level]["name"],
+        "selected_scope": args.selected_scope,
         "proposal_json": str(args.proposal_json),
         "proposal_sha256": proposal_digest,
         "proposal_metadata": {
@@ -709,13 +933,25 @@ def main() -> int:
             "action_units": proposal.get("action_units"),
             "is_absolute_action": proposal.get("is_absolute_action"),
         },
-        "selected_features": RIGHT_ARM_FEATURES,
-        "excluded_features": EXCLUDED_FEATURES,
+        "selected_features": selected_features,
+        "excluded_features": excluded_features,
         "session_envelope_json": str(args.session_envelope_json) if args.session_envelope_json else None,
         "execute_requested": bool(args.execute),
         "operator_session_approval_given": bool(args.operator_session_approval_given),
         "confirmation_phrase_matched": bool(envelope is not None and args.confirm == envelope.get("approval_phrase")),
+        "operator_safety_flags": {
+            "operator_at_robot": bool(args.operator_at_robot),
+            "power_abort_control_held": bool(args.power_held),
+            "abort_ready": bool(args.abort_ready),
+            "estop_ready": bool(args.estop_ready),
+            "right_arm_workspace_clear": bool(args.right_arm_workspace_clear),
+            "left_arm_workspace_clear": bool(args.left_arm_workspace_clear),
+            "gripper_workspace_clear": bool(args.gripper_workspace_clear),
+            "human_body_clear_of_arm": bool(args.human_body_clear_of_arm),
+        },
         "state_freshness_ttl_s": STATE_FRESHNESS_TTL_S,
+        "readback_soft_error_deg": readback_soft_error_deg,
+        "readback_hard_error_deg": readback_hard_error_deg,
         "fresh_state_age_s": state_age_s,
         "fresh_current_deg": fresh_current,
         "health_result": health_result,

@@ -6,6 +6,7 @@ import json
 import socket
 import subprocess
 import time
+from statistics import median
 from pathlib import Path
 
 import cv2
@@ -58,12 +59,21 @@ def make_bus(port: str) -> DamiaoMotorsBus:
     )
 
 
-def read_arm_state(port: str) -> dict[str, float]:
+def read_arm_state(port: str, *, samples: int, sample_delay_s: float) -> tuple[dict[str, float], list[dict[str, float]]]:
     bus = make_bus(port)
     bus.connect(handshake=False)
     try:
-        states = bus.sync_read_all_states()
-        return {name: float(state["position"]) for name, state in states.items()}
+        sample_rows = []
+        for idx in range(samples):
+            states = bus.sync_read_all_states()
+            sample_rows.append({name: float(state["position"]) for name, state in states.items()})
+            if idx + 1 < samples:
+                time.sleep(sample_delay_s)
+        state = {
+            name: float(median(row[name] for row in sample_rows))
+            for name in sample_rows[-1]
+        }
+        return state, sample_rows
     finally:
         bus.disconnect(disable_torque=False)
 
@@ -142,6 +152,8 @@ def main() -> int:
     parser.add_argument("--scene-note", default="")
     parser.add_argument("--left-port", default="can0")
     parser.add_argument("--right-port", default="can1")
+    parser.add_argument("--motor-read-samples", type=int, default=5)
+    parser.add_argument("--motor-read-sample-delay-s", type=float, default=0.1)
     parser.add_argument("--wrist-profiles", default="1280x720@15,640x480@30")
     parser.add_argument("--base-profiles", default="640x480@30,640x480@15,1280x720@15")
     args = parser.parse_args()
@@ -161,8 +173,16 @@ def main() -> int:
     }
     camera_results["base"]["source_alias"] = args.base_source_alias
 
-    right = read_arm_state(args.right_port)
-    left = read_arm_state(args.left_port)
+    right, right_samples = read_arm_state(
+        args.right_port,
+        samples=args.motor_read_samples,
+        sample_delay_s=args.motor_read_sample_delay_s,
+    )
+    left, left_samples = read_arm_state(
+        args.left_port,
+        samples=args.motor_read_samples,
+        sample_delay_s=args.motor_read_sample_delay_s,
+    )
     state = {
         "right_joint_1.pos": right["joint_1"],
         "right_joint_2.pos": right["joint_2"],
@@ -193,6 +213,13 @@ def main() -> int:
         "work_root": str(args.work_root),
         "camera_mapping": camera_results,
         "can_mapping": {"left_arm": args.left_port, "right_arm": args.right_port},
+        "motor_read_sampling": {
+            "samples": args.motor_read_samples,
+            "sample_delay_s": args.motor_read_sample_delay_s,
+            "aggregation": "per-motor median",
+            "right_samples": right_samples,
+            "left_samples": left_samples,
+        },
         "state_order": STATE_COLUMNS,
         "state_units": "degrees",
         "robot_config_path": None,
