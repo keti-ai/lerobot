@@ -58,6 +58,7 @@ LEFT_ARM_FEATURES = [
     "left_joint_7.pos",
 ]
 GRIPPER_FEATURES = ["right_gripper.pos", "left_gripper.pos"]
+JOINT4_FEATURES = ["right_joint_4.pos", "left_joint_4.pos"]
 FULL_16_FEATURES = ACTION_NAMES.copy()
 FEATURE_TO_MOTOR = {
     "right_joint_1.pos": "joint_1",
@@ -362,6 +363,12 @@ def validate_runtime_envelope(envelope: dict[str, Any], args: argparse.Namespace
             "allow_gripper_limit_saturation mismatch",
             errors,
         )
+    if "allow_joint4_limit_saturation" in envelope:
+        require(
+            bool(envelope["allow_joint4_limit_saturation"]) == bool(args.allow_joint4_limit_saturation),
+            "allow_joint4_limit_saturation mismatch",
+            errors,
+        )
     for key, value in [
         ("arm_delta_cap_deg", args.arm_delta_cap_deg),
         ("gripper_delta_cap_deg", args.gripper_delta_cap_deg),
@@ -465,6 +472,7 @@ def build_plan(
     selected_features: list[str],
     clip_to_delta_cap: bool,
     allow_gripper_limit_saturation: bool,
+    allow_joint4_limit_saturation: bool,
     arm_delta_cap_deg: float | None,
     gripper_delta_cap_deg: float | None,
 ) -> tuple[list[dict[str, Any]], list[str], list[str]]:
@@ -496,6 +504,15 @@ def build_plan(
         if allow_gripper_limit_saturation:
             for key in selected_features:
                 if key not in GRIPPER_FEATURES:
+                    continue
+                lo, hi = FEATURE_LIMITS[key]
+                saturated = clamp(target[key], lo, hi)
+                if saturated != target[key]:
+                    target[key] = saturated
+                    limit_saturated_features.append(key)
+        if allow_joint4_limit_saturation:
+            for key in selected_features:
+                if key not in JOINT4_FEATURES:
                     continue
                 lo, hi = FEATURE_LIMITS[key]
                 saturated = clamp(target[key], lo, hi)
@@ -916,6 +933,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gripper-readback-hard-error-deg", type=float)
     parser.add_argument("--clip-to-delta-cap", action="store_true")
     parser.add_argument("--allow-gripper-limit-saturation", action="store_true")
+    parser.add_argument("--allow-joint4-limit-saturation", action="store_true")
     parser.add_argument("--arm-delta-cap-deg", type=float)
     parser.add_argument("--gripper-delta-cap-deg", type=float)
     parser.add_argument("--json-out", type=Path, required=True)
@@ -1028,6 +1046,7 @@ def main() -> int:
             selected_features=selected_features,
             clip_to_delta_cap=args.clip_to_delta_cap,
             allow_gripper_limit_saturation=args.allow_gripper_limit_saturation,
+            allow_joint4_limit_saturation=args.allow_joint4_limit_saturation,
             arm_delta_cap_deg=args.arm_delta_cap_deg,
             gripper_delta_cap_deg=args.gripper_delta_cap_deg,
         )
@@ -1145,6 +1164,7 @@ def main() -> int:
         "gripper_readback_hard_error_deg": args.gripper_readback_hard_error_deg,
         "clip_to_delta_cap": bool(args.clip_to_delta_cap),
         "allow_gripper_limit_saturation": bool(args.allow_gripper_limit_saturation),
+        "allow_joint4_limit_saturation": bool(args.allow_joint4_limit_saturation),
         "arm_delta_cap_deg": args.arm_delta_cap_deg,
         "gripper_delta_cap_deg": args.gripper_delta_cap_deg,
         "fresh_state_age_s": state_age_s,
