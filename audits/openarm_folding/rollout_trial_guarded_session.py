@@ -356,6 +356,12 @@ def validate_runtime_envelope(envelope: dict[str, Any], args: argparse.Namespace
     errors: list[str] = []
     if "clip_to_delta_cap" in envelope:
         require(bool(envelope["clip_to_delta_cap"]) == bool(args.clip_to_delta_cap), "clip_to_delta_cap mismatch", errors)
+    if "allow_gripper_limit_saturation" in envelope:
+        require(
+            bool(envelope["allow_gripper_limit_saturation"]) == bool(args.allow_gripper_limit_saturation),
+            "allow_gripper_limit_saturation mismatch",
+            errors,
+        )
     for key, value in [
         ("arm_delta_cap_deg", args.arm_delta_cap_deg),
         ("gripper_delta_cap_deg", args.gripper_delta_cap_deg),
@@ -418,6 +424,7 @@ def make_step(
     feature_caps: dict[str, float],
     derived: bool,
     selected_features: list[str],
+    limit_saturated_features: list[str] | None = None,
 ) -> dict[str, Any]:
     rows = []
     for key in selected_features:
@@ -443,6 +450,7 @@ def make_step(
         "step_id": step_id,
         "model_action_index": model_action_index,
         "derived_from_model_action": derived,
+        "limit_saturated_features": limit_saturated_features or [],
         "cap_deg": cap_deg,
         "rows": rows,
     }
@@ -456,6 +464,7 @@ def build_plan(
     envelope: dict[str, Any] | None,
     selected_features: list[str],
     clip_to_delta_cap: bool,
+    allow_gripper_limit_saturation: bool,
     arm_delta_cap_deg: float | None,
     gripper_delta_cap_deg: float | None,
 ) -> tuple[list[dict[str, Any]], list[str], list[str]]:
@@ -483,6 +492,16 @@ def build_plan(
     plan: list[dict[str, Any]] = []
     for model_idx, action in enumerate(actions):
         target = {key: float(action[ACTION_NAMES.index(key)]) for key in selected_features}
+        limit_saturated_features: list[str] = []
+        if allow_gripper_limit_saturation:
+            for key in selected_features:
+                if key not in GRIPPER_FEATURES:
+                    continue
+                lo, hi = FEATURE_LIMITS[key]
+                saturated = clamp(target[key], lo, hi)
+                if saturated != target[key]:
+                    target[key] = saturated
+                    limit_saturated_features.append(key)
         deltas = {key: target[key] - previous[key] for key in selected_features}
         max_cap_ratio = max(abs(deltas[key]) / feature_caps[key] for key in selected_features if feature_caps[key] > 0)
         max_abs_delta = max(abs(value) for value in deltas.values())
@@ -501,12 +520,17 @@ def build_plan(
                     target=target,
                     cap_deg=cap_deg,
                     feature_caps=feature_caps,
-                    derived=False,
+                    derived=bool(limit_saturated_features),
                     selected_features=selected_features,
+                    limit_saturated_features=limit_saturated_features,
                 )
             )
             previous = target
         elif clip_to_delta_cap:
+            invalid_limits = [key for key, value in target.items() if not within_limits(key, value)]
+            if invalid_limits:
+                hard_errors.append(f"joint limit violation at model action {model_idx}: {invalid_limits}")
+                break
             if len(plan) >= max_commands:
                 break
             clipped_target = {}
@@ -524,6 +548,7 @@ def build_plan(
                     feature_caps=feature_caps,
                     derived=True,
                     selected_features=selected_features,
+                    limit_saturated_features=limit_saturated_features,
                 )
             )
             previous = clipped_target
@@ -549,6 +574,7 @@ def build_plan(
                         feature_caps=feature_caps,
                         derived=True,
                         selected_features=selected_features,
+                        limit_saturated_features=limit_saturated_features,
                     )
                 )
             previous = target if len(plan) < max_commands else {
@@ -889,6 +915,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gripper-readback-soft-error-deg", type=float)
     parser.add_argument("--gripper-readback-hard-error-deg", type=float)
     parser.add_argument("--clip-to-delta-cap", action="store_true")
+    parser.add_argument("--allow-gripper-limit-saturation", action="store_true")
     parser.add_argument("--arm-delta-cap-deg", type=float)
     parser.add_argument("--gripper-delta-cap-deg", type=float)
     parser.add_argument("--json-out", type=Path, required=True)
@@ -1000,6 +1027,7 @@ def main() -> int:
             envelope=envelope,
             selected_features=selected_features,
             clip_to_delta_cap=args.clip_to_delta_cap,
+            allow_gripper_limit_saturation=args.allow_gripper_limit_saturation,
             arm_delta_cap_deg=args.arm_delta_cap_deg,
             gripper_delta_cap_deg=args.gripper_delta_cap_deg,
         )
@@ -1116,6 +1144,7 @@ def main() -> int:
         "gripper_readback_soft_error_deg": args.gripper_readback_soft_error_deg,
         "gripper_readback_hard_error_deg": args.gripper_readback_hard_error_deg,
         "clip_to_delta_cap": bool(args.clip_to_delta_cap),
+        "allow_gripper_limit_saturation": bool(args.allow_gripper_limit_saturation),
         "arm_delta_cap_deg": args.arm_delta_cap_deg,
         "gripper_delta_cap_deg": args.gripper_delta_cap_deg,
         "fresh_state_age_s": state_age_s,
