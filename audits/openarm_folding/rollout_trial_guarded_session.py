@@ -352,6 +352,25 @@ def validate_envelope(
     return errors
 
 
+def validate_runtime_envelope(envelope: dict[str, Any], args: argparse.Namespace) -> list[str]:
+    errors: list[str] = []
+    if "clip_to_delta_cap" in envelope:
+        require(bool(envelope["clip_to_delta_cap"]) == bool(args.clip_to_delta_cap), "clip_to_delta_cap mismatch", errors)
+    for key, value in [
+        ("arm_delta_cap_deg", args.arm_delta_cap_deg),
+        ("gripper_delta_cap_deg", args.gripper_delta_cap_deg),
+        ("arm_readback_soft_error_deg", args.arm_readback_soft_error_deg),
+        ("arm_readback_hard_error_deg", args.arm_readback_hard_error_deg),
+        ("gripper_readback_soft_error_deg", args.gripper_readback_soft_error_deg),
+        ("gripper_readback_hard_error_deg", args.gripper_readback_hard_error_deg),
+    ]:
+        if key in envelope:
+            require(value is not None, f"{key} is required by envelope", errors)
+            if value is not None:
+                require(abs(float(envelope[key]) - float(value)) <= 1e-6, f"{key} mismatch", errors)
+    return errors
+
+
 def within_limits(key: str, value: float) -> bool:
     lo, hi = FEATURE_LIMITS[key]
     return lo <= value <= hi
@@ -932,6 +951,7 @@ def main() -> int:
                 selected_features=selected_features,
             )
         )
+        hard_errors.extend(validate_runtime_envelope(envelope, args))
 
     if args.execute:
         require(envelope is not None, "--session-envelope-json is required with --execute", hard_errors)
