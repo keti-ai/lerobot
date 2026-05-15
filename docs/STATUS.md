@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-15 (closed-loop 120s 인프라 준비, A6000 serving 대기)
+**마지막 갱신:** 2026-05-15 (D-8a continuation 004000 checkpoint 저장, 학습 진행 중)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -57,9 +57,9 @@
    - 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/audits/cudnn_env_review_20260515_140817.md`
    - smoke 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/audits/d9_torch27_train_smoke_20260515.{md,json}`
    - D-8a 시작: `20260515_163251`
-   - D-8a 최신 상태 커밋: `c72339e6 docs(a6000): D-8a status ping step 100`
-   - 현재 상태: step 125 부근 진행 중. 최근 로그는 step 100 loss 0.060, grad_norm 0.535, lr 4.8e-06.
-   - GPU: 4x RTX A6000, util 100/100/90/97%. deploy 후보 표기 금지.
+   - D-8a 최신 상태 파일: `audits/openarm_folding/a6000_d8a_status.md`
+   - 현재 상태: 004000 checkpoint 저장 완료, step 4100 부근 진행 중. 최근 로그는 step 4100 loss 0.067, grad_norm 0.501.
+   - GPU: 4x RTX A6000, util 61/92/93/86%. deploy 후보 표기 금지.
 
 6. **Track A closed-loop dry-run envelope 대기 — A6000 serving down**
    - `http://10.252.205.103:8766/health`, `http://10.252.205.103:8765/health` 모두 connection refused
@@ -193,7 +193,7 @@ checkpoint selection 만으로는 deploy 후보 확보 불가. **underfit 가설
 
 현재 상태:
 - D-9 option (i) torch 2.7 venv smoke PASS.
-- D-8a 003000 continuation config/command 준비 완료. 학습 시작은 아직 안 함.
+- D-8a 003000 continuation 학습 진행 중. checkpoint 004000까지 저장됨.
 - "병행 작업"은 syhlabtop Track D1/D3 쪽 작업을 뜻한다.
 - 세부 run path, checkpoint 목록, gate 결과는 A6000 산출물 생성 후 기록.
 
