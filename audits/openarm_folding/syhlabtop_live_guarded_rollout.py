@@ -510,14 +510,22 @@ def validate_proposal(
     request_payload: dict[str, Any],
     envelope: dict[str, Any] | None,
     excluded_features: list[str],
-) -> list[str]:
+    relaxed_proposal_validation: bool,
+) -> tuple[list[str], list[str]]:
     errors: list[str] = []
+    warnings: list[str] = []
     if proposal.get("schema") != "openarm_folding_live_action_proposal_v1":
         errors.append("unexpected proposal schema")
     if proposal.get("obs_seq") != request_payload.get("obs_seq"):
-        errors.append("proposal obs_seq mismatch")
+        if relaxed_proposal_validation:
+            warnings.append("proposal obs_seq mismatch")
+        else:
+            errors.append("proposal obs_seq mismatch")
     if proposal.get("obs_checksum") != request_payload.get("obs_checksum"):
-        errors.append("proposal obs_checksum mismatch")
+        if relaxed_proposal_validation:
+            warnings.append("proposal obs_checksum mismatch")
+        else:
+            errors.append("proposal obs_checksum mismatch")
     if proposal.get("action_shape") != [1, 30, 16]:
         errors.append(f"unexpected action_shape={proposal.get('action_shape')!r}")
     if proposal.get("all_finite") is not True:
@@ -562,7 +570,7 @@ def validate_proposal(
                 break
     except Exception as exc:
         errors.append(f"invalid predicted_abs_action_chunk: {exc!r}")
-    return errors
+    return errors, warnings
 
 
 def action_chunk(proposal: dict[str, Any]) -> list[list[float]]:
@@ -886,9 +894,14 @@ def build_envelope(args: argparse.Namespace, metadata: dict[str, Any], selected_
         "arm_readback_hard_error_deg": args.arm_readback_hard_error_deg,
         "gripper_readback_soft_error_deg": args.gripper_readback_soft_error_deg,
         "gripper_readback_hard_error_deg": args.gripper_readback_hard_error_deg,
+        "request_timeout_s": args.request_timeout_s,
+        "max_consecutive_inference_errors": args.max_consecutive_inference_errors,
         "clip_to_delta_cap": args.clip_to_delta_cap,
         "readback_stride": args.readback_stride,
         "hold_last_action": args.hold_last_action,
+        "relaxed_proposal_validation": args.relaxed_proposal_validation,
+        "record_eval_frames": args.record_eval_frames,
+        "record_frame_every_n_obs": args.record_frame_every_n_obs,
         "allow_gripper_limit_saturation": args.allow_gripper_limit_saturation,
         "allow_joint4_limit_saturation": args.allow_joint4_limit_saturation,
         "allow_joint_limit_saturation": args.allow_joint_limit_saturation,
@@ -926,11 +939,20 @@ def validate_envelope(envelope: dict[str, Any], args: argparse.Namespace, select
         ("arm_readback_hard_error_deg", args.arm_readback_hard_error_deg),
         ("gripper_readback_soft_error_deg", args.gripper_readback_soft_error_deg),
         ("gripper_readback_hard_error_deg", args.gripper_readback_hard_error_deg),
+        ("request_timeout_s", args.request_timeout_s),
     ]:
         if key in envelope and abs(float(envelope[key]) - float(value)) > 1e-6:
             errors.append(f"envelope {key} mismatch")
     for key, value in [
+        ("max_consecutive_inference_errors", args.max_consecutive_inference_errors),
+        ("record_frame_every_n_obs", args.record_frame_every_n_obs),
+    ]:
+        if key in envelope and int(envelope[key]) != int(value):
+            errors.append(f"envelope {key} mismatch")
+    for key, value in [
         ("clip_to_delta_cap", args.clip_to_delta_cap),
+        ("relaxed_proposal_validation", args.relaxed_proposal_validation),
+        ("record_eval_frames", args.record_eval_frames),
         ("allow_gripper_limit_saturation", args.allow_gripper_limit_saturation),
         ("allow_joint4_limit_saturation", args.allow_joint4_limit_saturation),
         ("allow_joint_limit_saturation", args.allow_joint_limit_saturation),
@@ -987,12 +1009,15 @@ def inference_loop(
             started = time.time()
             proposal = post_json(args.predict_url, request_payload, args.request_timeout_s)
             last_latency = time.time() - started
-            errors = validate_proposal(
+            errors, warnings = validate_proposal(
                 proposal,
                 request_payload=request_payload,
                 envelope=envelope,
                 excluded_features=excluded_features,
+                relaxed_proposal_validation=args.relaxed_proposal_validation,
             )
+            if warnings:
+                logger.write("proposal_validation_warning", obs_seq=obs_seq, warnings=warnings)
             if errors:
                 shared["stop_reason"] = f"proposal_validation_failed: {errors}"
                 logger.write("hard_block", reason=shared["stop_reason"])
@@ -1051,7 +1076,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--camera-start-retries", type=int, default=3)
     parser.add_argument("--camera-read-retries", type=int, default=2)
     parser.add_argument("--jpeg-quality", type=int, default=85)
-    parser.add_argument("--request-timeout-s", type=float, default=30.0)
+    parser.add_argument("--request-timeout-s", type=float, default=60.0)
     parser.add_argument("--selected-scope", choices=sorted(SELECTED_SCOPE_FEATURES), default="full-16")
     parser.add_argument("--max-session-duration-s", type=float, default=30.0)
     parser.add_argument("--max-chunks", type=int, default=12)
@@ -1065,7 +1090,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--arm-readback-hard-error-deg", type=float, default=5.0)
     parser.add_argument("--gripper-readback-soft-error-deg", type=float, default=30.0)
     parser.add_argument("--gripper-readback-hard-error-deg", type=float, default=30.0)
-    parser.add_argument("--max-consecutive-inference-errors", type=int, default=2)
+    parser.add_argument("--max-consecutive-inference-errors", type=int, default=5)
     parser.add_argument("--max-repeated-hard-readback", type=int, default=2)
     parser.add_argument("--clip-to-delta-cap", action="store_true")
     parser.add_argument(
@@ -1085,6 +1110,17 @@ def parse_args() -> argparse.Namespace:
         help=(
             "When the action queue drains between inference chunks, re-send the last "
             "absolute target instead of pausing. Eliminates motion gaps during chunk refresh."
+        ),
+    )
+    parser.add_argument(
+        "--relaxed-proposal-validation",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "When set, demote proposal obs_seq / obs_checksum mismatches from hard "
+            "errors to soft warnings. schema/action_shape/all_finite/motion_flags "
+            "checks remain hard. Use for long closed-loop sessions where state read "
+            "race with inference is acceptable."
         ),
     )
     parser.add_argument("--allow-gripper-limit-saturation", action="store_true")
