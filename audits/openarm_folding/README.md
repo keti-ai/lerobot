@@ -7,7 +7,7 @@ Scope: syhlabtop/A6000 OpenArm folding deployment audit, corrected checkpoint ro
 ## Current Status
 
 ```text
-Track B A6000 full_folding retrain: IN_PROGRESS — D-9 option (i), D-8 continuation artifact pending
+Track B A6000 full_folding retrain: READY_FOR_D8A_LAUNCH — torch 2.7/pyav config prepared
 Track A syhlabtop level2 live rollout: UNBLOCKED — proceed with level2 model
 Track C A6000 checkpoint_selection: COMPLETE — 002000/003000/004000 all replay FAIL, no deploy candidate
 Track D syhlabtop axis/camera work: IN_PROGRESS — this is the parallel work
@@ -17,7 +17,7 @@ robot_motion_from_this_readme: NOT_AUTHORIZED
 ```
 
 - Track B `full_folding` initial training finished at step 004000 (loss ~0.066). Recipe gate PASS. Dataset replay gate **FAIL**: model delta/recorded-delta ratio 0.128–0.282 (threshold 0.25–4.0), raw normalized error max 0.413 (threshold 0.25). No 60–70 deg abnormal deltas (max 2.086 deg). `full_folding 004000` is NOT a syhlabtop deploy candidate.
-- D-9 decision is option (i): torch 2.7.x + compatible cuDNN new venv. D-8 continuation artifacts are pending from A6000. The parallel work refers to syhlabtop Track D1/D3.
+- D-9 decision is option (i): torch 2.7.x + compatible cuDNN new venv. Smoke PASS with torch `2.7.1+cu126`, cuDNN `90501`, and `dataset.video_backend=pyav`. Torchcodec backend still fails in the LeRobot file-like decoder path. D-8a 003000 continuation config/command is prepared under the A6000 audits directory. The parallel work refers to syhlabtop Track D1/D3.
 - Track A is now unblocked. Use the current level2 corrected checkpoint (step 004000) on port 8766. Focus on base-view alignment and axis direction check before running a full session rollout.
 - Track C (A6000): checkpoint comparison is complete. `full_folding` checkpoints 002000, 003000, and 004000 all fail replay gate, so checkpoint selection alone does not produce a deploy candidate.
 - Any motion must use a fresh `rollout_trial_<timestamp>/` session, a fresh serving health check, a new approval envelope, and explicit operator approval.
@@ -77,6 +77,9 @@ key artifacts:
   full_folding_recipe_gate_20260514.md/json
   full_folding_dataset_replay_20260514.md/json     ← FAIL detail here
   full_folding_visual_refs_manifest_20260514.json
+  d8a_full_folding_continue_003000_torch27_pyav_config_20260515.json
+  d8a_full_folding_continue_003000_torch27_pyav_command_20260515.md
+  /data/.../audits/d9_torch27_train_smoke_20260515.md/json
   visual_refs/   (left_wrist, right_wrist, base samples)
 ```
 

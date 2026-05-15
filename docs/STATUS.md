@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-15 (D-9 option i + syhlabtop D1/D3 read-only 결과 머지)
+**마지막 갱신:** 2026-05-15 (D-9 smoke PASS + D-8a launch config 준비)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -10,7 +10,7 @@
 | Track | 상태 | 다음 행동 |
 |---|---|---|
 | **A** — syhlabtop level2 라이브 롤아웃 | UNBLOCKED | Track D 통과 후 messy shirt 첫 라이브 실행 |
-| **B** — full_folding 재학습 | **IN_PROGRESS** | A6000 D-8 추가 재학습 산출물 수신 후 recipe/replay gate |
+| **B** — full_folding 재학습 | **READY_FOR_D8A_LAUNCH** | 준비된 torch 2.7/pyav config로 003000 continuation 시작 |
 | **C** — full_folding ckpt 002000/003000 replay 비교 | **COMPLETE** | ckpt 002000/003000/004000 모두 replay FAIL → deploy 후보 없음 |
 | **D** — 축 probe + base 카메라 정렬 | D1 완료, D3 캡처 완료/참조 비교 대기 | a6000 visual refs manifest 확보 후 side-by-side, 이후 operator probe |
 
@@ -22,8 +22,10 @@
    - ckpt 002000: ratio 0.220–0.320, raw normalized max error 0.433 → FAIL
    - ckpt 003000: ratio 0.142–0.348, raw normalized max error 0.402 → FAIL
    - ckpt 004000: ratio 0.128–0.282, raw normalized max error 0.413 → FAIL
-   - 결론: 단순 checkpoint selection 으로 해결 불가. D-8 추가 재학습 진행/산출물 대기.
+   - 결론: 단순 checkpoint selection 으로 해결 불가. D-9 torch 2.7 smoke는 통과했고, D-8a 003000 continuation launch config 준비 완료.
    - 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/full_folding_dataset_replay_{002000,003000}.{md,json}`
+   - D-8a config: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/d8a_full_folding_continue_003000_torch27_pyav_config_20260515.json`
+   - D-8a command: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/d8a_full_folding_continue_003000_torch27_pyav_command_20260515.md`
 
 2. **base 카메라 FOV/scale 미스매치**
    - D3 live capture: `/tmp/openarm_folding_policy_input_viewer/policy_input_view_20260515_144933/`
@@ -46,8 +48,15 @@
 5. **D-9 cuDNN 환경 결정 완료 — option (i)**
    - A6000 torch `2.11.0+cu128` / CUDA `12.8` / cuDNN `91900` / driver `570.133.20` 환경에서 cuDNN enabled Conv2d 가 `CUDNN_STATUS_NOT_INITIALIZED` 로 실패
    - 사용자 결정: **(i) torch 2.7.x + 호환 cuDNN 새 venv**
-   - 우회 `torch.backends.cudnn.enabled=False` 는 추론에만 사용. 학습에는 사용 금지
+   - 새 venv: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/venv312_torch27_20260515`
+   - torch `2.7.1+cu126`, CUDA `12.6`, cuDNN `90501`, torchvision `0.22.1+cu126`
+   - cuDNN enabled Conv2d smoke: PASS
+   - 1-step train smoke: PASS with `dataset.video_backend=pyav` (`loss=0.191`, `grad_norm=2.538`)
+   - torchcodec backend: FAIL. `torchcodec 0.6.0` imports but LeRobot file-like `VideoDecoder` path fails at `torchcodec_ns::_convert_to_tensor`
+   - D-8 config must use `dataset.video_backend=pyav` unless torchcodec compatibility is fixed
+   - current repo `AdamWConfig` does not accept `optimizer.foreach`; D-8 config must remove that field or make an explicit config/code decision
    - 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/audits/cudnn_env_review_20260515_140817.md`
+   - smoke 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/audits/d9_torch27_train_smoke_20260515.{md,json}`
 
 6. **a6000(ketiserver) 측 워크트리 동기화 부재 — 참고만**
    - a6000 Codex 세션이 본 워크트리에는 audits/openarm_folding/ 의 현역 md/py 일부가 untracked/누락 상태였음
@@ -58,28 +67,32 @@
 
 ## 다음 N개 작업 (우선순위 순)
 
-1. **D-8 학습 모니터링** — A6000 추가 재학습 산출물 대기
-   - 세부 run path, checkpoint 목록, smoke 결과는 A6000 산출물 수신 후 기록
+1. **D-8a 추가 재학습 시작** — 준비된 config로 003000 continuation 실행
+   - config: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/d8a_full_folding_continue_003000_torch27_pyav_config_20260515.json`
+   - command: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/d8a_full_folding_continue_003000_torch27_pyav_command_20260515.md`
 
-2. **D-8 gate 실행** — 각 산출 checkpoint 에 대해 recipe gate + dataset replay gate 실행
+2. **D-8a 학습 모니터링** — 003000 에서 16000 step continuation
+   - 시작 전 현재 GPU/프로세스 확인, output_dir 신규 생성, 로그/audit 경로 고정
 
-3. **D-8 결과 판정** — replay PASS checkpoint 가 있으면 deploy 후보 검토, 없으면 데이터/recipe 재설계 결정
+3. **D-8 gate 실행** — 각 산출 checkpoint 에 대해 recipe gate + dataset replay gate 실행
 
-4. **Track D3 후속** — base 카메라 alignment side-by-side 판정
+4. **D-8 결과 판정** — replay PASS checkpoint 가 있으면 deploy 후보 검토, 없으면 데이터/recipe 재설계 결정
+
+5. **Track D3 후속** — base 카메라 alignment side-by-side 판정
    - 위치: syhlabtop
    - 입력: live capture `/tmp/openarm_folding_policy_input_viewer/policy_input_view_20260515_144933/`
    - 필요: a6000 측 `full_folding_visual_refs_manifest_20260514.json` 및 `visual_refs/` 접근 또는 syhlabtop 전송
 
-5. **Track D2** — 단일 조인트 축 probe 스펙 확정 및 operator 입회 실행
+6. **Track D2** — 단일 조인트 축 probe 스펙 확정 및 operator 입회 실행
    - 스펙: 한 joint 씩 selected motor torque only, 시작값 기준 `+1deg → return → -1deg → return`
    - 우선 대상: `left_joint_{4,5,6,7}` + `right_gripper.pos` + `left_gripper.pos`
    - 금지: operator 입회 없이 실행, `OpenArmFollower.connect()`, `send_action()`, `lerobot-rollout`, Damiao persistent setting 변경
 
-6. **Track A draft** — messy shirt 시나리오 approval envelope 생성
+7. **Track A draft** — messy shirt 시나리오 approval envelope 생성
    - 사전조건: D3 reference 비교 또는 operator visual 판정, D2 방향 probe 결정
    - 단독 실행 가능 범위: `trackA_level2_live_test_plan_2026-05-14.md` 첫 번째 커맨드 블록의 draft envelope 생성만, `--execute` 없음
 
-7. **Track A execute** — messy shirt 첫 라이브 롤아웃
+8. **Track A execute** — messy shirt 첫 라이브 롤아웃
    - 사전조건: operator 입회 + draft approval phrase + safety envelope 확인
 
 ---
@@ -166,9 +179,10 @@ checkpoint selection 만으로는 deploy 후보 확보 불가. **underfit 가설
 - **(i) torch 2.7.x + 호환 cuDNN 새 venv**
 
 현재 상태:
-- D-8 추가 재학습 진행/산출물 대기.
+- D-9 option (i) torch 2.7 venv smoke PASS.
+- D-8a 003000 continuation config/command 준비 완료. 학습 시작은 아직 안 함.
 - "병행 작업"은 syhlabtop Track D1/D3 쪽 작업을 뜻한다.
-- 세부 run path, checkpoint 목록, gate 결과는 A6000 산출물 수신 후 기록.
+- 세부 run path, checkpoint 목록, gate 결과는 A6000 산출물 생성 후 기록.
 
 산출물 커밋: `33ee0da4 docs: record cudnn environment review`
 
