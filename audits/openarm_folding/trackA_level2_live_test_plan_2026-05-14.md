@@ -54,6 +54,8 @@ finishes before generating any approval envelope.
 - Scope: `full-16`
 - Duration: 120 seconds (full folding cycle)
 - Queue: live closed-loop chunk refresh
+- Chunk contract: model proposal shape `[1, 30, 16]`; 30 policy actions at 30 Hz with max action horizon 20
+- Chunk cap: `--max-chunks 180` (`120s * 30Hz / 20 horizon`)
 - Safety mode: monitor-only software measurements; operator visual review and power cutoff are the hard safety gate
 - Delta handling: clip to cap
 - Limit handling: allow gripper, joint4, and general joint limit saturation while logging counts
@@ -77,7 +79,7 @@ bash audits/openarm_folding/run_rsusb_py312.sh \
   --base-serial 213622075840 \
   --selected-scope full-16 \
   --max-session-duration-s 120 \
-  --max-chunks 60 \
+  --max-chunks 180 \
   --execution-horizon 20 \
   --refresh-queue-threshold 10 \
   --action-period-s 0.03333333333333333 \
@@ -111,7 +113,7 @@ bash audits/openarm_folding/run_rsusb_py312.sh \
   --base-serial 213622075840 \
   --selected-scope full-16 \
   --max-session-duration-s 120 \
-  --max-chunks 60 \
+  --max-chunks 180 \
   --execution-horizon 20 \
   --refresh-queue-threshold 10 \
   --action-period-s 0.03333333333333333 \
