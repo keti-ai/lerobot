@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-15 (a6000 Track C + cuDNN 리뷰 머지)  
+**마지막 갱신:** 2026-05-15 (syhlabtop D1/D3 read-only 결과 반영)  
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -12,7 +12,7 @@
 | **A** — syhlabtop level2 라이브 롤아웃 | UNBLOCKED | Track D 통과 후 messy shirt 첫 라이브 실행 |
 | **B** — full_folding 재학습 | **DECISION_PENDING** | D-9 cuDNN 환경 결정 후 D-8a/D-8b 진행 |
 | **C** — full_folding ckpt 002000/003000 replay 비교 | **COMPLETE** | ckpt 002000/003000/004000 모두 replay FAIL → deploy 후보 없음 |
-| **D** — 축 probe + base 카메라 정렬 | NOT STARTED (syhlabtop 머신 필요) | `openarm_limit_axis_audit.py` read-only 재실행 |
+| **D** — 축 probe + base 카메라 정렬 | D1 완료, D3 캡처 완료/참조 비교 대기 | a6000 visual refs manifest 확보 후 side-by-side, 이후 operator probe |
 
 ---
 
@@ -26,12 +26,17 @@
    - 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/full_folding_dataset_replay_{002000,003000}.{md,json}`
 
 2. **base 카메라 FOV/scale 미스매치**  
-   - 현 카메라 height 에서 shirt 보이지만 팔 크기가 dataset 보다 작음  
+   - D3 live capture: `/tmp/openarm_folding_policy_input_viewer/policy_input_view_20260515_144933/`  
+   - 세 카메라 모두 `640x480@30`, `/status.json` 오류 없음, `read_only=true`, `robot_io=false`  
+   - base 캡처는 테이블과 셔츠를 넓게 포함하나, a6000 `full_folding_visual_refs_manifest_20260514.json` 이 syhlabtop 로컬에 없고 `ssh 10.252.205.103` 접근이 거부되어 dataset reference side-by-side 판정은 남음  
    - 의존성: 결정 D-6 (물리 raise vs preprocessing transform)
 
 3. **`left_joint_{4,5,6,7}` + 양 gripper 축 sign 미검증**  
    - 라이브 롤아웃에서 left wrist 키들의 saturation 빈도 높음  
-   - 진단: software limit 안 vs 실제 물리 sign 불일치 둘 다 가능  
+   - D1 read-only audit: `/home/syhlabtop/openarm_folding_20260512/audits/limit_axis_audit_20260515_144443.{md,json}`  
+   - 현재 16D readback 은 모두 software limit 안. 최저 마진: `right_joint_4.pos` 4.492 deg, `left_gripper.pos` 5.451 deg, `left_joint_4.pos` 5.606 deg, `right_joint_2.pos` 8.727 deg, `right_gripper.pos` 8.841 deg, `left_joint_2.pos` 11.284 deg  
+   - rollout 로그 증상은 계속 left wrist 중심: hard readback key top = `left_joint_7.pos` 26, `left_joint_5.pos` 22, `left_joint_4.pos` 14, `left_joint_1.pos` 12  
+   - 진단: current readback 은 안전 범위 안이지만, 실제 물리 sign/zero/comfortable range 불일치 가능성은 아직 남음  
    - 의존성: 결정 D-7 (operator 입회 probe)
 
 4. **wrist 카메라 capture/training 해상도 차이**  
@@ -65,17 +70,53 @@
 4. **D-8b (B 재오픈, 병행 가능)** — fold-only subset (4100 eps) 생성 및 별도 재학습  
    - 위치: A6000, D-9 해결 후
 
-5. **Track D1** — `openarm_limit_axis_audit.py` read-only 재실행  
-   - 위치: syhlabtop (a6000 에서는 실행 불가)  
-   - 모션 없음, CAN 읽기만
-
-6. **Track D3** — base 카메라 alignment 확인  
+5. **Track D3 후속** — base 카메라 alignment side-by-side 판정  
    - 위치: syhlabtop  
-   - 도구: `syhlabtop_live_policy_input_viewer.py` + a6000 측 `full_folding_visual_refs_manifest` 비교
+   - 입력: live capture `/tmp/openarm_folding_policy_input_viewer/policy_input_view_20260515_144933/`  
+   - 필요: a6000 측 `full_folding_visual_refs_manifest_20260514.json` 및 `visual_refs/` 접근 또는 syhlabtop 전송
 
-7. **Track D2** — left_joint_4 +1deg/-1deg 축 probe (operator 입회 필수)
+6. **Track D2** — 단일 조인트 축 probe 스펙 확정 및 operator 입회 실행  
+   - 스펙: 한 joint 씩 selected motor torque only, 시작값 기준 `+1deg → return → -1deg → return`  
+   - 우선 대상: `left_joint_{4,5,6,7}` + `right_gripper.pos` + `left_gripper.pos`  
+   - 금지: operator 입회 없이 실행, `OpenArmFollower.connect()`, `send_action()`, `lerobot-rollout`, Damiao persistent setting 변경
 
-8. **Track A** — messy shirt 시나리오 첫 라이브 롤아웃 (D1+D3 통과 + operator approval 후)
+7. **Track A draft** — messy shirt 시나리오 approval envelope 생성  
+   - 사전조건: D3 reference 비교 또는 operator visual 판정, D2 방향 probe 결정  
+   - 단독 실행 가능 범위: `trackA_level2_live_test_plan_2026-05-14.md` 첫 번째 커맨드 블록의 draft envelope 생성만, `--execute` 없음
+
+8. **Track A execute** — messy shirt 첫 라이브 롤아웃  
+   - 사전조건: operator 입회 + draft approval phrase + safety envelope 확인
+
+---
+
+## Track D read-only 결과 (syhlabtop 세션, 2026-05-15)
+
+### D1 — limit/axis readback audit
+
+```text
+artifact_md:   /home/syhlabtop/openarm_folding_20260512/audits/limit_axis_audit_20260515_144443.md
+artifact_json: /home/syhlabtop/openarm_folding_20260512/audits/limit_axis_audit_20260515_144443.json
+read_path:     DamiaoMotorsBus.connect(handshake=False) + sync_read_all_states()
+actuation:     false
+send_action:   false
+```
+
+판정: 현재 16D readback 은 모두 software limit 안이다. 다만 최저 마진이
+`right_joint_4.pos`, `left_gripper.pos`, `left_joint_4.pos` 에 몰려 있고,
+기존 rollout log 의 hard readback top 이 `left_joint_7/5/4/1` 에 집중되어
+D2 tiny direction probe 는 계속 필요하다.
+
+### D3 — live policy input capture
+
+```text
+capture_dir: /tmp/openarm_folding_policy_input_viewer/policy_input_view_20260515_144933/
+profiles:    left_wrist=640x480@30, right_wrist=640x480@30, base=640x480@30
+status:      errors=[], read_only=true, robot_io=false, actuator_commands_sent=false
+```
+
+판정: live camera capture 자체는 정상이다. a6000 visual reference manifest 가
+syhlabtop 로컬에 없고 현재 ssh 접근이 거부되어, `full_folding` reference 와의
+side-by-side 판정은 manifest/visual_refs 전송 후 다시 수행해야 한다.
 
 ---
 
