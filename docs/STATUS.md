@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-15 (D-8a continuation 008000 checkpoint 저장, 학습 진행 중)
+**마지막 갱신:** 2026-05-15 (D-8a partial run 종료, checkpoint 012000까지 보존)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -10,7 +10,7 @@
 | Track | 상태 | 다음 행동 |
 |---|---|---|
 | **A** — syhlabtop level2 라이브 롤아웃 | 120s closed-loop 인프라 준비 완료, draft는 A6000 serving health 대기 | serving 복구 후 envelope 재생성, 이후 operator 입회 실행 |
-| **B** — full_folding 재학습 | **D-8a RUNNING** | origin의 `a6000_d8a_status.md` 정기 확인 |
+| **B** — full_folding 재학습 | **D-8a PARTIAL COMPLETE** | 생성된 001000~012000 checkpoint gate 실행 |
 | **C** — full_folding ckpt 002000/003000 replay 비교 | **COMPLETE** | ckpt 002000/003000/004000 모두 replay FAIL → deploy 후보 없음 |
 | **D** — 축 probe + base 카메라 정렬 | read-only 결과 보존, 단일 조인트 probe/side-by-side 후속 폐기 | closed-loop 긴 타임시퀀스 평가로 전환 |
 
@@ -58,8 +58,9 @@
    - smoke 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/audits/d9_torch27_train_smoke_20260515.{md,json}`
    - D-8a 시작: `20260515_163251`
    - D-8a 최신 상태 파일: `audits/openarm_folding/a6000_d8a_status.md`
-   - 현재 상태: 008000 checkpoint 저장 완료, step 8200 부근 진행 중. 최근 로그는 step 8200 loss 0.056, grad_norm 0.470.
-   - GPU: 4x RTX A6000, util 69/82/78/75%. deploy 후보 표기 금지.
+   - 현재 상태: 012000 checkpoint까지 저장 후 step 12120 부근에서 `FrameTimestampError` 로 종료.
+   - 실패 파일: `videos/observation.images.right_wrist/chunk-000/file-557.mp4`, queried timestamp 1352.2334 vs loaded 1352.2333 근방, tolerance 0.0001 초과.
+   - 생성된 001000~012000 checkpoint에 대해 gate 실행 필요. deploy 후보 표기 금지.
 
 6. **Track A closed-loop dry-run envelope 대기 — A6000 serving down**
    - `http://10.252.205.103:8766/health`, `http://10.252.205.103:8765/health` 모두 connection refused
@@ -193,7 +194,7 @@ checkpoint selection 만으로는 deploy 후보 확보 불가. **underfit 가설
 
 현재 상태:
 - D-9 option (i) torch 2.7 venv smoke PASS.
-- D-8a 003000 continuation 학습 진행 중. checkpoint 008000까지 저장됨.
+- D-8a 003000 continuation 은 step 12120 부근에서 `FrameTimestampError` 로 종료. checkpoint 012000까지 저장됨.
 - "병행 작업"은 syhlabtop Track D1/D3 쪽 작업을 뜻한다.
 - 세부 run path, checkpoint 목록, gate 결과는 A6000 산출물 생성 후 기록.
 
