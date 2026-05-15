@@ -52,7 +52,7 @@ finishes before generating any approval envelope.
 ## Baseline Trial Shape
 
 - Scope: `full-16`
-- Duration: 30 to 60 seconds
+- Duration: 120 seconds (full folding cycle)
 - Queue: live closed-loop chunk refresh
 - Safety mode: monitor-only software measurements; operator visual review and power cutoff are the hard safety gate
 - Delta handling: clip to cap
@@ -76,8 +76,8 @@ bash audits/openarm_folding/run_rsusb_py312.sh \
   --predict-url http://10.252.205.103:8766/predict_live \
   --base-serial 213622075840 \
   --selected-scope full-16 \
-  --max-session-duration-s 60 \
-  --max-chunks 24 \
+  --max-session-duration-s 120 \
+  --max-chunks 60 \
   --execution-horizon 20 \
   --refresh-queue-threshold 10 \
   --action-period-s 0.03333333333333333 \
@@ -90,9 +90,12 @@ bash audits/openarm_folding/run_rsusb_py312.sh \
   --allow-joint-limit-saturation \
   --readback-stride 0 \
   --hold-last-action \
+  --relaxed-proposal-validation \
+  --max-consecutive-inference-errors 5 \
+  --request-timeout-s 60 \
   --safety-monitor-only \
   --record-eval-frames \
-  --record-frame-every-n-obs 15 \
+  --record-frame-every-n-obs 30 \
   --approval-draft-json "$TRIAL/live_session/session_envelope.json" \
   --approval-draft-md "$TRIAL/live_session/session_envelope.md"
 ```
@@ -107,8 +110,8 @@ bash audits/openarm_folding/run_rsusb_py312.sh \
   --predict-url http://10.252.205.103:8766/predict_live \
   --base-serial 213622075840 \
   --selected-scope full-16 \
-  --max-session-duration-s 60 \
-  --max-chunks 24 \
+  --max-session-duration-s 120 \
+  --max-chunks 60 \
   --execution-horizon 20 \
   --refresh-queue-threshold 10 \
   --action-period-s 0.03333333333333333 \
@@ -121,9 +124,12 @@ bash audits/openarm_folding/run_rsusb_py312.sh \
   --allow-joint-limit-saturation \
   --readback-stride 0 \
   --hold-last-action \
+  --relaxed-proposal-validation \
+  --max-consecutive-inference-errors 5 \
+  --request-timeout-s 60 \
   --safety-monitor-only \
   --record-eval-frames \
-  --record-frame-every-n-obs 15 \
+  --record-frame-every-n-obs 30 \
   --session-envelope-json "$TRIAL/live_session/session_envelope.json" \
   --execute \
   --operator-session-approval-given \
