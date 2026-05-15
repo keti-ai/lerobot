@@ -35,7 +35,7 @@ corrected checkpoint이며, full_folding 004000은 replay gate FAIL로 배포 �
 | G6 | full_folding ckpt 003000 replay gate | FAIL | Ratio 0.142-0.348, raw normalized max error 0.402 |
 | S1 | A6000 live policy server | READY | `a6000_live_policy_server.py`, offline env 필요 |
 | S2 | snapshot policy server/client | READY | no-send/snapshot 검증용 |
-| R1 | Track A first messy shirt rollout | BLOCKED BY D | Track D 축/FOV 확인 후 operator approval |
+| R1 | Track A first messy shirt rollout | WAITING FOR D | Track D 축/FOV 확인 후 operator approval |
 | R2 | left wrist 축 sign probe | NOT STARTED | Damiao persistent setting 변경 금지 |
 | R3 | base camera FOV/scale alignment | NOT STARTED | Track A 전 확인 필요 |
 | R4 | full_folding ckpt selection decision | COMPLETE | 002000/003000/004000 모두 replay FAIL, deploy 후보 없음 |
@@ -48,21 +48,25 @@ P0는 안전 불변조건 유지다. `OpenArmFollower.connect()`, `send_action()
 변경을 금지하고 모든 실제 모션은 `syhlabtop_live_guarded_rollout.py` approval
 envelope를 먼저 통과해야 한다.
 
-P1은 Track D다. left wrist 축 sign probe와 base 카메라 정렬이 아직 시작되지
-않았으므로, Track A 첫 messy shirt 실행 전의 직접 블로커다.
+P1은 A6000 Track B 후속 작업의 D-9 cuDNN 환경 결정이다. full_folding 추가
+학습은 cuDNN enabled Conv2d가 통과하는 환경에서만 시작한다.
 
-P2는 Track A다. syhlabtop level2 라이브 롤아웃은 UNBLOCKED 상태지만 Track D
+P2는 Track D다. left wrist 축 sign probe와 base 카메라 정렬이 아직 시작되지
+않았으므로, Track A 첫 messy shirt 실행 전의 직접 선행조건이다.
+
+P3은 Track A다. syhlabtop level2 라이브 롤아웃은 UNBLOCKED 상태지만 Track D
 결과를 본 뒤 operator approval로 첫 messy shirt 실행을 진행한다.
 
-P3은 Track C다. full_folding 004000은 Track B에서 COMPLETE이나 replay FAIL로
-배포 후보가 아니므로, ckpt 002000/003000 replay gate를 비교하여 underfit인지
-checkpoint selection 문제인지 결정해야 한다.
+P4는 Track C 후속 판정이다. full_folding 002000/003000/004000은 모두 replay
+FAIL이므로 단순 checkpoint selection으로는 배포 후보를 만들 수 없고, underfit
+추가 학습 또는 데이터/recipe 재설계 결정이 필요하다.
 
 Track A: syhlabtop level2 라이브 롤아웃. 상태는 UNBLOCKED, 첫 messy shirt 실행
 대기.
 
-Track B: full_folding 재학습. 상태는 COMPLETE. 004000 recipe gate PASS, replay
-gate FAIL이므로 deploy candidate 아님.
+Track B: full_folding 재학습. 초기 004000 학습은 COMPLETE이나 002000/003000/004000
+모두 replay gate FAIL이므로 deploy candidate가 없다. 추가 학습(D-8a) 또는
+fold-only 재학습(D-8b)은 D-9 cuDNN 환경 결정 후에만 시작한다.
 
 Track C: full_folding ckpt 002000/003000 replay gate 비교. 상태는 완료. 002000,
 003000, 004000 모두 relstats-aware replay gate FAIL이므로 full_folding deploy
@@ -79,8 +83,8 @@ Track D: left wrist 축 probe + base 카메라 정렬. 상태는 미실행.
 - D-5: Track D 결과 확인 후 Track A messy shirt 첫 live rollout go/no-go를 operator approval로 결정해야 한다.
 - D-6: A6000 server는 `HF_HOME`, `HF_HUB_CACHE`, `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`을 유지한 offline serving으로만 운용해야 한다.
 - D-7: 현재 작업트리에는 지시문 기준 현역 md/py 일부가 존재하지 않으므로 복구 또는 별도 소스 확인이 필요하다.
-- D-8: full_folding 002000/003000/004000이 모두 replay FAIL이므로, 다음 full_folding 작업은 underfit 추가 학습인지 학습 recipe/RABC/gate sample 재설계인지 결정해야 한다.
-- D-9: 현재 A6000 torch `2.11.0+cu128` 환경은 cuDNN Conv2d가 `CUDNN_STATUS_NOT_INITIALIZED`로 실패하므로, replay 실행은 임시로 `torch.backends.cudnn.enabled=False` 우회를 쓰거나 PyTorch/cuDNN 환경을 정비할지 결정해야 한다.
+- D-8: full_folding 002000/003000/004000이 모두 replay FAIL이므로, 다음 full_folding 작업은 003000에서 8000/16000 step 추가 학습(D-8a)인지 fold-only subset 재학습(D-8b)인지 결정해야 한다. D-9가 해결될 때까지 학습 시작 금지.
+- D-9: A6000 full_folding venv는 torch `2.11.0+cu128`, CUDA `12.8`, cuDNN `91900`, driver `570.133.20` 환경이며 cuDNN enabled Conv2d가 `CUDNN_STATUS_NOT_INITIALIZED`로 실패한다. `torch.backends.cudnn.enabled=False`는 추론 산출물 생성에만 사용했고 학습에는 사용하지 않는다. 선택지는 (i) torch 2.7.x + 호환 cuDNN 새 venv, (ii) torch 2.11.0 유지 + cuDNN 별도 정비, (iii) Docker 격리이며, 사용자 결정 필요. 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/audits/cudnn_env_review_20260515_140817.md`.
 
 ## 6. 현역 참조 파일
 
