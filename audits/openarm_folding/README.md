@@ -7,17 +7,18 @@ Scope: syhlabtop/A6000 OpenArm folding deployment audit, corrected checkpoint ro
 ## Current Status
 
 ```text
-Track B A6000 full_folding retrain: COMPLETE — replay_gate=FAIL, NOT_DEPLOY_CANDIDATE
+Track B A6000 full_folding retrain: IN_PROGRESS — D-9 option (i), D-8 two parallel continuation jobs running
 Track A syhlabtop level2 live rollout: UNBLOCKED — proceed with level2 model
-Track C A6000 checkpoint_selection: NEEDED — compare checkpoints 002000/003000 replay gate
+Track C A6000 checkpoint_selection: COMPLETE — 002000/003000/004000 all replay FAIL, no deploy candidate
 new_stage_numbers: forbidden
 next_experiment_axis: rollout_trial_<timestamp>/
 robot_motion_from_this_readme: NOT_AUTHORIZED
 ```
 
-- Track B `full_folding` training finished at step 004000 (loss ~0.066). Recipe gate PASS. Dataset replay gate **FAIL**: model delta/recorded-delta ratio 0.128–0.282 (threshold 0.25–4.0), raw normalized error max 0.413 (threshold 0.25). No 60–70 deg abnormal deltas (max 2.086 deg). `full_folding 004000` is NOT a syhlabtop deploy candidate.
+- Track B `full_folding` initial training finished at step 004000 (loss ~0.066). Recipe gate PASS. Dataset replay gate **FAIL**: model delta/recorded-delta ratio 0.128–0.282 (threshold 0.25–4.0), raw normalized error max 0.413 (threshold 0.25). No 60–70 deg abnormal deltas (max 2.086 deg). `full_folding 004000` is NOT a syhlabtop deploy candidate.
+- D-9 decision is option (i): torch 2.7.x + compatible cuDNN new venv. D-8 additional retraining has two parallel A6000 jobs running. Run paths and gate results are pending A6000 artifacts.
 - Track A is now unblocked. Use the current level2 corrected checkpoint (step 004000) on port 8766. Focus on base-view alignment and axis direction check before running a full session rollout.
-- Track C (A6000): compare `full_folding` checkpoints 002000 and 003000 to determine whether replay gate failure is underfitting or checkpoint selection.
+- Track C (A6000): checkpoint comparison is complete. `full_folding` checkpoints 002000, 003000, and 004000 all fail replay gate, so checkpoint selection alone does not produce a deploy candidate.
 - Any motion must use a fresh `rollout_trial_<timestamp>/` session, a fresh serving health check, a new approval envelope, and explicit operator approval.
 
 ## Major Timeline Summary

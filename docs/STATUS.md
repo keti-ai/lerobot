@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-15 (a6000 Track C + cuDNN 리뷰 머지)  
+**마지막 갱신:** 2026-05-15 (D-9 option i 선택 + D-8 병렬 추가 재학습 진행)  
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -10,7 +10,7 @@
 | Track | 상태 | 다음 행동 |
 |---|---|---|
 | **A** — syhlabtop level2 라이브 롤아웃 | UNBLOCKED | Track D 통과 후 messy shirt 첫 라이브 실행 |
-| **B** — full_folding 재학습 | **DECISION_PENDING** | D-9 cuDNN 환경 결정 후 D-8a/D-8b 진행 |
+| **B** — full_folding 재학습 | **IN_PROGRESS** | A6000 D-8 추가 재학습 2개 병렬 작업 완료 후 recipe/replay gate |
 | **C** — full_folding ckpt 002000/003000 replay 비교 | **COMPLETE** | ckpt 002000/003000/004000 모두 replay FAIL → deploy 후보 없음 |
 | **D** — 축 probe + base 카메라 정렬 | NOT STARTED (syhlabtop 머신 필요) | `openarm_limit_axis_audit.py` read-only 재실행 |
 
@@ -22,7 +22,7 @@
    - ckpt 002000: ratio 0.220–0.320, raw normalized max error 0.433 → FAIL  
    - ckpt 003000: ratio 0.142–0.348, raw normalized max error 0.402 → FAIL  
    - ckpt 004000: ratio 0.128–0.282, raw normalized max error 0.413 → FAIL  
-   - 결론: 단순 checkpoint selection 으로 해결 불가. 다음은 **underfit 추가 학습(D-8a)** 또는 **fold-only 재학습(D-8b)** 결정 필요.  
+   - 결론: 단순 checkpoint selection 으로 해결 불가. D-8 추가 재학습 2개 병렬 작업 진행 중.  
    - 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/full_folding_dataset_replay_{002000,003000}.{md,json}`
 
 2. **base 카메라 FOV/scale 미스매치**  
@@ -38,9 +38,10 @@
    - syhlabtop 측 640×480 캡처 → server 가 1280×720 으로 resize 후 모델 입력  
    - 서버 측 resize 가 정확히 training 분포와 일치하는지 검증 안 됨
 
-5. **D-9 cuDNN 환경 미해결**  
+5. **D-9 cuDNN 환경 결정 완료 — option (i)**  
    - A6000 torch `2.11.0+cu128` / CUDA `12.8` / cuDNN `91900` / driver `570.133.20` 환경에서 cuDNN enabled Conv2d 가 `CUDNN_STATUS_NOT_INITIALIZED` 로 실패  
-   - 우회 `torch.backends.cudnn.enabled=False` 는 추론에만 사용. 학습은 환경 결정 전 금지  
+   - 사용자 결정: **(i) torch 2.7.x + 호환 cuDNN 새 venv**  
+   - 우회 `torch.backends.cudnn.enabled=False` 는 추론에만 사용. 학습에는 사용 금지  
    - 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/audits/cudnn_env_review_20260515_140817.md`
 
 6. **a6000(ketiserver) 측 워크트리 동기화 부재 — 참고만**  
@@ -52,30 +53,24 @@
 
 ## 다음 N개 작업 (우선순위 순)
 
-1. **D-9 사용자 결정** — cuDNN 환경 정비 옵션 선택  
-   - (i) torch 2.7.x + 호환 cuDNN 새 venv (가장 안정적)  
-   - (ii) torch 2.11.0 유지 + cuDNN 별도 정비  
-   - (iii) Docker 격리
+1. **D-8 병렬 학습 모니터링** — A6000 추가 재학습 2개 작업 완료 대기  
+   - 세부 run path, checkpoint 목록, smoke 결과는 A6000 산출물 수신 후 기록
 
-2. **D-9 후속** — 선택한 환경에서 cuDNN enabled Conv2d + 짧은 train smoke 검증
+2. **D-8 gate 실행** — 각 산출 checkpoint 에 대해 recipe gate + dataset replay gate 실행
 
-3. **D-8a (B 재오픈)** — 003000 에서 8000/16000 step 추가 학습으로 underfit 가설 검증  
-   - 위치: A6000, D-9 해결 후
+3. **D-8 결과 판정** — replay PASS checkpoint 가 있으면 deploy 후보 검토, 없으면 데이터/recipe 재설계 결정
 
-4. **D-8b (B 재오픈, 병행 가능)** — fold-only subset (4100 eps) 생성 및 별도 재학습  
-   - 위치: A6000, D-9 해결 후
-
-5. **Track D1** — `openarm_limit_axis_audit.py` read-only 재실행  
+4. **Track D1** — `openarm_limit_axis_audit.py` read-only 재실행  
    - 위치: syhlabtop (a6000 에서는 실행 불가)  
    - 모션 없음, CAN 읽기만
 
-6. **Track D3** — base 카메라 alignment 확인  
+5. **Track D3** — base 카메라 alignment 확인  
    - 위치: syhlabtop  
    - 도구: `syhlabtop_live_policy_input_viewer.py` + a6000 측 `full_folding_visual_refs_manifest` 비교
 
-7. **Track D2** — left_joint_4 +1deg/-1deg 축 probe (operator 입회 필수)
+6. **Track D2** — left_joint_4 +1deg/-1deg 축 probe (operator 입회 필수)
 
-8. **Track A** — messy shirt 시나리오 첫 라이브 롤아웃 (D1+D3 통과 + operator approval 후)
+7. **Track A** — messy shirt 시나리오 첫 라이브 롤아웃 (D1+D3 통과 + operator approval 후)
 
 ---
 
@@ -126,10 +121,12 @@ checkpoint selection 만으로는 deploy 후보 확보 불가. **underfit 가설
   cuDNN 우회 설정은 학습에 사용 금지 (속도 치명적 + 결과 신뢰성).
 ```
 
-선택지 (사용자 결정 대기):
-- (i) torch 2.7.x + 호환 cuDNN 새 venv
-- (ii) torch 2.11.0 유지 + cuDNN 별도 정비
-- (iii) Docker 격리
+사용자 결정:
+- **(i) torch 2.7.x + 호환 cuDNN 새 venv**
+
+현재 상태:
+- D-8 추가 재학습 2개 병렬 작업 진행 중.
+- 세부 run path, checkpoint 목록, gate 결과는 A6000 산출물 수신 후 기록.
 
 산출물 커밋: `33ee0da4 docs: record cudnn environment review`
 

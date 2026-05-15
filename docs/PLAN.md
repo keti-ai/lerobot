@@ -1,6 +1,6 @@
 # OpenArm 폴딩 재학습 — 작업 플랜 (SSOT)
 
-**마지막 갱신:** 2026-05-15 (a6000 Track C + cuDNN 리뷰 머지)  
+**마지막 갱신:** 2026-05-15 (D-9 option i 선택 + D-8 병렬 추가 재학습 진행)  
 **브랜치:** `audit/openarm-folding-baseline`  
 **용도:** 이 레포에 들어오는 Codex/Claude 세션이 이 문서 하나만으로 다음 작업을 선택 가능하게 함.
 
@@ -80,7 +80,7 @@ loss:    0.066 at step 4000/4000
 출처:    level2_final_quality3_t_0_hil_data_c 의 corrected relstats 재학습
 ```
 
-### A6000 학습 환경 (D-9 미해결)
+### A6000 학습 환경 (D-9)
 
 ```
 host:   ketiserver (a6000)
@@ -90,7 +90,8 @@ torch:  2.11.0+cu128
 CUDA:   12.8
 cuDNN:  91900  ← Conv2d 에서 CUDNN_STATUS_NOT_INITIALIZED 실패
 
-상태:   D-8 추가 학습은 환경 결정 전 시작 금지.
+결정:   option (i) torch 2.7.x + 호환 cuDNN 새 venv
+상태:   D-8 추가 재학습 2개 병렬 작업 진행 중. 세부 run path/결과는 산출물 대기.
 ```
 
 ---
@@ -104,7 +105,7 @@ cuDNN:  91900  ← Conv2d 에서 CUDNN_STATUS_NOT_INITIALIZED 실패
 | **P1** 전처리 | level2 chunk30 relstats | ✅ 완료 | gripper 제외 |
 | **P2** 전처리 | full_folding chunk30 relstats | ✅ 완료 | curated mix 필요 여부 = D-2 |
 | **T1** 학습 | level2 step 4000 PI0.5 | ✅ 완료 | loss 0.066 |
-| **T2** 학습 | full_folding step 4000 PI0.5 | ✅ 완료 | 추가 step / fine-tune = D-8 |
+| **T2** 학습 | full_folding step 4000 PI0.5 + D-8 추가 재학습 | ⏳ 진행 중 | D-9 option (i), 2개 병렬 작업 |
 | **G1** Recipe gate | level2 004000 | ✅ PASS | — |
 | **G2** Replay gate | level2 004000 | ✅ PASS | — |
 | **G3** Recipe gate | full_folding 004000 | ✅ PASS | — |
@@ -118,7 +119,7 @@ cuDNN:  91900  ← Conv2d 에서 CUDNN_STATUS_NOT_INITIALIZED 실패
 | **R3** 카메라 정렬 | base FOV/scale 일치 | ⬜ 미완 | physical raise vs preprocessing = D-6 |
 | **R4** 축 probe | left_joint_{4,5,6,7} + 양 gripper sign | ⬜ 미완 | operator 입회 필요 = D-7 |
 | **R5** 분석 | 시나리오 다양화 / 결과 회귀 | ⬜ 미완 | — |
-| **R6** ckpt selection | full_folding deploy 후보 선정 | ❌ 002000/003000/004000 모두 FAIL | 추가 학습 또는 데이터 재설계 필요 = D-8 |
+| **R6** ckpt selection | full_folding deploy 후보 선정 | ⏳ 진행 중 | D-8 추가 재학습 산출물 gate 대기 |
 
 ---
 
@@ -127,7 +128,7 @@ cuDNN:  91900  ← Conv2d 에서 CUDNN_STATUS_NOT_INITIALIZED 실패
 | Track | Goal | 현재 상태 |
 |---|---|---|
 | **A** | syhlabtop level2 라이브 롤아웃 | UNBLOCKED — Track D 결과 본 뒤 messy shirt 실행 |
-| **B** | full_folding 재학습 | **DECISION_PENDING** — D-9 cuDNN 환경 결정 후 D-8a/D-8b 진행 |
+| **B** | full_folding 재학습 | **IN_PROGRESS** — D-9 option (i), D-8 추가 재학습 2개 병렬 작업 중 |
 | **C** | full_folding ckpt 002000/003000 replay gate 비교 | **COMPLETE** — 둘 다 FAIL, deploy 후보 없음 |
 | **D** | 축 방향 probe + base 카메라 정렬 | NOT STARTED — syhlabtop 머신 + operator 필요 |
 
@@ -137,12 +138,12 @@ cuDNN:  91900  ← Conv2d 에서 CUDNN_STATUS_NOT_INITIALIZED 실패
 P0 (안전 불변조건):
   - 하드룰 8개 위반 금지 (AGENTS.md 참조)
 
-P1 (사용자 결정 필요, 즉시):
-  - D-9: A6000 cuDNN 환경 옵션 선택 (i/ii/iii)
-  - D-8: 003000 추가 학습(D-8a) vs fold-only 재학습(D-8b) 방향
+P1 (A6000 진행 중):
+  - D-9: option (i) torch 2.7.x + 호환 cuDNN 새 venv 선택됨
+  - D-8: 추가 재학습 2개 병렬 작업 진행 중. run path/metric 산출물 대기
 
-P2 (병렬 가능, 결정 후):
-  - D-8a/D-8b: A6000 추가 학습 (D-9 환경 정비 후)
+P2 (병렬 가능):
+  - D-8: 완료된 checkpoint 별 recipe gate + replay gate
   - Track D1: openarm_limit_axis_audit.py read-only (syhlabtop)
   - Track D3: base 카메라 alignment 확인 (syhlabtop)
 
@@ -166,8 +167,8 @@ P3 (Track D 통과 후):
 | **D-5** | Track A 라이브 롤아웃 실행 일정 | Track D 통과 후. operator 입회 필요. |
 | **D-6** | base 카메라 정렬 우선순위 | (a) 물리 raise/tilt 우선 vs (b) runtime preprocessing transform 우선. 후자는 `vision_preprocess_id` 로 contract 등록 필요. |
 | **D-7** | left_joint_{4,5,6,7} + 양 gripper 물리 축 probe 실행 여부 | `limit_axis_physical_check_plan_2026-05-14.md` 의 `+1deg/-1deg` 시퀀스. operator 입회 필요. |
-| **D-8** | full_folding 002000/003000/004000 모두 replay FAIL — 다음 방향 | (a) 003000 에서 8000/16000 step 추가 학습으로 underfit 가설 검증, (b) fold-only subset 별도 재학습. D-9 해결 후 시작. |
-| **D-9** | A6000 cuDNN 환경 — Conv2d 가 `CUDNN_STATUS_NOT_INITIALIZED` 실패 | torch 2.11.0+cu128, CUDA 12.8, cuDNN 91900, driver 570.133.20. 우회 `cudnn.enabled=False` 는 추론만 가능, 학습 금지. 선택지: (i) torch 2.7.x + 호환 cuDNN 새 venv, (ii) torch 2.11.0 유지 + cuDNN 별도 정비, (iii) Docker 격리. 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/audits/cudnn_env_review_20260515_140817.md` |
+| **D-8** | full_folding 002000/003000/004000 모두 replay FAIL — 추가 재학습 | 추가 재학습 2개 병렬 작업 진행 중. 세부 run path, checkpoint 목록, gate 결과는 A6000 산출물 수신 후 기록. |
+| **D-9** | A6000 cuDNN 환경 — Conv2d 가 `CUDNN_STATUS_NOT_INITIALIZED` 실패 | 사용자 결정: option (i) torch 2.7.x + 호환 cuDNN 새 venv. 기존 torch 2.11.0+cu128 우회 `cudnn.enabled=False` 는 추론만 가능, 학습 금지. 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/audits/cudnn_env_review_20260515_140817.md` |
 
 ---
 
