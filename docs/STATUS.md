@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-15 (D-9 option i 선택 + D-8 병렬 추가 재학습 진행)  
+**마지막 갱신:** 2026-05-15 (D-9 option i 선택 + syhlabtop 병행 작업 의미 정정)  
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -10,9 +10,9 @@
 | Track | 상태 | 다음 행동 |
 |---|---|---|
 | **A** — syhlabtop level2 라이브 롤아웃 | UNBLOCKED | Track D 통과 후 messy shirt 첫 라이브 실행 |
-| **B** — full_folding 재학습 | **IN_PROGRESS** | A6000 D-8 추가 재학습 2개 병렬 작업 완료 후 recipe/replay gate |
+| **B** — full_folding 재학습 | **IN_PROGRESS** | A6000 D-8 추가 재학습 산출물 수신 후 recipe/replay gate |
 | **C** — full_folding ckpt 002000/003000 replay 비교 | **COMPLETE** | ckpt 002000/003000/004000 모두 replay FAIL → deploy 후보 없음 |
-| **D** — 축 probe + base 카메라 정렬 | NOT STARTED (syhlabtop 머신 필요) | `openarm_limit_axis_audit.py` read-only 재실행 |
+| **D** — 축 probe + base 카메라 정렬 | IN_PROGRESS (syhlabtop 병행 작업) | D1 read-only audit, D3 camera alignment 확인 |
 
 ---
 
@@ -22,7 +22,7 @@
    - ckpt 002000: ratio 0.220–0.320, raw normalized max error 0.433 → FAIL  
    - ckpt 003000: ratio 0.142–0.348, raw normalized max error 0.402 → FAIL  
    - ckpt 004000: ratio 0.128–0.282, raw normalized max error 0.413 → FAIL  
-   - 결론: 단순 checkpoint selection 으로 해결 불가. D-8 추가 재학습 2개 병렬 작업 진행 중.  
+   - 결론: 단순 checkpoint selection 으로 해결 불가. D-8 추가 재학습 진행/산출물 대기.  
    - 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/full_folding_dataset_replay_{002000,003000}.{md,json}`
 
 2. **base 카메라 FOV/scale 미스매치**  
@@ -53,18 +53,18 @@
 
 ## 다음 N개 작업 (우선순위 순)
 
-1. **D-8 병렬 학습 모니터링** — A6000 추가 재학습 2개 작업 완료 대기  
+1. **D-8 학습 모니터링** — A6000 추가 재학습 산출물 대기  
    - 세부 run path, checkpoint 목록, smoke 결과는 A6000 산출물 수신 후 기록
 
 2. **D-8 gate 실행** — 각 산출 checkpoint 에 대해 recipe gate + dataset replay gate 실행
 
 3. **D-8 결과 판정** — replay PASS checkpoint 가 있으면 deploy 후보 검토, 없으면 데이터/recipe 재설계 결정
 
-4. **Track D1** — `openarm_limit_axis_audit.py` read-only 재실행  
+4. **Track D1 병행 작업** — `openarm_limit_axis_audit.py` read-only 재실행  
    - 위치: syhlabtop (a6000 에서는 실행 불가)  
    - 모션 없음, CAN 읽기만
 
-5. **Track D3** — base 카메라 alignment 확인  
+5. **Track D3 병행 작업** — base 카메라 alignment 확인  
    - 위치: syhlabtop  
    - 도구: `syhlabtop_live_policy_input_viewer.py` + a6000 측 `full_folding_visual_refs_manifest` 비교
 
@@ -125,7 +125,8 @@ checkpoint selection 만으로는 deploy 후보 확보 불가. **underfit 가설
 - **(i) torch 2.7.x + 호환 cuDNN 새 venv**
 
 현재 상태:
-- D-8 추가 재학습 2개 병렬 작업 진행 중.
+- D-8 추가 재학습 진행/산출물 대기.
+- "병행 작업"은 syhlabtop Track D1/D3 쪽 작업을 뜻한다.
 - 세부 run path, checkpoint 목록, gate 결과는 A6000 산출물 수신 후 기록.
 
 산출물 커밋: `33ee0da4 docs: record cudnn environment review`
