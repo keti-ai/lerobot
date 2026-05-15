@@ -176,3 +176,6 @@ outputs/
 *.urdf
 *.xml
 *.part
+
+# Embedded git repo — open-arms-mini submodule
+audits/openarm_printing/open_arms_mini/source/open-arms-mini

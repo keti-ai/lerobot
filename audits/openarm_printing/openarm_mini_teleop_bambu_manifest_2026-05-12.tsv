@@ -1,0 +1,19 @@
+stage	category	file_id	source_path	local_filename	qty	printer	material_first_pass	process	first_action	status
+download	leader_end_effector	10EDD5XNu0QdHVIMmumbt6R882Hs82X5v	STL (3d print)/Leader Gripper/rail-connector-leader.STL	rail-connector-leader.STL	2	X1C	PETG HF	0.20mm Strength	download	pending
+download	leader_end_effector	1BpTIdL0EQdFl7Z4v3ffXGvK-CYVKhezS	STL (3d print)/Leader Gripper/swivel-rotor-leader.STL	swivel-rotor-leader.STL	2	X1C	PETG HF	0.20mm Strength	download	pending
+download	leader_end_effector	1pnHrikiqHXQAuJV-KQFmUnzFFUein0u5	STL (3d print)/Leader Gripper/swivel-link-leader.STL	swivel-link-leader.STL	4	P1S	PETG HF	0.16mm High Quality	download	pending
+download	leader_end_effector	19ltIE6GRpUSWRkIImFYyxxyPNpmF4bad	STL (3d print)/Leader Gripper/right-pincer.STL	right-pincer.STL	2	P1S	PETG HF	0.16mm High Quality	download	pending
+download	leader_end_effector	1nlYKTa1Ve5pKBrYOZAONBrU8sY6UyI7T	STL (3d print)/Leader Gripper/left-pincer.STL	left-pincer.STL	2	P1S	PETG HF	0.16mm High Quality	download	pending
+download	leader_casing	10OUOs_jl5icPILMO9u3nrrinKMUUcxCG	STL (3d print)/Casing/J4-J5_Cover_Leader_B.STL	J4-J5_Cover_Leader_B.STL	1	P1S	PETG HF	0.20mm Standard	download	pending
+download	casing	1vbfS7azniD0Erj6OoREKD_M_wX5QdMYK	STL (3d print)/Casing/J4-J5_Cover_A.STL	J4-J5_Cover_A.STL	1	P1S	PETG HF	0.20mm Standard	download	pending
+download	casing	1iem4jWxsf7qIEmcLYzaC5Sg5J5URBOF0	STL (3d print)/Casing/J3-J4_Cover_A.STL	J3-J4_Cover_A.STL	1	P1S	PETG HF	0.20mm Standard	download	pending
+download	casing	1bpj-NXjFDyy1-rMycxgpD2ntMxa4Xy8L	STL (3d print)/Casing/J3-J4_Cover_B.STL	J3-J4_Cover_B.STL	1	P1S	PETG HF	0.20mm Standard	download	pending
+download	casing	1OW2keFf78TQAzcgLxH8GNlSjMyemtDpn	STL (3d print)/Casing/J2-J3_Cover_A.STL	J2-J3_Cover_A.STL	1	P1S	PETG HF	0.20mm Standard	download	pending
+download	casing	14vbyMyfCmLuesWB6DsE2MxS9egutTFlU	STL (3d print)/Casing/J2-J3_Cover_B.STL	J2-J3_Cover_B.STL	1	P1S	PETG HF	0.20mm Standard	download	pending
+download	casing	1OWFS2xlXekDspvAmo5oNYHLKb4w83bSh	STL (3d print)/Casing/J1-J2_Cover_A.STL	J1-J2_Cover_A.STL	1	P1S	PETG HF	0.20mm Standard	download	pending
+download	casing	1aQmKvoOX_CIdrEJNRRUaSg7opJ1o_C7y	STL (3d print)/Casing/J1-J2_Cover_B.STL	J1-J2_Cover_B.STL	1	P1S	PETG HF	0.20mm Standard	download	pending
+local	custom_mod	local	/home/syhlabtop/openarm_folding_20260511/hardware_modifications/J3-J4_Cover_front_extended.stl	J3-J4_Cover_front_extended.stl	1	P1S	PETG HF	0.20mm Standard	only_if_extended_J4_needed	available
+local	custom_mod	local	/home/syhlabtop/openarm_folding_20260511/hardware_modifications/J3-J4_Cover_back_extended.stl	J3-J4_Cover_back_extended.stl	1	P1S	PETG HF	0.20mm Standard	only_if_extended_J4_needed	available
+local	custom_mod	local	/home/syhlabtop/openarm_folding_20260511/hardware_modifications/jaw_normal.stl	jaw_normal.stl	2	P1S	PETG HF	0.16mm High Quality	only_if_custom_gripper_needed	available
+local	custom_mod	local	/home/syhlabtop/openarm_folding_20260511/hardware_modifications/head_camera_holder_v4.stl	head_camera_holder_v4.stl	1	P1S	PETG HF	0.20mm Standard	only_if_head_camera_needed	available
+local	custom_mod	local	/home/syhlabtop/openarm_folding_20260511/hardware_modifications/arducam_holder.stl	arducam_holder.stl	1	P1S	PETG HF	0.20mm Standard	only_if_arducam_needed	available

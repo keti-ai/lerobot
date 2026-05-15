@@ -1,0 +1,22 @@
+batch,file,description,qty_pair,qty_first_arm,printer_first_pass,material,layer_height,infill,walls,priority,status
+1,J1_holder v1.stl,shoulder pan motor holder,2,1,P1S,PETG HF,0.20 mm,35%,4,holder,started_J1_hol_J7_hol_J8LR_3mf
+1,J trigger L v2.stl,left gripper trigger,1,1,P1S,PETG HF,0.20 mm,35%,4,gripper,pending_remaining_gripper_plate
+2,J1 v5.stl,shoulder pan joint,2,1,X1C,PETG HF,0.20 mm,40%,5,core_joint,started_J1_7_3mf_first_copy
+2,J2 v2.stl,shoulder lift joint,2,1,X1C,PETG HF,0.20 mm,40%,5,core_joint,started_J1_7_3mf_first_copy
+2,J3 v2.stl,shoulder roll joint,2,1,X1C,PETG HF,0.20 mm,40%,5,core_joint,started_J1_7_3mf_first_copy
+2,J4 v3.stl,elbow joint,2,1,X1C,PETG HF,0.20 mm,40%,5,core_joint,started_J1_7_3mf_first_copy
+2,J5 v4.stl,forearm rotation joint,2,1,X1C,PETG HF,0.20 mm,40%,5,core_joint,started_J1_7_3mf_first_copy
+2,J6 v6.stl,wrist flex joint,2,1,X1C,PETG HF,0.20 mm,40%,5,core_joint,started_J1_7_3mf_first_copy
+2,J7 v4.stl,wrist roll joint,2,1,X1C,PETG HF,0.20 mm,40%,5,core_joint,started_J1_7_3mf_first_copy
+2,J2_holder v1.stl,shoulder lift motor holder,2,1,P1S,PETG HF,0.20 mm,35%,4,motor_holder,started_J1_hol_J7_hol_J8LR_3mf
+2,J4_holder v1.stl,elbow motor holder,2,1,P1S,PETG HF,0.20 mm,35%,4,motor_holder,started_J1_hol_J7_hol_J8LR_3mf
+2,J7_holder v1.stl,wrist roll motor holder,2,1,P1S,PETG HF,0.20 mm,35%,4,motor_holder,started_J1_hol_J7_hol_J8LR_3mf
+3,J6 holder with strap v4.stl,wrist strap holder,2,1,X1C,PETG HF,0.20 mm,40%,5,wrist_load,pending
+3,J Handle v12.stl,main handle,2,1,X1C,PETG HF,0.20 mm,40%,5,hand_contact,pending
+3,J8 L v4.stl,left gripper claw,1,1,P1S,PETG HF,0.20 mm,35%,4,gripper,started_J1_hol_J7_hol_J8LR_3mf
+3,J8 R v10.stl,right gripper claw,1,1,P1S,PETG HF,0.20 mm,35%,4,gripper,started_J1_hol_J7_hol_J8LR_3mf
+3,J8 holder L v2.stl,left gripper holder,1,1,P1S,PETG HF,0.20 mm,35%,4,gripper,pending
+3,J8 holder R v6.stl,right gripper holder,1,1,P1S,PETG HF,0.20 mm,35%,4,gripper,pending
+3,J trigger R v2.stl,right gripper trigger,1,1,P1S,PETG HF,0.20 mm,35%,4,gripper,pending
+5,WaveShare_Mounting_Plate_SO101 v1.stl,controller mounting plate shared by pair,1,1,P1S,PETG HF,0.20 mm,30%,4,controller,pending
+5,arducam_holder v6.stl,optional Arducam camera mount,0,0,P1S,PETG HF,0.20 mm,30%,4,optional,pending

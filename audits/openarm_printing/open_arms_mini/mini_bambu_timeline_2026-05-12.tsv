@@ -1,0 +1,11 @@
+day,time_block,printer,plate,files,estimated_duration,gate_or_action,status
+1,started 16:05,X1C,J1_7.3mf,"J1/J2/J3/J4/J5/J6/J7 x1 each",from Bambu Studio,first core-joint set,started
+1,started 16:08,P1S,J1_hol_J7_hol_J8LR.3mf,"J1_holder/J2_holder/J4_holder/J7_holder x2 each; J8 L/R",from Bambu Studio,pair holders plus gripper claws,started
+1,next X1C slot,X1C,X1C-B,"J1/J2/J3/J4/J5/J6/J7 second copy",5-7h,second core-joint set,pending
+1,next P1S slot,P1S,P1S-B,"J8 holder L/R; J trigger L/R",2-3h,remaining gripper linkage,pending
+1,next X1C slot,X1C,X1C-C,"J6 holder with strap x2; J Handle x2",5-7h,pair hand-load parts,pending
+1,next P1S slot,P1S,P1S-C,"WaveShare_Mounting_Plate_SO101 x1",1-2h,controller plate,pending
+1,next P1S slot,P1S,P1S-D,"spares; optional arducam_holder",1-3h,small spares if needed,pending
+1,next available,BENCH,FINISH-1,"all printed parts",1h,remove supports and label,pending
+1,next available,BENCH,FINISH-2,"all motors and major printed parts",1-1.5h,servo dry-fit and cable path check,pending
+1,next available,BENCH,LOG,"manifest and reprint list",30m,update status,pending
