@@ -231,8 +231,10 @@ class RealSenseColorStream:
 
     def stop(self) -> None:
         if self.started:
-            self.pipeline.stop()
-            self.started = False
+            try:
+                self.pipeline.stop()
+            finally:
+                self.started = False
 
 
 class LiveCameras:
@@ -280,9 +282,14 @@ class LiveCameras:
     def read_all(self, timeout_ms: int) -> dict[str, tuple[np.ndarray, float]]:
         return {key: stream.read(timeout_ms) for key, stream in self.streams.items()}
 
-    def stop(self) -> None:
-        for stream in self.streams.values():
-            stream.stop()
+    def stop(self) -> list[str]:
+        errors: list[str] = []
+        for name, stream in self.streams.items():
+            try:
+                stream.stop()
+            except Exception as exc:
+                errors.append(f"{name}_camera_stop_failed: {exc!r}")
+        return errors
 
 
 class MotorIO:
@@ -1348,52 +1355,56 @@ def main() -> int:
     finally:
         try:
             cleanup_errors = motor_io.disconnect()
-        finally:
-            cameras.stop()
-            remaining_torque_enabled = {
-                side: sorted(motors, key=lambda motor: MOTOR_INDEX[motor])
-                for side, motors in motor_io.torque_enabled.items()
-                if motors
-            }
-            if cleanup_errors:
-                logger.write("cleanup_errors", cleanup_errors=cleanup_errors)
-                if args.execute:
-                    motion_status = "BLOCKED_FOR_REVIEW"
-            stats["chunks_accepted"] = action_queue.chunks_accepted
-            summary = {
-                "schema": "openarm_folding_live_rollout_summary_v1",
-                "timestamp": time.strftime("%Y%m%d_%H%M%S"),
-                "hostname": socket.gethostname(),
-                "trial_root": str(args.trial_root),
-                "session_root": str(session_root),
-                "selected_scope": args.selected_scope,
-                "selected_features": selected_features,
-                "excluded_features": excluded_features,
-                "execute_requested": bool(args.execute),
-                "actuator_commands_sent": actuator_commands_sent,
-                "motion_status": motion_status,
-                "stop_reason": shared.get("stop_reason") or "completed",
-                "safety_mode": "monitor_only_operator_visual_power_gate"
-                if args.safety_monitor_only
-                else "software_pause_block_enabled",
-                "software_safety_measurements_blocking": not bool(args.safety_monitor_only),
-                "startup_soft_warnings": soft_warnings,
-                "cleanup_errors": cleanup_errors,
-                "remaining_torque_enabled_motors": remaining_torque_enabled,
-                "torque_disable_complete": not cleanup_errors and not remaining_torque_enabled,
-                "stats": stats,
-                "events": str(events_path),
-                "command_path": "DamiaoMotorsBus guarded MIT batch" if actuator_commands_sent else "not_run",
-                "forbidden_paths": {
-                    "send_action": True,
-                    "lerobot_rollout_actual": True,
-                    "openarm_follower_connect_actual": True,
-                },
-            }
-            write_summary(summary_path, summary)
-            logger.write("summary", **summary)
-            logger.close()
-            print(json.dumps(summary, indent=2, sort_keys=True))
+        except Exception as exc:
+            cleanup_errors = [f"motor_disconnect_failed: {exc!r}"]
+        cleanup_errors.extend(cameras.stop())
+        remaining_torque_enabled = {
+            side: sorted(motors, key=lambda motor: MOTOR_INDEX[motor])
+            for side, motors in motor_io.torque_enabled.items()
+            if motors
+        }
+        torque_cleanup_errors = [
+            error for error in cleanup_errors if "camera_stop_failed" not in error
+        ]
+        if cleanup_errors:
+            logger.write("cleanup_errors", cleanup_errors=cleanup_errors)
+            if args.execute:
+                motion_status = "BLOCKED_FOR_REVIEW"
+        stats["chunks_accepted"] = action_queue.chunks_accepted
+        summary = {
+            "schema": "openarm_folding_live_rollout_summary_v1",
+            "timestamp": time.strftime("%Y%m%d_%H%M%S"),
+            "hostname": socket.gethostname(),
+            "trial_root": str(args.trial_root),
+            "session_root": str(session_root),
+            "selected_scope": args.selected_scope,
+            "selected_features": selected_features,
+            "excluded_features": excluded_features,
+            "execute_requested": bool(args.execute),
+            "actuator_commands_sent": actuator_commands_sent,
+            "motion_status": motion_status,
+            "stop_reason": shared.get("stop_reason") or "completed",
+            "safety_mode": "monitor_only_operator_visual_power_gate"
+            if args.safety_monitor_only
+            else "software_pause_block_enabled",
+            "software_safety_measurements_blocking": not bool(args.safety_monitor_only),
+            "startup_soft_warnings": soft_warnings,
+            "cleanup_errors": cleanup_errors,
+            "remaining_torque_enabled_motors": remaining_torque_enabled,
+            "torque_disable_complete": not torque_cleanup_errors and not remaining_torque_enabled,
+            "stats": stats,
+            "events": str(events_path),
+            "command_path": "DamiaoMotorsBus guarded MIT batch" if actuator_commands_sent else "not_run",
+            "forbidden_paths": {
+                "send_action": True,
+                "lerobot_rollout_actual": True,
+                "openarm_follower_connect_actual": True,
+            },
+        }
+        write_summary(summary_path, summary)
+        logger.write("summary", **summary)
+        logger.close()
+        print(json.dumps(summary, indent=2, sort_keys=True))
     return exit_code
 
 
