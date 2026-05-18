@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-18 (Track A RTC ON 두 번째 120s 완주 + repeat 카메라 케이블 탈락 기록)
+**마지막 갱신:** 2026-05-18 (Track A RTC ON repeat3 120s 완주 + 보조 RealSense 녹화 적용)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -9,7 +9,7 @@
 
 | Track | 상태 | 다음 행동 |
 |---|---|---|
-| **A** — syhlabtop level2 라이브 롤아웃 | **첫 120s closed-loop PASS, 두 번째 RTC ON 120s 완주** | right wrist 카메라 cable slack/strain relief 후 repeat |
+| **A** — syhlabtop level2 라이브 롤아웃 | **첫 120s closed-loop PASS, RTC ON repeat3 120s 완주** | repeat3 보조 AVI/eval frames operator 리뷰 후 RTC 튜닝 여부 결정 |
 | **B** — full_folding 재학습 | **D-8a relaware COMPLETE — no deploy candidate** | D-8b fold-only 또는 추가 step 여부 결정 |
 | **C** — full_folding ckpt 002000/003000 replay 비교 | **COMPLETE** | ckpt 002000/003000/004000 모두 replay FAIL → deploy 후보 없음 |
 | **D** — 축 probe + base 카메라 정렬 | read-only 결과 보존, 단일 조인트 probe/side-by-side 후속 폐기 | closed-loop 긴 타임시퀀스 평가로 전환 |
@@ -69,7 +69,7 @@
    - 생성된 001000~012000 checkpoint는 current gate 기준 recipe FAIL이었으나 relaware gate 기준 recipe PASS로 복구.
    - relaware replay는 001000~012000 모두 FAIL. deploy 후보 없음.
 
-6. **RESOLVED — A6000 serving 복구 + Track A RTC ON 두 번째 closed-loop 완주**
+6. **RESOLVED — A6000 serving 복구 + Track A RTC ON repeat3 closed-loop 완주**
    - `http://10.252.205.103:8766/health`, `http://10.252.205.103:8765/health` 모두 OK
    - 8766 live: level2 corrected 004000, `send_allowed=false`, `motion_allowed=false`
    - 8766 RTC: `rtc_enabled=true`, `rtc_execution_horizon=20`, `rtc_max_guidance_weight=10.0`, `rtc_prefix_attention_schedule=EXP`, `use_relative_actions=true`
@@ -90,6 +90,11 @@
    - repeat 중단: `actions_executed=1118`, `chunks_accepted=19`, 약 `42.400s` 진행 후 right wrist camera read 실패
    - 사용자/operator 원인 확인: 오른팔이 기둥 쪽으로 가면서 right wrist 카메라 케이블이 물리적으로 빠짐
    - repeat 부분 실행 문서: `audits/openarm_folding/trackA_rtc_on_repeat_partial_20260518_184402.md`
+   - 보조 RealSense 녹화 recipe commit: `78d979ad`
+   - repeat3 trial: `/home/syhlabtop/openarm_folding_20260512/rollout_trial_20260518_185509_rtc_on_repeat3/`
+   - repeat3 결과: `stop_reason=max_session_duration_s`, `actions_executed=3031`, `chunks_accepted=142`, `torque_disable_complete=true`, `cleanup_errors=[]`
+   - repeat3 보조 녹화: `/home/syhlabtop/workspace/realsense_live/recordings/rollout_trial_20260518_185509_rtc_on_repeat3.avi`, `128.386s`, `3821` frames
+   - repeat3 문서: `audits/openarm_folding/trackA_rtc_on_repeat3_20260518_185509.md`
 
 7. **a6000(ketiserver) 측 워크트리 동기화 부재 — 참고만**
    - a6000 Codex 세션이 본 워크트리에는 audits/openarm_folding/ 의 현역 md/py 일부가 untracked/누락 상태였음
@@ -100,9 +105,9 @@
 
 ## 다음 N개 작업 (우선순위 순)
 
-1. **Track A cable slack/strain relief 후 repeat**
-   - right wrist 카메라 케이블을 재체결하고, 오른팔이 기둥 쪽으로 갈 때 당겨지지 않도록 cable slack/strain relief 를 만든다.
-   - 같은 trial 은 재사용하지 않고 새 trial/envelope/approval phrase 로 재시도한다.
+1. **Track A repeat3 operator 리뷰**
+   - 보조 AVI 와 eval frames 를 함께 보고 chunk lip, fold 진행도, 카메라/케이블 안정성을 판정한다.
+   - 리뷰 결과를 기준으로 RTC tuning 필요 여부를 결정한다.
 
 2. **Track B 다음 방향 결정**
    - D-8a relaware 결과도 no-candidate.
@@ -194,6 +199,28 @@ inference_error: right_wrist read failed after wait_for_frames cannot be called 
 카메라 케이블이 물리적으로 빠진 것이다. 이 실행은 cleanup 중 camera stop 예외가
 execute summary 기록을 막았고, 후속 커밋 `5af32b7a` 로 camera cleanup 예외가 있어도
 summary 를 남기도록 수정했다.
+
+---
+
+## Track A RTC ON repeat3 120s 실행 결과 (syhlabtop 세션, 2026-05-18)
+
+```text
+trial: /home/syhlabtop/openarm_folding_20260512/rollout_trial_20260518_185509_rtc_on_repeat3/
+report: audits/openarm_folding/trackA_rtc_on_repeat3_20260518_185509.md
+realsense_wrapper_commit: 78d979ad
+stop_reason: max_session_duration_s
+actions_executed: 3031
+chunks_accepted: 142
+torque_disable_complete: true
+cleanup_errors: []
+aux_recording: /home/syhlabtop/workspace/realsense_live/recordings/rollout_trial_20260518_185509_rtc_on_repeat3.avi
+```
+
+판정: RTC ON repeat3 는 120초 closed-loop 를 완주했다. 보조 `../realsense_live`
+D415 녹화도 rollout 앞뒤 wrapper 로 정상 기록됐고, `128.386s`, `3821` frames,
+`141,974,578 bytes` 로 stop 완료했다. chunk 직후 scalar jerk proxy 는 RTC OFF 대비
+낮고 RTC ON second 대비도 소폭 낮다. 다만 joint4/joint_limit saturation 은 증가했으므로
+operator 시각 리뷰와 함께 판단한다.
 
 ---
 
