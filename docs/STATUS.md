@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-18 (Track A 첫 closed-loop 120s 완주 + A6000 RTC health 노출)
+**마지막 갱신:** 2026-05-18 (Track A 첫 closed-loop 120s 완주 + A6000 RTC health 노출 + D-8a relaware 재판정)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -10,7 +10,7 @@
 | Track | 상태 | 다음 행동 |
 |---|---|---|
 | **A** — syhlabtop level2 라이브 롤아웃 | **첫 120s closed-loop 완주** | 실행 로그/시각 결과 기반 다음 파라미터 조정 |
-| **B** — full_folding 재학습 | **D-10c COMPLETE — gate false-negative** | D-8a 001000~012000 relstats-aware gate/replay 재판정 |
+| **B** — full_folding 재학습 | **D-8a relaware COMPLETE — no deploy candidate** | D-8b fold-only 또는 추가 step 여부 결정 |
 | **C** — full_folding ckpt 002000/003000 replay 비교 | **COMPLETE** | ckpt 002000/003000/004000 모두 replay FAIL → deploy 후보 없음 |
 | **D** — 축 probe + base 카메라 정렬 | read-only 결과 보존, 단일 조인트 probe/side-by-side 후속 폐기 | closed-loop 긴 타임시퀀스 평가로 전환 |
 
@@ -26,9 +26,11 @@
    - 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/full_folding_dataset_replay_{002000,003000}.{md,json}`
    - D-8a config: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/d8a_full_folding_continue_003000_torch27_pyav_config_20260515.json`
    - D-8a command: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/d8a_full_folding_continue_003000_torch27_pyav_command_20260515.md`
-   - D-8a current gate: `001000`~`012000` 모두 recipe FAIL, replay SKIPPED. D-10c에서 false-negative 가능성이 높다고 판정.
+   - D-8a current gate: `001000`~`012000` 모두 recipe FAIL, replay SKIPPED. D-10c에서 false-negative로 판정.
+   - D-8a relstats-aware 재판정: `001000`~`012000` 모두 recipe PASS, replay FAIL. ratio 0.125–0.468, arm raw max err 0.361–0.513. deploy 후보 없음.
    - D-10c 결론: full_folding 003000과 D-8a 012000의 postprocessor stats diff는 0.0. RABC는 `sample_weighting` 에 기록되어 있다. current `stage29/stage22` gate가 relstats-aware contract와 맞지 않는다.
    - D-8a summary: `audits/openarm_folding/a6000_d8a_gate_summary.md`, `audits/openarm_folding/a6000_d8a_no_candidate.md`
+   - D-8a relaware summary: `audits/openarm_folding/a6000_d8a_gate_summary_relaware.md`, `audits/openarm_folding/a6000_d8a_no_candidate_relaware.md`
    - D-10c diagnosis: `audits/openarm_folding/a6000_d10c_postprocessor_rabc_diagnosis_20260518.md`
 
 2. **base 카메라 FOV/scale 미스매치 — side-by-side 후속 폐기**
@@ -64,7 +66,8 @@
    - D-8a 최신 상태 파일: `audits/openarm_folding/a6000_d8a_status.md`
    - 현재 상태: 012000 checkpoint까지 저장 후 step 12120 부근에서 `FrameTimestampError` 로 종료.
    - 실패 파일: `videos/observation.images.right_wrist/chunk-000/file-557.mp4`, queried timestamp 1352.2334 vs loaded 1352.2333 근방, tolerance 0.0001 초과.
-   - 생성된 001000~012000 checkpoint는 recipe gate 모두 FAIL. replay는 실행하지 않았다. deploy 후보 없음.
+   - 생성된 001000~012000 checkpoint는 current gate 기준 recipe FAIL이었으나 relaware gate 기준 recipe PASS로 복구.
+   - relaware replay는 001000~012000 모두 FAIL. deploy 후보 없음.
 
 6. **RESOLVED — A6000 serving 복구 + Track A 첫 closed-loop 완주**
    - `http://10.252.205.103:8766/health`, `http://10.252.205.103:8765/health` 모두 OK
@@ -92,15 +95,16 @@
    - 입력: `/home/syhlabtop/openarm_folding_20260512/rollout_trial_20260518_131245_level2_messy_shirt_retry_no_readback_fix/live_session/events.ndjson`
    - 목표: joint_limit/gripper saturation 이 높은 원인을 feature 별로 나눠 다음 파라미터 조정을 정한다.
 
-2. **D-8a relstats-aware gate/replay 재판정**
-   - current `stage29/stage22` gate 결과를 deploy 판정에 쓰지 않는다.
-   - D-8a `001000`~`012000` 을 relstats-aware recipe/replay gate로 다시 판정한다.
+2. **Track B 다음 방향 결정**
+   - D-8a relaware 결과도 no-candidate.
+   - D-8b fold-only subset 재학습 또는 D-8a 추가 step 중 하나를 사용자 결정으로 선택한다.
 
 3. **Track A 두 번째 120s 실행 준비**
    - 같은 120s/180chunk 설정을 기본값으로 유지한다.
    - scene 초기조건과 shirt 중심 위치를 더 일관되게 맞춘 뒤 새 envelope 를 생성한다.
 
-4. **재판정 후 D-8a 재시도 또는 D-8b 결정**
+4. **full_folding gate 산출물 기준 정리**
+   - D-8a relaware 결과를 README/PLAN 의 다음 결정 항목과 일치시킨다.
 
 ---
 

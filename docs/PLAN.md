@@ -172,9 +172,9 @@ P3 (Track D 통과 후):
 | **D-5** | Track A 라이브 롤아웃 실행 일정 | Track D 통과 후. operator 입회 필요. |
 | **D-6** | base 카메라 정렬 우선순위 | (a) 물리 raise/tilt 우선 vs (b) runtime preprocessing transform 우선. 후자는 `vision_preprocess_id` 로 contract 등록 필요. |
 | **D-7** | left_joint_{4,5,6,7} + 양 gripper 물리 축 probe 실행 여부 | `limit_axis_physical_check_plan_2026-05-14.md` 의 `+1deg/-1deg` 시퀀스. operator 입회 필요. |
-| **D-8** | full_folding 002000/003000/004000 모두 replay FAIL — 추가 재학습 | D-8a 003000 continuation 은 012000까지 저장 후 step 12120 부근 `FrameTimestampError` 로 종료. 생성 checkpoint `001000`~`012000` current gate는 recipe FAIL/replay SKIPPED였으나, D-10c에서 gate false-negative로 판정. relstats-aware gate/replay 재판정 필요. |
+| **D-8** | full_folding 002000/003000/004000 모두 replay FAIL — 추가 재학습 | D-8a 003000 continuation 은 012000까지 저장 후 step 12120 부근 `FrameTimestampError` 로 종료. 생성 checkpoint `001000`~`012000` current gate는 recipe FAIL/replay SKIPPED였으나 D-10c에서 gate false-negative로 판정. relstats-aware 재판정 결과는 recipe PASS / replay FAIL 전부 no-candidate. 다음은 D-8b fold-only 또는 D-8a 추가 step 결정. |
 | **D-9** | A6000 cuDNN 환경 — Conv2d 가 `CUDNN_STATUS_NOT_INITIALIZED` 실패 | 사용자 결정: option (i) torch 2.7.x + 호환 cuDNN 새 venv. 새 venv smoke PASS: torch `2.7.1+cu126`, cuDNN `90501`, Conv2d PASS, 1-step train smoke PASS with pyav. torchcodec backend FAIL. 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/audits/d9_torch27_train_smoke_20260515.{md,json}` |
-| **D-10** | D-8a no-candidate 이후 다음 방향 | **case γ 완료**: checkpoint/config 결함보다 current gate/진단 코드가 relstats-aware contract를 반영하지 못한 false-negative. 다음은 D-8a `001000`~`012000` relstats-aware recipe/replay 재판정. |
+| **D-10** | D-8a no-candidate 이후 다음 방향 | **case γ 완료**: current gate/진단 코드는 relstats-aware contract를 반영하지 못한 false-negative였다. relaware gate 재작성 뒤 D-8a `001000`~`012000`은 recipe PASS로 복구됐지만 replay는 전부 FAIL. deploy 후보 없음. |
 
 ---
 
