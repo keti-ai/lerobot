@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-18 (D-10c 완료, serving 복구)
+**마지막 갱신:** 2026-05-18 (Track A 첫 closed-loop 120s 완주)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -9,7 +9,7 @@
 
 | Track | 상태 | 다음 행동 |
 |---|---|---|
-| **A** — syhlabtop level2 라이브 롤아웃 | 120s closed-loop 인프라 준비 완료, A6000 8766/8765 serving 복구됨 | envelope 재생성, 이후 operator 입회 실행 |
+| **A** — syhlabtop level2 라이브 롤아웃 | **첫 120s closed-loop 완주** | 실행 로그/시각 결과 기반 다음 파라미터 조정 |
 | **B** — full_folding 재학습 | **D-10c COMPLETE — gate false-negative** | D-8a 001000~012000 relstats-aware gate/replay 재판정 |
 | **C** — full_folding ckpt 002000/003000 replay 비교 | **COMPLETE** | ckpt 002000/003000/004000 모두 replay FAIL → deploy 후보 없음 |
 | **D** — 축 probe + base 카메라 정렬 | read-only 결과 보존, 단일 조인트 probe/side-by-side 후속 폐기 | closed-loop 긴 타임시퀀스 평가로 전환 |
@@ -66,15 +66,16 @@
    - 실패 파일: `videos/observation.images.right_wrist/chunk-000/file-557.mp4`, queried timestamp 1352.2334 vs loaded 1352.2333 근방, tolerance 0.0001 초과.
    - 생성된 001000~012000 checkpoint는 recipe gate 모두 FAIL. replay는 실행하지 않았다. deploy 후보 없음.
 
-6. **RESOLVED — A6000 serving 복구**
+6. **RESOLVED — A6000 serving 복구 + Track A 첫 closed-loop 완주**
    - `http://10.252.205.103:8766/health`, `http://10.252.205.103:8765/health` 모두 OK
    - 8766 live: level2 corrected 004000, `send_allowed=false`, `motion_allowed=false`
    - 8765 snapshot: level2 corrected 004000, `send_allowed=false`, `motion_allowed=false`
    - 산출물: `audits/openarm_folding/a6000_serving_restored_20260518.md`
-   - dry-run trial: `/home/syhlabtop/openarm_folding_20260512/rollout_trial_20260515_164553_closed_loop_dryrun/`
-   - summary: `live_session/summary.json`
-   - 결과: `execute_requested=false`, `actuator_commands_sent=false`, `command_path=not_run`, `chunks_accepted=0`, `torque_disable_complete=true`
-   - `session_envelope.{json,md}` 는 health metadata 가 없어 생성되지 않음. serving 복구 후 같은 120s/180chunk 인자로 재생성 필요.
+   - 첫 성공 trial: `/home/syhlabtop/openarm_folding_20260512/rollout_trial_20260518_131245_level2_messy_shirt_retry_no_readback_fix/`
+   - 결과: `stop_reason=max_session_duration_s`, `actions_executed=2992`, `chunks_accepted=149`, `torque_disable_complete=true`, `cleanup_errors=[]`
+   - 이벤트: `hard_block=0`, proposal validation warning `0`
+   - saturations: clipped `805`, gripper `648`, joint4 `0`, joint_limit `3049`
+   - 결과 문서: `audits/openarm_folding/trackA_first_closed_loop_run_20260518_131627.md`
 
 7. **a6000(ketiserver) 측 워크트리 동기화 부재 — 참고만**
    - a6000 Codex 세션이 본 워크트리에는 audits/openarm_folding/ 의 현역 md/py 일부가 untracked/누락 상태였음
@@ -85,16 +86,17 @@
 
 ## 다음 N개 작업 (우선순위 순)
 
-1. **operator 입회 일정 잡기 — Track A closed-loop 120s 첫 실행**
-   - 실행 직전 A6000 serving health 확인 후 120s/180chunk draft envelope 를 재생성한다.
-   - `--execute` 는 operator 입회, power abort, approval phrase 확인 후 별도 세션에서만 실행한다.
+1. **Track A 실행 로그 분석 — saturation 상위 feature/구간 집계**
+   - 입력: `/home/syhlabtop/openarm_folding_20260512/rollout_trial_20260518_131245_level2_messy_shirt_retry_no_readback_fix/live_session/events.ndjson`
+   - 목표: joint_limit/gripper saturation 이 높은 원인을 feature 별로 나눠 다음 파라미터 조정을 정한다.
 
 2. **D-8a relstats-aware gate/replay 재판정**
    - current `stage29/stage22` gate 결과를 deploy 판정에 쓰지 않는다.
    - D-8a `001000`~`012000` 을 relstats-aware recipe/replay gate로 다시 판정한다.
 
-3. **Track A draft envelope 재생성**
-   - A6000 8766 `/health` 복구 상태에서 120s/180chunk draft envelope 를 재생성한다.
+3. **Track A 두 번째 120s 실행 준비**
+   - 같은 120s/180chunk 설정을 기본값으로 유지한다.
+   - scene 초기조건과 shirt 중심 위치를 더 일관되게 맞춘 뒤 새 envelope 를 생성한다.
 
 4. **재판정 후 D-8a 재시도 또는 D-8b 결정**
 
@@ -114,6 +116,25 @@ dry_run_trial: /home/syhlabtop/openarm_folding_20260512/rollout_trial_20260515_1
 판정: 코드/템플릿 인프라는 준비됐다. A6000 serving 이 내려가 있어 health 기반
 `session_envelope.{json,md}` 는 아직 생성되지 않았다. dry-run summary 는 모션 없이
 생성됐고 actuator command 는 없었다.
+
+---
+
+## Track A 첫 closed-loop 120s 실행 결과 (syhlabtop 세션, 2026-05-18)
+
+```text
+trial: /home/syhlabtop/openarm_folding_20260512/rollout_trial_20260518_131245_level2_messy_shirt_retry_no_readback_fix/
+report: audits/openarm_folding/trackA_first_closed_loop_run_20260518_131627.md
+rollout_fix_commit: 20ec9a05
+stop_reason: max_session_duration_s
+actions_executed: 2992
+chunks_accepted: 149
+torque_disable_complete: true
+cleanup_errors: []
+```
+
+판정: 첫 120초 closed-loop 는 runtime 막힘 없이 완주했다. eval frame 5개 샘플 중
+시작 이후 4개 샘플에서 양팔 접근/접촉과 셔츠 형태 변화가 보인다. 완성 fold 는
+아니며, 다음 작업은 saturation feature 분석과 scene 초기조건 개선이다.
 
 ---
 
