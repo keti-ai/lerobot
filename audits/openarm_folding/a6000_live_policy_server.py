@@ -17,7 +17,9 @@ import torch
 from PIL import Image
 
 from lerobot.configs import PreTrainedConfig
+from lerobot.configs.types import RTCAttentionSchedule
 from lerobot.policies import get_policy_class, make_pre_post_processors
+from lerobot.policies.rtc import RTCConfig
 from lerobot.policies.rtc.relative import reanchor_relative_rtc_prefix
 from lerobot.policies.utils import prepare_observation_for_inference
 from lerobot.processor import NormalizerProcessorStep, RelativeActionsProcessorStep
@@ -46,6 +48,9 @@ IMAGE_KEYS = ["left_wrist", "right_wrist", "base"]
 ROBOT_CONFIG_ID = "openarms_follower:16d:3cam:v1"
 ACTION_SPACE_VERSION = "openarm_folding_abs_16d_deg_v1"
 ACTION_UNITS = "degrees"
+DEFAULT_RTC_EXECUTION_HORIZON = 20
+DEFAULT_RTC_MAX_GUIDANCE_WEIGHT = 10.0
+DEFAULT_RTC_PREFIX_ATTENTION_SCHEDULE = RTCAttentionSchedule.EXP
 LIMITS = {
     "right_joint_1.pos": (-75.0, 75.0),
     "right_joint_2.pos": (-9.0, 90.0),
@@ -135,6 +140,47 @@ def find_step(pipeline: Any, cls: type) -> Any | None:
     return None
 
 
+def rtc_schedule_name(value: Any) -> str | None:
+    if value is None:
+        return None
+    return getattr(value, "value", str(value))
+
+
+def ensure_rtc_config(cfg: PreTrainedConfig) -> RTCConfig:
+    existing = getattr(cfg, "rtc_config", None)
+    if isinstance(existing, RTCConfig):
+        existing.enabled = True
+        if existing.execution_horizon is None:
+            existing.execution_horizon = DEFAULT_RTC_EXECUTION_HORIZON
+        if existing.max_guidance_weight is None:
+            existing.max_guidance_weight = DEFAULT_RTC_MAX_GUIDANCE_WEIGHT
+        if existing.prefix_attention_schedule is None:
+            existing.prefix_attention_schedule = DEFAULT_RTC_PREFIX_ATTENTION_SCHEDULE
+        return existing
+    if isinstance(existing, dict):
+        schedule = existing.get("prefix_attention_schedule") or DEFAULT_RTC_PREFIX_ATTENTION_SCHEDULE
+        if not isinstance(schedule, RTCAttentionSchedule):
+            schedule = RTCAttentionSchedule(str(schedule))
+        rtc_config = RTCConfig(
+            enabled=True,
+            execution_horizon=int(existing.get("execution_horizon") or DEFAULT_RTC_EXECUTION_HORIZON),
+            max_guidance_weight=float(
+                existing.get("max_guidance_weight") or DEFAULT_RTC_MAX_GUIDANCE_WEIGHT
+            ),
+            prefix_attention_schedule=schedule,
+        )
+        cfg.rtc_config = rtc_config
+        return rtc_config
+    rtc_config = RTCConfig(
+        enabled=True,
+        execution_horizon=DEFAULT_RTC_EXECUTION_HORIZON,
+        max_guidance_weight=DEFAULT_RTC_MAX_GUIDANCE_WEIGHT,
+        prefix_attention_schedule=DEFAULT_RTC_PREFIX_ATTENTION_SCHEDULE,
+    )
+    cfg.rtc_config = rtc_config
+    return rtc_config
+
+
 class LivePolicyService:
     def __init__(self, *, model_dir: Path, device: str) -> None:
         self.model_dir = model_dir.resolve()
@@ -143,6 +189,8 @@ class LivePolicyService:
         cfg.device = device
         if hasattr(cfg, "compile_model"):
             cfg.compile_model = False
+        self.rtc_config = ensure_rtc_config(cfg)
+        self.use_relative_actions = bool(getattr(cfg, "use_relative_actions", False))
 
         policy_cls = get_policy_class(cfg.type)
         self.preprocessor, self.postprocessor = make_pre_post_processors(
@@ -158,6 +206,28 @@ class LivePolicyService:
         self.action_normalization_id = self._action_normalization_id()
         self.relative_step = find_step(self.preprocessor, RelativeActionsProcessorStep)
         self.normalizer_step = find_step(self.preprocessor, NormalizerProcessorStep)
+        print(
+            "[RTC] enabled="
+            f"{str(self.rtc_enabled).lower()} horizon={self.rtc_execution_horizon} "
+            f"max_guidance={self.rtc_max_guidance_weight} schedule={self.rtc_prefix_attention_schedule}",
+            flush=True,
+        )
+
+    @property
+    def rtc_enabled(self) -> bool:
+        return bool(self.rtc_config is not None and self.rtc_config.enabled)
+
+    @property
+    def rtc_execution_horizon(self) -> int | None:
+        return None if self.rtc_config is None else int(self.rtc_config.execution_horizon)
+
+    @property
+    def rtc_max_guidance_weight(self) -> float | None:
+        return None if self.rtc_config is None else float(self.rtc_config.max_guidance_weight)
+
+    @property
+    def rtc_prefix_attention_schedule(self) -> str | None:
+        return None if self.rtc_config is None else rtc_schedule_name(self.rtc_config.prefix_attention_schedule)
 
     def _checkpoint_id(self) -> str:
         if self.model_dir.name == "pretrained_model":
@@ -221,8 +291,11 @@ class LivePolicyService:
         if prev_leftover is not None:
             rtc_kwargs["prev_chunk_left_over"] = prev_leftover
             rtc_kwargs["inference_delay"] = int(request.get("inference_delay_steps", 0))
-            if request.get("execution_horizon") is not None:
-                rtc_kwargs["execution_horizon"] = int(request["execution_horizon"])
+            rtc_kwargs["execution_horizon"] = (
+                int(request["execution_horizon"])
+                if request.get("execution_horizon") is not None
+                else self.rtc_execution_horizon
+            )
 
         started = time.time()
         # RTC guidance temporarily enables gradients inside the denoiser, so avoid
@@ -278,9 +351,13 @@ class LivePolicyService:
             "max_abs_arm_delta_deg": max(arm_delta) if arm_delta else None,
             "rows": rows,
             "rtc": {
+                "enabled": self.rtc_enabled,
+                "execution_horizon_default": self.rtc_execution_horizon,
+                "max_guidance_weight": self.rtc_max_guidance_weight,
+                "prefix_attention_schedule": self.rtc_prefix_attention_schedule,
                 "prev_leftover_supplied": prev_leftover is not None,
                 "inference_delay_steps": int(request.get("inference_delay_steps", 0)),
-                "execution_horizon": request.get("execution_horizon"),
+                "execution_horizon": rtc_kwargs.get("execution_horizon"),
             },
             "send_allowed": False,
             "motion_allowed": False,
@@ -317,6 +394,11 @@ def make_handler(service: LivePolicyService):
                     "checkpoint_id": service.checkpoint_id,
                     "robot_config_id": ROBOT_CONFIG_ID,
                     "action_normalization_id": service.action_normalization_id,
+                    "rtc_enabled": service.rtc_enabled,
+                    "rtc_execution_horizon": service.rtc_execution_horizon,
+                    "rtc_max_guidance_weight": service.rtc_max_guidance_weight,
+                    "rtc_prefix_attention_schedule": service.rtc_prefix_attention_schedule,
+                    "use_relative_actions": service.use_relative_actions,
                     "action_space_version": ACTION_SPACE_VERSION,
                     "joint_order": ACTION_NAMES,
                     "action_units": ACTION_UNITS,
@@ -376,6 +458,11 @@ def main() -> int:
                 "model_id": service.model_id,
                 "checkpoint_id": service.checkpoint_id,
                 "device": service.device,
+                "rtc_enabled": service.rtc_enabled,
+                "rtc_execution_horizon": service.rtc_execution_horizon,
+                "rtc_max_guidance_weight": service.rtc_max_guidance_weight,
+                "rtc_prefix_attention_schedule": service.rtc_prefix_attention_schedule,
+                "use_relative_actions": service.use_relative_actions,
                 "send_allowed": False,
                 "motion_allowed": False,
             },

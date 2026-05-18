@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-18 (Track A 첫 closed-loop 120s 완주)
+**마지막 갱신:** 2026-05-18 (Track A 첫 closed-loop 120s 완주 + A6000 RTC health 노출)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -69,8 +69,10 @@
 6. **RESOLVED — A6000 serving 복구 + Track A 첫 closed-loop 완주**
    - `http://10.252.205.103:8766/health`, `http://10.252.205.103:8765/health` 모두 OK
    - 8766 live: level2 corrected 004000, `send_allowed=false`, `motion_allowed=false`
+   - 8766 RTC: `rtc_enabled=true`, `rtc_execution_horizon=20`, `rtc_max_guidance_weight=10.0`, `rtc_prefix_attention_schedule=EXP`, `use_relative_actions=true`
    - 8765 snapshot: level2 corrected 004000, `send_allowed=false`, `motion_allowed=false`
    - 산출물: `audits/openarm_folding/a6000_serving_restored_20260518.md`
+   - RTC 산출물: `audits/openarm_folding/a6000_rtc_status_20260518.md`
    - 첫 성공 trial: `/home/syhlabtop/openarm_folding_20260512/rollout_trial_20260518_131245_level2_messy_shirt_retry_no_readback_fix/`
    - 결과: `stop_reason=max_session_duration_s`, `actions_executed=2992`, `chunks_accepted=149`, `torque_disable_complete=true`, `cleanup_errors=[]`
    - 이벤트: `hard_block=0`, proposal validation warning `0`
