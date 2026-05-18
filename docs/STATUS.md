@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-18 (Track A RTC ON repeat3 120s 완주 + 보조 RealSense 녹화 적용)
+**마지막 갱신:** 2026-05-18 (Track A RTC ON repeat3 operator 리뷰 반영)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -9,7 +9,7 @@
 
 | Track | 상태 | 다음 행동 |
 |---|---|---|
-| **A** — syhlabtop level2 라이브 롤아웃 | **첫 120s closed-loop PASS, RTC ON repeat3 120s 완주** | repeat3 보조 AVI/eval frames operator 리뷰 후 RTC 튜닝 여부 결정 |
+| **A** — syhlabtop level2 라이브 롤아웃 | **runtime 120s PASS, task success 미달** | pi0.5 folding trick 분석 + chunk/HZ 최적점 설계 |
 | **B** — full_folding 재학습 | **D-8a relaware COMPLETE — no deploy candidate** | D-8b fold-only 또는 추가 step 여부 결정 |
 | **C** — full_folding ckpt 002000/003000 replay 비교 | **COMPLETE** | ckpt 002000/003000/004000 모두 replay FAIL → deploy 후보 없음 |
 | **D** — 축 probe + base 카메라 정렬 | read-only 결과 보존, 단일 조인트 probe/side-by-side 후속 폐기 | closed-loop 긴 타임시퀀스 평가로 전환 |
@@ -95,6 +95,9 @@
    - repeat3 결과: `stop_reason=max_session_duration_s`, `actions_executed=3031`, `chunks_accepted=142`, `torque_disable_complete=true`, `cleanup_errors=[]`
    - repeat3 보조 녹화: `/home/syhlabtop/workspace/realsense_live/recordings/rollout_trial_20260518_185509_rtc_on_repeat3.avi`, `128.386s`, `3821` frames
    - repeat3 문서: `audits/openarm_folding/trackA_rtc_on_repeat3_20260518_185509.md`
+   - operator 리뷰: tabletop folding 태스크를 시도하는 방향성은 보이나, 옷을 안정적으로 집지 못했고 fold 성공으로 보기는 어렵다.
+   - operator 리뷰: 끊김은 아직 남아 있고 chunk 사이 transition 이 시각적으로 보인다. chunk size/HZ/execution cadence 최적점 탐색이 필요하다.
+   - operator 리뷰: 기본 pi0.5 대비 folding demo/robot execution 쪽에 어떤 trick 이 추가됐는지 확실히 분석해야 한다. 현재 작업 수행력과 OOD 영역이 넓어 보인다.
 
 7. **a6000(ketiserver) 측 워크트리 동기화 부재 — 참고만**
    - a6000 Codex 세션이 본 워크트리에는 audits/openarm_folding/ 의 현역 md/py 일부가 untracked/누락 상태였음
@@ -105,23 +108,25 @@
 
 ## 다음 N개 작업 (우선순위 순)
 
-1. **Track A repeat3 operator 리뷰**
-   - 보조 AVI 와 eval frames 를 함께 보고 chunk lip, fold 진행도, 카메라/케이블 안정성을 판정한다.
-   - 리뷰 결과를 기준으로 RTC tuning 필요 여부를 결정한다.
+1. **pi0.5/OpenArm folding trick 분석**
+   - 기본 pi0.5 대비 folding demo/robot execution 에 추가된 trick 을 확인한다.
+   - chunk handoff, action repeat/interpolation, receding horizon, inference cadence, camera/record timing, hold behavior 를 우선 본다.
 
-2. **Track B 다음 방향 결정**
+2. **Track A chunk/HZ 최적점 설계**
+   - 같은 checkpoint 에서 runtime 변수만 바꾸는 sweep 을 설계한다.
+   - 후보 축: chunk size, action Hz, execution horizon, refresh threshold, interpolation multiplier.
+   - 목표: chunk 사이 시각적 끊김 감소와 옷 grasp 안정화.
+
+3. **Track B 다음 방향 결정**
    - D-8a relaware 결과도 no-candidate.
    - D-8b fold-only subset 재학습 또는 D-8a 추가 step 중 하나를 사용자 결정으로 선택한다.
 
-3. **필요 시 RTC parameter tuning**
+4. **필요 시 RTC parameter tuning**
    - operator 리뷰가 `유사` 또는 `악화` 이면 `max_guidance_weight 5 vs 10 vs 15` 를 우선 비교한다.
    - 필요 시 `execution_horizon 15 vs 20` 을 비교한다.
 
-4. **시나리오 다양화**
+5. **시나리오 다양화**
    - shirt 위치, 초기 구김 정도, 조명 변화를 작게 나눠 Track A 반복성을 본다.
-
-5. **full_folding gate 산출물 기준 정리**
-   - D-8a relaware 결과를 README/PLAN 의 다음 결정 항목과 일치시킨다.
 
 ---
 
@@ -218,9 +223,10 @@ aux_recording: /home/syhlabtop/workspace/realsense_live/recordings/rollout_trial
 
 판정: RTC ON repeat3 는 120초 closed-loop 를 완주했다. 보조 `../realsense_live`
 D415 녹화도 rollout 앞뒤 wrapper 로 정상 기록됐고, `128.386s`, `3821` frames,
-`141,974,578 bytes` 로 stop 완료했다. chunk 직후 scalar jerk proxy 는 RTC OFF 대비
-낮고 RTC ON second 대비도 소폭 낮다. 다만 joint4/joint_limit saturation 은 증가했으므로
-operator 시각 리뷰와 함께 판단한다.
+`141,974,578 bytes` 로 stop 완료했다. runtime 인프라는 PASS 이지만, operator 리뷰상
+task success 는 아직 미달이다. 정책이 tabletop folding 을 시도하는 방향성은 보이나
+옷을 안정적으로 집지 못했고, chunk 사이 transition 이 시각적으로 남아 있다.
+다음은 pi0.5/OpenArm folding execution trick 분석과 chunk size/HZ/cadence 최적점 설계다.
 
 ---
 

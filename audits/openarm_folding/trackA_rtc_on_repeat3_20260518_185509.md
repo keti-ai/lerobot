@@ -85,11 +85,23 @@ eval frame 경로:
 - `obs_000090`
 - `obs_000120`
 
-operator post-review 는 아직 별도 기록 전이다. 직전 리뷰는 RTC ON 적용 후 chunk lip 이 일부 감소했다는 판정이었다. 이번 repeat3 는 보조 D415 녹화가 있으므로, eval frames 와 AVI 를 같이 보며 chunk lip 과 fold 진행도를 다시 판정한다.
+## operator 리뷰
+
+사용자/operator post-review:
+
+- 정책이 tabletop folding 태스크를 수행하려는 방향성은 보인다.
+- 그러나 실제 작업 수행력은 아직 부족하다. 옷을 안정적으로 집지 못했고, fold 성공으로 보기는 어렵다.
+- 끊김은 아직 남아 있다. RTC ON 으로 일부 감소했지만, chunk 사이 transition 이 시각적으로 여전히 보인다.
+- 다음에는 chunk size, action Hz, execution horizon, queue refresh 조건의 최적점을 찾아야 한다.
+- 기본 pi0.5 대비 folding demo/robot execution 쪽에 추가로 들어간 trick 이 무엇인지 확실히 분석해야 한다.
+- 현재 정책은 작업 수행력과 OOD 영역이 모두 넓어 보인다. scene/garment 초기조건 변화에 대한 견고성도 아직 부족하다.
+
+판정: repeat3 는 runtime closed-loop 인프라 검증은 PASS 이지만, task success 는 PASS 가 아니다. 다음 단계는 무작정 재실행이 아니라 execution cadence/queue tuning 과 pi0.5 folding 운영 trick 분석이다.
 
 ## 다음 권장
 
-1. repeat3 보조 AVI 와 eval frames 를 기준으로 operator 시각 리뷰를 기록한다.
-2. chunk lip 이 여전히 남으면 `max_guidance_weight 5 vs 10 vs 15` 를 먼저 비교한다.
-3. saturation 이 결과 품질에 영향을 준다고 보이면 joint4/joint_limit saturation 시점과 eval frame 구간을 맞춰 본다.
-4. 실제 벡터 jerk 분석이 필요하면 `events.ndjson` 에 full 16D action 또는 per-feature delta summary 를 추가한다.
+1. pi0.5/OpenArm folding reference 에서 execution trick 을 정리한다. 특히 chunk handoff, action repeat/interpolation, receding horizon, inference cadence, camera/record timing, safety/hold behavior 를 확인한다.
+2. chunk size / action Hz / execution horizon / refresh threshold sweep 설계를 만든다. 우선 동일 checkpoint 에서 runtime 변수만 바꿔 chunk lip 을 줄일 수 있는지 본다.
+3. 실제 벡터 jerk 분석이 필요하면 `events.ndjson` 에 full 16D action 또는 per-feature delta summary 를 추가한다.
+4. saturation 이 결과 품질에 영향을 준다고 보이면 joint4/joint_limit saturation 시점과 eval frame 구간을 맞춰 본다.
+5. 재실행은 tuning 가설을 먼저 세운 뒤 같은 messy-shirt setup 으로 비교한다.
