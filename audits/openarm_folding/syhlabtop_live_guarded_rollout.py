@@ -742,8 +742,11 @@ def execute_one_action(
     commanded_deltas = {key: abs(targets[key] - current[key]) for key in selected_features}
     max_commanded_key = max(commanded_deltas, key=commanded_deltas.get)
     max_commanded_delta = commanded_deltas[max_commanded_key]
-    max_readback_key = max(per_joint, key=lambda key: abs(per_joint[key]["error_deg"]))
-    max_readback_error = abs(per_joint[max_readback_key]["error_deg"])
+    max_readback_key = None
+    max_readback_error = None
+    if per_joint:
+        max_readback_key = max(per_joint, key=lambda key: abs(per_joint[key]["error_deg"]))
+        max_readback_error = abs(per_joint[max_readback_key]["error_deg"])
     logger.write(
         "action_executed",
         step_index=step_index,
@@ -755,6 +758,7 @@ def execute_one_action(
         max_abs_commanded_delta_deg=max_commanded_delta,
         max_abs_readback_error_key=max_readback_key,
         max_abs_readback_error_deg=max_readback_error,
+        readback_performed=bool(per_joint),
         hard_readback=hard_readback,
         soft_readback=soft_readback,
     )
