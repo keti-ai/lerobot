@@ -60,6 +60,8 @@ finishes before generating any approval envelope.
 - Delta handling: clip to cap
 - Limit handling: allow gripper, joint4, and general joint limit saturation while logging counts
 - Record eval frames for visual comparison
+- Auxiliary recording: every robot `--execute` run starts/stops `../realsense_live`
+  recording through `http://127.0.0.1:8080`
 
 ## Command Template
 
@@ -102,9 +104,25 @@ bash audits/openarm_folding/run_rsusb_py312.sh \
   --approval-draft-md "$TRIAL/live_session/session_envelope.md"
 ```
 
-Execute only after the operator approval phrase in the draft is explicitly provided:
+Execute only after the operator approval phrase in the draft is explicitly provided.
+Robot experiments should always start the auxiliary `../realsense_live` recording
+immediately before `--execute` and stop it immediately after the rollout exits:
 
 ```bash
+set -euo pipefail
+
+REALSENSE_LIVE_URL=${REALSENSE_LIVE_URL:-http://127.0.0.1:8080}
+REALSENSE_RECORD_NAME=$(basename "$TRIAL")
+REALSENSE_RECORD_ACTIVE=0
+
+curl -fsS -X POST "$REALSENSE_LIVE_URL/camera/start" >/dev/null
+mkdir -p "$TRIAL/live_session"
+curl -fsS -X POST "$REALSENSE_LIVE_URL/record/start?name=$REALSENSE_RECORD_NAME" \
+  > "$TRIAL/live_session/realsense_record_start.json"
+REALSENSE_RECORD_ACTIVE=1
+trap 'if [ "${REALSENSE_RECORD_ACTIVE:-0}" = 1 ]; then curl -fsS -X POST "$REALSENSE_LIVE_URL/record/stop" > "$TRIAL/live_session/realsense_record_stop.json" || true; fi' EXIT
+
+set +e
 bash audits/openarm_folding/run_rsusb_py312.sh \
   audits/openarm_folding/syhlabtop_live_guarded_rollout.py \
   --trial-root "$TRIAL" \
@@ -144,6 +162,16 @@ bash audits/openarm_folding/run_rsusb_py312.sh \
   --gripper-workspace-clear \
   --human-body-clear-of-arm \
   --confirm "<APPROVAL_PHRASE_FROM_DRAFT>"
+ROLLOUT_STATUS=$?
+set -e
+
+if [ "$REALSENSE_RECORD_ACTIVE" = 1 ]; then
+  curl -fsS -X POST "$REALSENSE_LIVE_URL/record/stop" \
+    > "$TRIAL/live_session/realsense_record_stop.json"
+  REALSENSE_RECORD_ACTIVE=0
+fi
+trap - EXIT
+exit "$ROLLOUT_STATUS"
 ```
 
 ## Acceptance Signals
