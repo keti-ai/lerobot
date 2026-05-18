@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-15 (D-8a partial run 종료, checkpoint 012000까지 보존)
+**마지막 갱신:** 2026-05-18 (D-8a gate 완료, deploy 후보 없음)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -10,7 +10,7 @@
 | Track | 상태 | 다음 행동 |
 |---|---|---|
 | **A** — syhlabtop level2 라이브 롤아웃 | 120s closed-loop 인프라 준비 완료, draft는 A6000 serving health 대기 | serving 복구 후 envelope 재생성, 이후 operator 입회 실행 |
-| **B** — full_folding 재학습 | **D-8a PARTIAL COMPLETE** | 생성된 001000~012000 checkpoint gate 실행 |
+| **B** — full_folding 재학습 | **D-8a NO CANDIDATE** | D-8a 재시도 vs D-8b fold-only vs postprocessor/RABC 원인 조사 결정 |
 | **C** — full_folding ckpt 002000/003000 replay 비교 | **COMPLETE** | ckpt 002000/003000/004000 모두 replay FAIL → deploy 후보 없음 |
 | **D** — 축 probe + base 카메라 정렬 | read-only 결과 보존, 단일 조인트 probe/side-by-side 후속 폐기 | closed-loop 긴 타임시퀀스 평가로 전환 |
 
@@ -22,10 +22,13 @@
    - ckpt 002000: ratio 0.220–0.320, raw normalized max error 0.433 → FAIL
    - ckpt 003000: ratio 0.142–0.348, raw normalized max error 0.402 → FAIL
    - ckpt 004000: ratio 0.128–0.282, raw normalized max error 0.413 → FAIL
-   - 결론: 단순 checkpoint selection 으로 해결 불가. D-9 torch 2.7 smoke는 통과했고, D-8a 003000 continuation 이 진행 중이다.
+   - 결론: 단순 checkpoint selection 으로 해결 불가. D-9 torch 2.7 smoke는 통과했고, D-8a 003000 continuation 도 deploy 후보를 만들지 못했다.
    - 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/full_folding_dataset_replay_{002000,003000}.{md,json}`
    - D-8a config: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/d8a_full_folding_continue_003000_torch27_pyav_config_20260515.json`
    - D-8a command: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/d8a_full_folding_continue_003000_torch27_pyav_command_20260515.md`
+   - D-8a gate: `001000`~`012000` 모두 recipe FAIL. replay gate는 SKIPPED. deploy 후보 없음.
+   - 공통 실패: `rabc_recorded_in_train_config`, `postprocessor_action_stats_are_relative_for_arm_joints`; rel_q01_err 40.268 deg, rel_q99_err 39.561 deg, span_ratio 12.932.
+   - D-8a summary: `audits/openarm_folding/a6000_d8a_gate_summary.md`, `audits/openarm_folding/a6000_d8a_no_candidate.md`
 
 2. **base 카메라 FOV/scale 미스매치 — side-by-side 후속 폐기**
    - D3 live capture: `/tmp/openarm_folding_policy_input_viewer/policy_input_view_20260515_144933/`
@@ -44,7 +47,7 @@
    - syhlabtop 측 640×480 캡처 → server 가 1280×720 으로 resize 후 모델 입력
    - 서버 측 resize 가 정확히 training 분포와 일치하는지 검증 안 됨
 
-5. **RESOLVED — D-9 cuDNN 환경 결정 완료, option (i), D-8a 진행 중**
+5. **RESOLVED — D-9 cuDNN 환경 결정 완료, option (i), D-8a no-candidate**
    - A6000 torch `2.11.0+cu128` / CUDA `12.8` / cuDNN `91900` / driver `570.133.20` 환경에서 cuDNN enabled Conv2d 가 `CUDNN_STATUS_NOT_INITIALIZED` 로 실패
    - 사용자 결정: **(i) torch 2.7.x + 호환 cuDNN 새 venv**
    - 새 venv: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/venv312_torch27_20260515`
@@ -60,7 +63,7 @@
    - D-8a 최신 상태 파일: `audits/openarm_folding/a6000_d8a_status.md`
    - 현재 상태: 012000 checkpoint까지 저장 후 step 12120 부근에서 `FrameTimestampError` 로 종료.
    - 실패 파일: `videos/observation.images.right_wrist/chunk-000/file-557.mp4`, queried timestamp 1352.2334 vs loaded 1352.2333 근방, tolerance 0.0001 초과.
-   - 생성된 001000~012000 checkpoint에 대해 gate 실행 필요. deploy 후보 표기 금지.
+   - 생성된 001000~012000 checkpoint는 recipe gate 모두 FAIL. replay는 실행하지 않았다. deploy 후보 없음.
 
 6. **Track A closed-loop dry-run envelope 대기 — A6000 serving down**
    - `http://10.252.205.103:8766/health`, `http://10.252.205.103:8765/health` 모두 connection refused
@@ -82,13 +85,14 @@
    - 실행 직전 A6000 serving health 확인 후 120s/180chunk draft envelope 를 재생성한다.
    - `--execute` 는 operator 입회, power abort, approval phrase 확인 후 별도 세션에서만 실행한다.
 
-2. **(병행) a6000 D-8a 학습 모니터 — origin/audit/openarm-folding-baseline 정기 fetch**
-   - `audits/openarm_folding/a6000_d8a_status.md` 업데이트 확인.
-   - `a6000_d8a_deploy_candidate.md` 또는 `a6000_d8a_no_candidate.md` 가 올라오면 즉시 판정한다.
+2. **D-8 다음 방향 결정**
+   - D-8a recipe 보존 설정 재시도, D-8b fold-only subset, postprocessor/RABC 원인 조사 중 하나를 선택한다.
+   - 현재 D-8a 산출물은 deploy 후보가 아니다.
 
-3. **(a6000 PASS 떨어지면) A6000 서빙 ckpt 새 후보로 교체 + Track A 재실행**
+3. **A6000 serving 복구**
+   - Track A draft envelope 생성을 위해 port 8766 `/health` 를 복구한다.
 
-4. **(a6000 PASS 없으면) D-8b fold-only subset 재학습 결정**
+4. **선택 후 D-8b 또는 D-8a 재시도 실행**
 
 ---
 
@@ -195,8 +199,9 @@ checkpoint selection 만으로는 deploy 후보 확보 불가. **underfit 가설
 현재 상태:
 - D-9 option (i) torch 2.7 venv smoke PASS.
 - D-8a 003000 continuation 은 step 12120 부근에서 `FrameTimestampError` 로 종료. checkpoint 012000까지 저장됨.
+- D-8a 001000~012000 recipe gate 모두 FAIL, replay SKIPPED, deploy 후보 없음.
 - "병행 작업"은 syhlabtop Track D1/D3 쪽 작업을 뜻한다.
-- 세부 run path, checkpoint 목록, gate 결과는 A6000 산출물 생성 후 기록.
+- 세부 run path, checkpoint 목록, gate 결과는 `audits/openarm_folding/a6000_d8a_gate_summary.md` 참조.
 
 산출물 커밋: `33ee0da4 docs: record cudnn environment review`
 
