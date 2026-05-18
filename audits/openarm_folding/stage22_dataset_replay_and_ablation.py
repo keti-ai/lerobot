@@ -109,6 +109,11 @@ def read_info(dataset_root: Path) -> dict[str, Any]:
     return json.loads((dataset_root / "meta" / "info.json").read_text())
 
 
+def read_stats(dataset_root: Path) -> dict[str, Any]:
+    path = dataset_root / "meta" / "stats.json"
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
 def parquet_rows(path: Path) -> list[dict[str, Any]]:
     import pyarrow.parquet as pq
 
@@ -181,10 +186,70 @@ def load_checkpoint_action_quantiles(model_dir: Path) -> tuple[np.ndarray, np.nd
     return tensors["action.q01"].cpu().numpy(), tensors["action.q99"].cpu().numpy()
 
 
+def detect_action_stats_are_relative(dataset_root: Path, info: dict[str, Any]) -> tuple[bool, str]:
+    stats = read_stats(dataset_root)
+    action_count = (stats.get("action", {}).get("count") or [0])[0]
+    total_frames = int(info.get("total_frames") or 0)
+    if total_frames > 0 and action_count > total_frames * 2:
+        return True, f"meta/stats action count {action_count} > total_frames {total_frames} * 2"
+    root_name = str(dataset_root).lower()
+    if "relative_stats" in root_name or "relstats" in root_name:
+        return True, "dataset root name contains relative_stats/relstats"
+    if any(dataset_root.glob(".relstats_complete*")):
+        return True, "dataset root has .relstats_complete marker"
+    return False, "no relstats marker detected"
+
+
+def detect_replay_action_rows_are_relative(dataset_root: Path) -> tuple[bool, str]:
+    markers = sorted(dataset_root.glob(".relstats_complete*"))
+    if markers:
+        return True, f"dataset root has {markers[0].name} marker"
+    return False, "no relative action-row marker detected; treating parquet action rows as absolute targets"
+
+
+def resolve_action_is_relative(raw: str, dataset_root: Path, info: dict[str, Any]) -> tuple[bool, str]:
+    if raw == "true":
+        return True, "cli --action-is-relative=true"
+    if raw == "false":
+        return False, "cli --action-is-relative=false"
+    return detect_action_stats_are_relative(dataset_root, info)
+
+
+def resolve_replay_action_is_relative(raw: str, dataset_root: Path) -> tuple[bool, str]:
+    if raw == "true":
+        return True, "cli --action-is-relative=true"
+    if raw == "false":
+        return False, "cli --action-is-relative=false"
+    return detect_replay_action_rows_are_relative(dataset_root)
+
+
+def load_action_quantile_stats(dataset_root: Path) -> dict[str, Any] | None:
+    action = read_stats(dataset_root).get("action")
+    if not action:
+        return None
+    required = {"q01", "q99"}
+    if not required.issubset(action):
+        return None
+    return {
+        "rows": int((action.get("count") or [0])[0]),
+        "relative_q01": np.asarray(action["q01"], dtype=np.float32),
+        "relative_q99": np.asarray(action["q99"], dtype=np.float32),
+        "absolute_q01": np.asarray(action["q01"], dtype=np.float32),
+        "absolute_q99": np.asarray(action["q99"], dtype=np.float32),
+        "source": "meta/stats.json action quantiles",
+    }
+
+
 def sample_relative_action_stats(
     dataset_root: Path,
     max_rows: int,
+    *,
+    action_is_relative: bool,
 ) -> dict[str, Any]:
+    if action_is_relative:
+        stats = load_action_quantile_stats(dataset_root)
+        if stats is not None:
+            return stats
     states: list[np.ndarray] = []
     actions: list[np.ndarray] = []
     for path in sorted((dataset_root / "data").glob("**/*.parquet")):
@@ -202,13 +267,14 @@ def sample_relative_action_stats(
         raise ValueError(f"No rows loaded from {dataset_root / 'data'}")
     state_arr = np.stack(states)
     action_arr = np.stack(actions)
-    rel = action_arr - state_arr
+    rel = action_arr.copy() if action_is_relative else action_arr - state_arr
     return {
         "rows": int(rel.shape[0]),
         "relative_q01": np.percentile(rel, 1, axis=0),
         "relative_q99": np.percentile(rel, 99, axis=0),
         "absolute_q01": np.percentile(action_arr, 1, axis=0),
         "absolute_q99": np.percentile(action_arr, 99, axis=0),
+        "source": "sampled parquet action rows" if action_is_relative else "sampled parquet action-state rows",
     }
 
 
@@ -226,12 +292,18 @@ def validate_folding_recipe(
     max_rows: int,
     relative_stats_tolerance_deg: float,
     action_span_ratio_limit: float,
+    action_is_relative: bool,
+    action_is_relative_source: str,
 ) -> dict[str, Any]:
     train_cfg = load_training_config(model_dir)
     train_dataset_repo = train_cfg.get("dataset", {}).get("repo_id")
-    train_policy = train_cfg.get("policy", {})
+    sample_weighting = train_cfg.get("sample_weighting") or {}
     q01, q99 = load_checkpoint_action_quantiles(model_dir)
-    sampled = sample_relative_action_stats(dataset_root, max_rows=max_rows)
+    sampled = sample_relative_action_stats(
+        dataset_root,
+        max_rows=max_rows,
+        action_is_relative=action_is_relative,
+    )
     rel_q01 = sampled["relative_q01"]
     rel_q99 = sampled["relative_q99"]
     abs_q01 = sampled["absolute_q01"]
@@ -289,13 +361,15 @@ def validate_folding_recipe(
         int(getattr(cfg, "n_action_steps", -1)) == 30,
         {"actual": getattr(cfg, "n_action_steps", None)},
     )
+    sample_weighting_is_rabc = sample_weighting.get("type") == "rabc"
     add_check(
         "rabc_recorded_in_train_config",
-        bool(train_cfg.get("use_rabc", False)),
+        bool(train_cfg.get("use_rabc", False)) or sample_weighting_is_rabc,
         {
             "use_rabc": train_cfg.get("use_rabc"),
-            "rabc_kappa": train_cfg.get("rabc_kappa"),
-            "rabc_progress_path": train_cfg.get("rabc_progress_path"),
+            "rabc_kappa": train_cfg.get("rabc_kappa") or sample_weighting.get("kappa"),
+            "rabc_progress_path": train_cfg.get("rabc_progress_path") or sample_weighting.get("progress_path"),
+            "sample_weighting": sample_weighting,
         },
     )
 
@@ -311,6 +385,9 @@ def validate_folding_recipe(
         and max_arm_span_ratio <= action_span_ratio_limit,
         {
             "sample_rows": sampled["rows"],
+            "sample_source": sampled.get("source"),
+            "action_is_relative": action_is_relative,
+            "action_is_relative_source": action_is_relative_source,
             "relative_stats_tolerance_deg": relative_stats_tolerance_deg,
             "action_span_ratio_limit": action_span_ratio_limit,
             "max_post_vs_relative_q01_error_deg": max_post_vs_rel_q01_error,
@@ -329,6 +406,8 @@ def validate_folding_recipe(
         "summary": {
             "passed": all(check["passed"] for check in checks),
             "failed_checks": [check["name"] for check in checks if not check["passed"]],
+            "action_is_relative": action_is_relative,
+            "action_is_relative_source": action_is_relative_source,
         },
         "expected_runtime": {
             "robot": "bimanual OpenArm",
@@ -537,6 +616,7 @@ def run_policy_case(
         preprocessed = preprocessor(prepared)
         model_action = policy.predict_action_chunk(preprocessed)
         postprocessed = postprocessor(model_action)
+    raw_normalized = model_action[0, 0].detach().cpu().numpy().astype(np.float32)
     absolute = postprocessed[0, 0].detach().cpu().numpy().astype(np.float32)
     relative_step = find_relative_step(preprocessor)
     cached_state = relative_step.get_cached_state()
@@ -546,9 +626,12 @@ def run_policy_case(
     idx = int(np.argmax(abs_deltas))
     return {
         "action_shape": list(postprocessed.shape),
+        "raw_normalized": raw_normalized.tolist(),
         "max_abs_delta_deg": float(abs_deltas[idx]),
         "max_abs_delta_key": ACTION_NAMES[idx],
         "mean_abs_delta_deg": float(np.mean(abs_deltas)),
+        "arm_mean_abs_delta_deg": float(np.mean(abs_deltas[ARM_ACTION_MASK])),
+        "arm_max_abs_delta_deg": float(np.max(abs_deltas[ARM_ACTION_MASK])),
         "rows": [
             {
                 "key": key,
@@ -561,15 +644,30 @@ def run_policy_case(
     }
 
 
-def compare_to_recorded(case: dict[str, Any], recorded_action: np.ndarray, state: np.ndarray) -> dict[str, Any]:
+def compare_to_recorded(
+    case: dict[str, Any],
+    recorded_action: np.ndarray,
+    state: np.ndarray,
+    *,
+    replay_action_is_relative: bool,
+) -> dict[str, Any]:
     recorded_delta = recorded_action - state
+    if replay_action_is_relative:
+        recorded_delta = recorded_delta.copy()
+        recorded_delta[ARM_ACTION_MASK] = recorded_action[ARM_ACTION_MASK]
     model_delta = np.asarray([row["predicted_delta_deg"] for row in case["rows"]], dtype=np.float32)
     error = model_delta - recorded_delta
     abs_error = np.abs(error)
     idx = int(np.argmax(abs_error))
+    arm_model_mean = float(np.mean(np.abs(model_delta[ARM_ACTION_MASK])))
+    arm_recorded_mean = float(np.mean(np.abs(recorded_delta[ARM_ACTION_MASK])))
     return {
         "recorded_mean_abs_delta_deg": float(np.mean(np.abs(recorded_delta))),
         "recorded_max_abs_delta_deg": float(np.max(np.abs(recorded_delta))),
+        "recorded_arm_mean_abs_delta_deg": arm_recorded_mean,
+        "recorded_arm_max_abs_delta_deg": float(np.max(np.abs(recorded_delta[ARM_ACTION_MASK]))),
+        "model_arm_mean_abs_delta_deg": arm_model_mean,
+        "mean_delta_ratio_model_over_recorded_arm": float(arm_model_mean / max(arm_recorded_mean, 1e-6)),
         "model_minus_recorded_mean_abs_error_deg": float(np.mean(abs_error)),
         "model_minus_recorded_max_abs_error_deg": float(abs_error[idx]),
         "model_minus_recorded_max_abs_error_key": ACTION_NAMES[idx],
@@ -580,10 +678,113 @@ def compare_to_recorded(case: dict[str, Any], recorded_action: np.ndarray, state
                 "recorded_delta_deg": float(recorded_delta[i]),
                 "model_delta_deg": float(model_delta[i]),
                 "model_minus_recorded_delta_deg": float(error[i]),
+                "target_semantics": "relative_delta"
+                if replay_action_is_relative and ARM_ACTION_MASK[i]
+                else "absolute_target_delta",
             }
             for i, key in enumerate(ACTION_NAMES)
         ],
     }
+
+
+def normalize_action_target(target_deg: np.ndarray, q01: np.ndarray, q99: np.ndarray) -> np.ndarray:
+    denom = np.where(q99 == q01, 1e-8, q99 - q01)
+    return 2.0 * (target_deg - q01) / denom - 1.0
+
+
+def normalized_target_comparison(
+    *,
+    case: dict[str, Any],
+    recorded_action: np.ndarray,
+    state: np.ndarray,
+    q01: np.ndarray,
+    q99: np.ndarray,
+    replay_action_is_relative: bool,
+) -> dict[str, Any]:
+    target = recorded_action - state
+    target_semantics = np.full(len(ACTION_NAMES), "relative_delta_from_absolute_target", dtype=object)
+    if replay_action_is_relative:
+        target = target.copy()
+        target[ARM_ACTION_MASK] = recorded_action[ARM_ACTION_MASK]
+        target_semantics[ARM_ACTION_MASK] = "relative_delta"
+    target[~ARM_ACTION_MASK] = recorded_action[~ARM_ACTION_MASK]
+    target_semantics[~ARM_ACTION_MASK] = "absolute_gripper"
+
+    target_normalized = normalize_action_target(target, q01, q99)
+    model_raw = np.asarray(case["raw_normalized"], dtype=np.float32)
+    raw_error = model_raw - target_normalized
+    arm_abs_error = np.abs(raw_error[ARM_ACTION_MASK])
+    gripper_abs_error = np.abs(raw_error[~ARM_ACTION_MASK])
+    order = np.argsort(-np.abs(raw_error))[:8]
+    return {
+        "arm_max_abs_raw_normalized_error": float(np.max(arm_abs_error)),
+        "arm_mean_abs_raw_normalized_error": float(np.mean(arm_abs_error)),
+        "gripper_max_abs_raw_normalized_error_absolute_target": float(np.max(gripper_abs_error)),
+        "max_error_rows": [
+            {
+                "key": ACTION_NAMES[int(i)],
+                "recorded_target_deg": float(target[int(i)]),
+                "model_delta_deg": float(case["rows"][int(i)]["predicted_delta_deg"]),
+                "model_absolute_deg": float(case["rows"][int(i)]["predicted_abs_deg"]),
+                "mixed_target_normalized": float(target_normalized[int(i)]),
+                "model_raw_normalized": float(model_raw[int(i)]),
+                "raw_minus_target": float(raw_error[int(i)]),
+                "target_semantics": str(target_semantics[int(i)]),
+            }
+            for i in order
+        ],
+    }
+
+
+def build_replay_checks(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    ratio_values = [
+        item["recorded_comparison"]["mean_delta_ratio_model_over_recorded_arm"]
+        for item in payload["dataset_replay"]
+    ]
+    max_global_delta = max(item["model_summary"]["arm_max_abs_delta_deg"] for item in payload["dataset_replay"])
+    watched = {"left_joint_4.pos", "right_joint_4.pos", "right_joint_7.pos"}
+    max_watched_delta = 0.0
+    for item in payload["dataset_replay"]:
+        for row in item["model_summary"]["rows"]:
+            if row["key"] in watched:
+                max_watched_delta = max(max_watched_delta, abs(float(row["predicted_delta_deg"])))
+    max_raw_error = max(
+        item["normalized_target_comparison"]["arm_max_abs_raw_normalized_error"]
+        for item in payload["dataset_replay"]
+    )
+    checks = [
+        {
+            "name": "recipe_gate_passed",
+            "passed": bool(payload["recipe_gate"]["summary"]["passed"]) if payload.get("recipe_gate") else True,
+        },
+        {
+            "name": "model_mean_abs_delta_same_order_as_recorded",
+            "passed": min(ratio_values) >= 0.25 and max(ratio_values) <= 4.0,
+            "ratio_range": [float(min(ratio_values)), float(max(ratio_values))],
+            "threshold_range": [0.25, 4.0],
+        },
+        {
+            "name": "no_60_70deg_abnormal_delta_on_watched_or_global_joints",
+            "passed": max_global_delta <= 20.0 and max_watched_delta <= 20.0,
+            "max_global_abs_delta_deg": float(max_global_delta),
+            "max_watched_abs_delta_deg": float(max_watched_delta),
+            "threshold_deg": 20.0,
+            "watched_keys": sorted(watched),
+        },
+        {
+            "name": "raw_normalized_output_close_to_recorded_relative_arm_target",
+            "passed": max_raw_error < 0.25,
+            "max_arm_abs_raw_normalized_error": float(max_raw_error),
+            "threshold": 0.25,
+            "note": "Arm joints use replay target semantics; grippers are evaluated as absolute excluded dims.",
+        },
+        {
+            "name": "gripper_excluded_from_relative_conversion",
+            "passed": True,
+            "relative_exclude_joints": payload.get("relative_exclude_joints", []),
+        },
+    ]
+    return checks
 
 
 def write_markdown(path: Path, payload: dict[str, Any]) -> None:
@@ -632,21 +833,35 @@ def write_markdown(path: Path, payload: dict[str, Any]) -> None:
         f"- Model: `{payload['model_dir']}`",
         f"- Video backend: `{payload['video_backend']}`",
         f"- Robot type: `{payload['robot_type']}`",
+        f"- Action stats are relative: `{payload['action_is_relative']}` ({payload['action_is_relative_source']})",
+        f"- Replay action rows are relative: `{payload['replay_action_is_relative']}` "
+        f"({payload['replay_action_is_relative_source']})",
         f"- Snapshot: `{payload.get('snapshot_dir') or 'not provided'}`",
         "",
         "## Dataset Replay",
         "",
     ])
+    if payload.get("summary"):
+        status = "PASS" if payload["summary"]["passed"] else "FAIL"
+        lines.append(f"- Status: `{status}`")
+        if payload["summary"].get("failed_checks"):
+            lines.append(f"- Failed checks: `{', '.join(payload['summary']['failed_checks'])}`")
+    if payload.get("checks"):
+        for check in payload["checks"]:
+            mark = "PASS" if check["passed"] else "FAIL"
+            lines.append(f"- `{check['name']}`: {mark}")
+        lines.append("")
     for sample in payload["dataset_replay"]:
         summary = sample["model_summary"]
         cmp_summary = sample["recorded_comparison"]
+        raw_summary = sample["normalized_target_comparison"]
         lines.append(
-            f"- frame `{sample['frame_index']}`: model mean_abs_delta="
-            f"{summary['mean_abs_delta_deg']:.3f}, max_abs_delta="
+            f"- frame `{sample['frame_index']}`: model arm_mean_abs_delta="
+            f"{summary['arm_mean_abs_delta_deg']:.3f}, max_abs_delta="
             f"{summary['max_abs_delta_deg']:.3f} at `{summary['max_abs_delta_key']}`; "
-            f"recorded mean_abs_delta={cmp_summary['recorded_mean_abs_delta_deg']:.3f}, "
-            f"model-vs-recorded max_error={cmp_summary['model_minus_recorded_max_abs_error_deg']:.3f} "
-            f"at `{cmp_summary['model_minus_recorded_max_abs_error_key']}`"
+            f"recorded arm_mean_abs_delta={cmp_summary['recorded_arm_mean_abs_delta_deg']:.3f}, "
+            f"ratio={cmp_summary['mean_delta_ratio_model_over_recorded_arm']:.3f}, "
+            f"arm_raw_max_err={raw_summary['arm_max_abs_raw_normalized_error']:.3f}"
         )
     if payload.get("ablations"):
         lines.extend(["", "## State / Visual Ablation", ""])
@@ -664,13 +879,13 @@ def write_markdown(path: Path, payload: dict[str, Any]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Offline dataset replay and state/visual ablation for OpenArm folding.")
-    parser.add_argument("--dataset-repo", default="lerobot/full_folding")
-    parser.add_argument("--dataset-root", type=Path, required=True)
+    parser.add_argument("--dataset-repo")
+    parser.add_argument("--dataset-root", type=Path)
     parser.add_argument("--dataset-revision")
     parser.add_argument("--episode-index", type=int, default=0)
     parser.add_argument("--frames", default="auto")
     parser.add_argument("--video-backend", default="cv2")
-    parser.add_argument("--model-dir", type=Path, required=True)
+    parser.add_argument("--model-dir", "--checkpoint", type=Path, required=True)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--snapshot-dir", type=Path)
     parser.add_argument("--ablation-frame", type=int, default=0)
@@ -684,12 +899,30 @@ def main() -> int:
     parser.add_argument("--recipe-gate-max-rows", type=int, default=5000)
     parser.add_argument("--recipe-gate-relative-stats-tolerance-deg", type=float, default=2.0)
     parser.add_argument("--recipe-gate-action-span-ratio-limit", type=float, default=3.0)
-    parser.add_argument("--json-out", type=Path, required=True)
-    parser.add_argument("--md-out", type=Path, required=True)
+    parser.add_argument("--action-is-relative", choices=["auto", "true", "false"], default="auto")
+    parser.add_argument("--json-out", "--output-json", type=Path, required=True)
+    parser.add_argument("--md-out", "--output-md", type=Path, required=True)
     args = parser.parse_args()
 
+    train_cfg = load_training_config(args.model_dir)
+    if args.dataset_repo is None:
+        args.dataset_repo = train_cfg.get("dataset", {}).get("repo_id") or "lerobot/full_folding"
+    if args.dataset_root is None:
+        root = train_cfg.get("dataset", {}).get("root")
+        if root is None:
+            raise ValueError("--dataset-root is required when checkpoint train_config has no dataset.root")
+        args.dataset_root = Path(root)
     dataset_root = resolve_dataset_root(args.dataset_repo, args.dataset_root, args.dataset_revision)
     info = read_info(dataset_root)
+    action_is_relative, action_is_relative_source = resolve_action_is_relative(
+        args.action_is_relative,
+        dataset_root,
+        info,
+    )
+    replay_action_is_relative, replay_action_is_relative_source = resolve_replay_action_is_relative(
+        args.action_is_relative,
+        dataset_root,
+    )
     cfg = PreTrainedConfig.from_pretrained(args.model_dir)
     recipe_gate = None
     if not args.no_recipe_gate:
@@ -702,6 +935,8 @@ def main() -> int:
             max_rows=args.recipe_gate_max_rows,
             relative_stats_tolerance_deg=args.recipe_gate_relative_stats_tolerance_deg,
             action_span_ratio_limit=args.recipe_gate_action_span_ratio_limit,
+            action_is_relative=action_is_relative,
+            action_is_relative_source=action_is_relative_source,
         )
     if args.recipe_gate_only:
         payload = {
@@ -711,6 +946,8 @@ def main() -> int:
             "policy_type": cfg.type,
             "use_relative_actions": bool(getattr(cfg, "use_relative_actions", False)),
             "relative_exclude_joints": list(getattr(cfg, "relative_exclude_joints", [])),
+            "action_is_relative": action_is_relative,
+            "action_is_relative_source": action_is_relative_source,
             "recipe_gate": recipe_gate,
             "recipe_gate_only": True,
             "safety": {
@@ -752,6 +989,10 @@ def main() -> int:
         "policy_type": cfg.type,
         "use_relative_actions": bool(getattr(cfg, "use_relative_actions", False)),
         "relative_exclude_joints": list(getattr(cfg, "relative_exclude_joints", [])),
+        "action_is_relative": action_is_relative,
+        "action_is_relative_source": action_is_relative_source,
+        "replay_action_is_relative": replay_action_is_relative,
+        "replay_action_is_relative_source": replay_action_is_relative_source,
         "video_backend": args.video_backend,
         "robot_type": args.robot_type,
         "action_names": ACTION_NAMES,
@@ -766,6 +1007,7 @@ def main() -> int:
             "send_action": False,
         },
     }
+    q01, q99 = load_checkpoint_action_quantiles(args.model_dir)
 
     for sample in samples:
         model_summary = run_policy_case(
@@ -785,9 +1027,28 @@ def main() -> int:
                 "timestamp": sample.timestamp,
                 "task": sample.task,
                 "model_summary": model_summary,
-                "recorded_comparison": compare_to_recorded(model_summary, sample.action, sample.state),
+                "recorded_comparison": compare_to_recorded(
+                    model_summary,
+                    sample.action,
+                    sample.state,
+                    replay_action_is_relative=replay_action_is_relative,
+                ),
+                "normalized_target_comparison": normalized_target_comparison(
+                    case=model_summary,
+                    recorded_action=sample.action,
+                    state=sample.state,
+                    q01=q01,
+                    q99=q99,
+                    replay_action_is_relative=replay_action_is_relative,
+                ),
             }
         )
+
+    payload["checks"] = build_replay_checks(payload)
+    payload["summary"] = {
+        "passed": all(check["passed"] for check in payload["checks"]),
+        "failed_checks": [check["name"] for check in payload["checks"] if not check["passed"]],
+    }
 
     if args.snapshot_dir is not None:
         snapshot_state = read_state_csv(args.snapshot_dir / "state_16.csv")
@@ -821,6 +1082,19 @@ def main() -> int:
     write_markdown(args.md_out, payload)
     if recipe_gate is not None and not recipe_gate["summary"]["passed"]:
         print(json.dumps({"json_out": str(args.json_out), "md_out": str(args.md_out), "recipe_gate": "FAIL"}, indent=2))
+        return 2
+    if not payload["summary"]["passed"]:
+        print(
+            json.dumps(
+                {
+                    "json_out": str(args.json_out),
+                    "md_out": str(args.md_out),
+                    "replay_gate": "FAIL",
+                    "failed_checks": payload["summary"]["failed_checks"],
+                },
+                indent=2,
+            )
+        )
         return 2
     print(json.dumps({"json_out": str(args.json_out), "md_out": str(args.md_out)}, indent=2))
     return 0

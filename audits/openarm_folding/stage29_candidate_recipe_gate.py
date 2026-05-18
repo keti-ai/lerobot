@@ -77,6 +77,8 @@ def gate_candidate(
     max_rows: int,
     relative_stats_tolerance_deg: float,
     action_span_ratio_limit: float,
+    action_is_relative: bool,
+    action_is_relative_source: str,
 ) -> dict[str, Any]:
     cfg = PreTrainedConfig.from_pretrained(candidate.path)
     gate = replay.validate_folding_recipe(
@@ -88,6 +90,8 @@ def gate_candidate(
         max_rows=max_rows,
         relative_stats_tolerance_deg=relative_stats_tolerance_deg,
         action_span_ratio_limit=action_span_ratio_limit,
+        action_is_relative=action_is_relative,
+        action_is_relative_source=action_is_relative_source,
     )
     failed_checks = set(gate["summary"]["failed_checks"])
     recipe_failures_without_dataset = sorted(failed_checks - {"model_training_dataset_matches_replay_dataset"})
@@ -169,21 +173,39 @@ def write_markdown(path: Path, payload: dict[str, Any]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Gate OpenArm folding checkpoint candidates without robot IO.")
-    parser.add_argument("--dataset-repo", default="lerobot-data-collection/level2_final_quality3_t_0_hil_data_c")
-    parser.add_argument("--dataset-root", type=Path, required=True)
+    parser.add_argument("--dataset-repo")
+    parser.add_argument("--dataset-root", type=Path)
     parser.add_argument("--dataset-revision")
-    parser.add_argument("--candidate", action="append", dest="candidates")
+    parser.add_argument("--candidate", "--checkpoint", action="append", dest="candidates")
     parser.add_argument("--candidate-cache-dir", type=Path, default=Path("audits/openarm_folding/candidate_cache"))
     parser.add_argument("--local-only", action="store_true")
     parser.add_argument("--max-rows", type=int, default=5000)
     parser.add_argument("--relative-stats-tolerance-deg", type=float, default=2.0)
     parser.add_argument("--action-span-ratio-limit", type=float, default=3.0)
-    parser.add_argument("--json-out", type=Path, required=True)
-    parser.add_argument("--md-out", type=Path, required=True)
+    parser.add_argument("--action-is-relative", choices=["auto", "true", "false"], default="auto")
+    parser.add_argument("--json-out", "--output-json", type=Path, required=True)
+    parser.add_argument("--md-out", "--output-md", type=Path, required=True)
     args = parser.parse_args()
 
+    if (args.dataset_repo is None or args.dataset_root is None) and args.candidates and len(args.candidates) == 1:
+        first_candidate = Path(args.candidates[0])
+        if first_candidate.exists():
+            train_cfg = replay.load_training_config(first_candidate)
+            if args.dataset_repo is None:
+                args.dataset_repo = train_cfg.get("dataset", {}).get("repo_id")
+            if args.dataset_root is None and train_cfg.get("dataset", {}).get("root") is not None:
+                args.dataset_root = Path(train_cfg["dataset"]["root"])
+    if args.dataset_repo is None:
+        args.dataset_repo = "lerobot-data-collection/level2_final_quality3_t_0_hil_data_c"
+    if args.dataset_root is None:
+        raise ValueError("--dataset-root is required unless a local checkpoint train_config provides dataset.root")
     dataset_root = replay.resolve_dataset_root(args.dataset_repo, args.dataset_root, args.dataset_revision)
     info = replay.read_info(dataset_root)
+    action_is_relative, action_is_relative_source = replay.resolve_action_is_relative(
+        args.action_is_relative,
+        dataset_root,
+        info,
+    )
     args.candidate_cache_dir.mkdir(parents=True, exist_ok=True)
 
     payload: dict[str, Any] = {
@@ -191,6 +213,8 @@ def main() -> int:
         "dataset_root": str(dataset_root),
         "source_map": replay.FOLDING_RECIPE_SOURCE_MAP,
         "locked_recipe": replay.LOCKED_FOLDING_RECIPE,
+        "action_is_relative": action_is_relative,
+        "action_is_relative_source": action_is_relative_source,
         "candidates": args.candidates or DEFAULT_CANDIDATES,
         "results": [],
         "safety": {
@@ -212,6 +236,8 @@ def main() -> int:
                     max_rows=args.max_rows,
                     relative_stats_tolerance_deg=args.relative_stats_tolerance_deg,
                     action_span_ratio_limit=args.action_span_ratio_limit,
+                    action_is_relative=action_is_relative,
+                    action_is_relative_source=action_is_relative_source,
                 )
             )
         except Exception as exc:
