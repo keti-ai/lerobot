@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-18 (Track A RTC ON 두 번째 120s 완주 + D-8a relaware no-candidate)
+**마지막 갱신:** 2026-05-18 (Track A RTC ON 두 번째 120s 완주 + repeat 카메라 케이블 탈락 기록)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -9,7 +9,7 @@
 
 | Track | 상태 | 다음 행동 |
 |---|---|---|
-| **A** — syhlabtop level2 라이브 롤아웃 | **첫 120s closed-loop PASS, 두 번째 RTC ON 120s 완주** | operator 시각 리뷰 반영 후 RTC 파라미터 유지/조정 결정 |
+| **A** — syhlabtop level2 라이브 롤아웃 | **첫 120s closed-loop PASS, 두 번째 RTC ON 120s 완주** | right wrist 카메라 cable slack/strain relief 후 repeat |
 | **B** — full_folding 재학습 | **D-8a relaware COMPLETE — no deploy candidate** | D-8b fold-only 또는 추가 step 여부 결정 |
 | **C** — full_folding ckpt 002000/003000 replay 비교 | **COMPLETE** | ckpt 002000/003000/004000 모두 replay FAIL → deploy 후보 없음 |
 | **D** — 축 probe + base 카메라 정렬 | read-only 결과 보존, 단일 조인트 probe/side-by-side 후속 폐기 | closed-loop 긴 타임시퀀스 평가로 전환 |
@@ -85,6 +85,11 @@
    - RTC ON 결과: `stop_reason=max_session_duration_s`, `actions_executed=2907`, `chunks_accepted=135`, `torque_disable_complete=true`, `cleanup_errors=[]`
    - transition proxy: chunk 직후 첫 5 action jerk proxy mean `2687.141` → `971.120` (`-63.9%`), p95 `15071.648` → `3609.263` (`-76.1%`)
    - RTC ON 결과 문서: `audits/openarm_folding/trackA_rtc_on_run_20260518_183440.md`
+   - operator 시각 리뷰: chunk lip 이 이전 실행 대비 일부 감소
+   - repeat trial: `/home/syhlabtop/openarm_folding_20260512/rollout_trial_20260518_184402_rtc_on_repeat/`
+   - repeat 중단: `actions_executed=1118`, `chunks_accepted=19`, 약 `42.400s` 진행 후 right wrist camera read 실패
+   - 사용자/operator 원인 확인: 오른팔이 기둥 쪽으로 가면서 right wrist 카메라 케이블이 물리적으로 빠짐
+   - repeat 부분 실행 문서: `audits/openarm_folding/trackA_rtc_on_repeat_partial_20260518_184402.md`
 
 7. **a6000(ketiserver) 측 워크트리 동기화 부재 — 참고만**
    - a6000 Codex 세션이 본 워크트리에는 audits/openarm_folding/ 의 현역 md/py 일부가 untracked/누락 상태였음
@@ -95,18 +100,22 @@
 
 ## 다음 N개 작업 (우선순위 순)
 
-1. **Track B 다음 방향 결정**
+1. **Track A cable slack/strain relief 후 repeat**
+   - right wrist 카메라 케이블을 재체결하고, 오른팔이 기둥 쪽으로 갈 때 당겨지지 않도록 cable slack/strain relief 를 만든다.
+   - 같은 trial 은 재사용하지 않고 새 trial/envelope/approval phrase 로 재시도한다.
+
+2. **Track B 다음 방향 결정**
    - D-8a relaware 결과도 no-candidate.
    - D-8b fold-only subset 재학습 또는 D-8a 추가 step 중 하나를 사용자 결정으로 선택한다.
 
-2. **필요 시 RTC parameter tuning**
+3. **필요 시 RTC parameter tuning**
    - operator 리뷰가 `유사` 또는 `악화` 이면 `max_guidance_weight 5 vs 10 vs 15` 를 우선 비교한다.
    - 필요 시 `execution_horizon 15 vs 20` 을 비교한다.
 
-3. **시나리오 다양화**
+4. **시나리오 다양화**
    - shirt 위치, 초기 구김 정도, 조명 변화를 작게 나눠 Track A 반복성을 본다.
 
-4. **full_folding gate 산출물 기준 정리**
+5. **full_folding gate 산출물 기준 정리**
    - D-8a relaware 결과를 README/PLAN 의 다음 결정 항목과 일치시킨다.
 
 ---
@@ -164,7 +173,27 @@ cleanup_errors: []
 events 에 full 16D action vector 가 없어 실제 벡터 jerk 는 재구성할 수 없고,
 `max_abs_commanded_delta_deg` 기반 proxy 로 비교했다. chunk 직후 첫 5 action 의
 jerk proxy mean 은 `2687.141` → `971.120` 으로 `-63.9%`, p95 는 `15071.648` →
-`3609.263` 으로 `-76.1%` 감소했다. operator 시각 리뷰는 사용자 확인 대기다.
+`3609.263` 으로 `-76.1%` 감소했다. operator 시각 리뷰도 이전 실행 대비
+chunk lip 이 일부 감소했다.
+
+---
+
+## Track A RTC ON repeat 부분 실행 중단 (syhlabtop 세션, 2026-05-18)
+
+```text
+trial: /home/syhlabtop/openarm_folding_20260512/rollout_trial_20260518_184402_rtc_on_repeat/
+report: audits/openarm_folding/trackA_rtc_on_repeat_partial_20260518_184402.md
+rollout_cleanup_fix_commit: 5af32b7a
+actions_executed: 1118
+chunks_accepted: 19
+duration_s: 42.400
+inference_error: right_wrist read failed after wait_for_frames cannot be called before start()
+```
+
+판정: 중단 원인은 RTC/정책 문제가 아니라 오른팔이 기둥 쪽으로 가면서 right wrist
+카메라 케이블이 물리적으로 빠진 것이다. 이 실행은 cleanup 중 camera stop 예외가
+execute summary 기록을 막았고, 후속 커밋 `5af32b7a` 로 camera cleanup 예외가 있어도
+summary 를 남기도록 수정했다.
 
 ---
 
