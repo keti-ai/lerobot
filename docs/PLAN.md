@@ -1,6 +1,6 @@
 # OpenArm 폴딩 재학습 — 작업 플랜 (SSOT)
 
-**마지막 갱신:** 2026-05-18 (D-8a gate 완료, deploy 후보 없음)
+**마지막 갱신:** 2026-05-18 (D-10c 완료, serving 복구)
 **브랜치:** `audit/openarm-folding-baseline`  
 **용도:** 이 레포에 들어오는 Codex/Claude 세션이 이 문서 하나만으로 다음 작업을 선택 가능하게 함.
 
@@ -95,8 +95,8 @@ venv:   /data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_
 검증:   torch 2.7.1+cu126, cuDNN 90501, cuDNN enabled Conv2d PASS
         1-step train smoke PASS with dataset.video_backend=pyav
 주의:   torchcodec backend FAIL. D-8 config는 pyav 사용, optimizer.foreach 제거 필요.
-상태:   D-8a 003000 continuation 은 012000까지 저장 후 recipe gate 전부 FAIL.
-        replay는 실행하지 않았고 deploy 후보 없음. 병행 작업은 syhlabtop Track D1/D3 의미.
+상태:   D-10c 결과, D-8a에 사용한 current stage29/stage22 gate는 relstats-aware
+        contract와 맞지 않는 false-negative. D-8a는 relstats-aware gate/replay 재판정 필요.
 ```
 
 ---
@@ -110,7 +110,7 @@ venv:   /data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_
 | **P1** 전처리 | level2 chunk30 relstats | ✅ 완료 | gripper 제외 |
 | **P2** 전처리 | full_folding chunk30 relstats | ✅ 완료 | curated mix 필요 여부 = D-2 |
 | **T1** 학습 | level2 step 4000 PI0.5 | ✅ 완료 | loss 0.066 |
-| **T2** 학습 | full_folding step 4000 PI0.5 + D-8a 추가 재학습 | ⚠️ no candidate | D-8a 001000~012000 recipe FAIL |
+| **T2** 학습 | full_folding step 4000 PI0.5 + D-8a 추가 재학습 | ⚠️ 재판정 필요 | D-10c: current gate false-negative |
 | **G1** Recipe gate | level2 004000 | ✅ PASS | — |
 | **G2** Replay gate | level2 004000 | ✅ PASS | — |
 | **G3** Recipe gate | full_folding 004000 | ✅ PASS | — |
@@ -124,7 +124,7 @@ venv:   /data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_
 | **R3** 카메라 정렬 | base FOV/scale 일치 | ⬜ 미완 | physical raise vs preprocessing = D-6 |
 | **R4** 축 probe | left_joint_{4,5,6,7} + 양 gripper sign | ⬜ 미완 | operator 입회 필요 = D-7 |
 | **R5** 분석 | 시나리오 다양화 / 결과 회귀 | ⬜ 미완 | — |
-| **R6** ckpt selection | full_folding deploy 후보 선정 | ❌ 후보 없음 | D-8a도 no-candidate, D-10 결정 필요 |
+| **R6** ckpt selection | full_folding deploy 후보 선정 | ⏳ 재판정 필요 | D-8a relstats-aware gate/replay 필요 |
 
 ---
 
@@ -133,7 +133,7 @@ venv:   /data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_
 | Track | Goal | 현재 상태 |
 |---|---|---|
 | **A** | syhlabtop level2 라이브 롤아웃 | UNBLOCKED — Track D 결과 본 뒤 messy shirt 실행 |
-| **B** | full_folding 재학습 | **D-8a NO CANDIDATE** — 001000~012000 recipe FAIL, replay SKIPPED |
+| **B** | full_folding 재학습 | **D-10c COMPLETE** — current gate false-negative, relstats-aware 재판정 필요 |
 | **C** | full_folding ckpt 002000/003000 replay gate 비교 | **COMPLETE** — 둘 다 FAIL, deploy 후보 없음 |
 | **D** | 축 방향 probe + base 카메라 정렬 | IN_PROGRESS — syhlabtop 병행 작업, D1/D3 read-only 우선 |
 
@@ -145,7 +145,7 @@ P0 (안전 불변조건):
 
 P1 (A6000 진행 중):
   - D-9: option (i) torch 2.7.x + 호환 cuDNN 새 venv smoke PASS
-  - D-8a: 003000 continuation 은 no-candidate. 다음 방향은 D-10 결정 필요
+  - D-10c: current gate false-negative 판정. D-8a relstats-aware gate/replay 재판정 필요
 
 P2 (병렬 가능):
   - D-8/D-10: 다음 재학습 또는 원인 조사 방향 결정
@@ -172,9 +172,9 @@ P3 (Track D 통과 후):
 | **D-5** | Track A 라이브 롤아웃 실행 일정 | Track D 통과 후. operator 입회 필요. |
 | **D-6** | base 카메라 정렬 우선순위 | (a) 물리 raise/tilt 우선 vs (b) runtime preprocessing transform 우선. 후자는 `vision_preprocess_id` 로 contract 등록 필요. |
 | **D-7** | left_joint_{4,5,6,7} + 양 gripper 물리 축 probe 실행 여부 | `limit_axis_physical_check_plan_2026-05-14.md` 의 `+1deg/-1deg` 시퀀스. operator 입회 필요. |
-| **D-8** | full_folding 002000/003000/004000 모두 replay FAIL — 추가 재학습 | D-8a 003000 continuation 은 012000까지 저장 후 step 12120 부근 `FrameTimestampError` 로 종료. 생성 checkpoint `001000`~`012000` 모두 recipe FAIL, replay SKIPPED, deploy 후보 없음. Summary: `audits/openarm_folding/a6000_d8a_gate_summary.md`. |
+| **D-8** | full_folding 002000/003000/004000 모두 replay FAIL — 추가 재학습 | D-8a 003000 continuation 은 012000까지 저장 후 step 12120 부근 `FrameTimestampError` 로 종료. 생성 checkpoint `001000`~`012000` current gate는 recipe FAIL/replay SKIPPED였으나, D-10c에서 gate false-negative로 판정. relstats-aware gate/replay 재판정 필요. |
 | **D-9** | A6000 cuDNN 환경 — Conv2d 가 `CUDNN_STATUS_NOT_INITIALIZED` 실패 | 사용자 결정: option (i) torch 2.7.x + 호환 cuDNN 새 venv. 새 venv smoke PASS: torch `2.7.1+cu126`, cuDNN `90501`, Conv2d PASS, 1-step train smoke PASS with pyav. torchcodec backend FAIL. 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/audits/d9_torch27_train_smoke_20260515.{md,json}` |
-| **D-10** | D-8a no-candidate 이후 다음 방향 | 선택 필요: (a) recipe 보존 설정으로 D-8a 재시도, (b) D-8b fold-only subset 재학습, (c) full_folding continuation 중 postprocessor/RABC 기록이 gate 밖으로 벗어난 원인 조사. 임의 결정 금지. |
+| **D-10** | D-8a no-candidate 이후 다음 방향 | **case γ 완료**: checkpoint/config 결함보다 current gate/진단 코드가 relstats-aware contract를 반영하지 못한 false-negative. 다음은 D-8a `001000`~`012000` relstats-aware recipe/replay 재판정. |
 
 ---
 
@@ -239,6 +239,7 @@ P3 (Track D 통과 후):
 |---|---|---|
 | 2026-05-15 | a6000 측 Track C 결과 + D-9 cuDNN 환경 리뷰 통합. G5/G6 FAIL 반영, D-3/D-4 종결, D-8/D-9 신규. | 머지 커밋, origin/378e2bd9 + origin/33ee0da4 |
 | 2026-05-18 | D-8a 003000 continuation gate 완료. 001000~012000 모두 recipe FAIL, replay SKIPPED, deploy 후보 없음. D-10 결정 항목 추가. | A6000 측 작업 |
+| 2026-05-18 | A6000 8766/8765 serving 복구. D-10c postprocessor/RABC 진단 완료, case γ current gate false-negative 판정. | A6000 측 작업 |
 | 2026-05-15 | SSOT 도입 (`docs/PLAN.md`, `docs/STATUS.md`), `docs/_archive/openarm_folding/` 분리, `AGENTS.md` 에 OpenArm Fork Operations 섹션 + 8개 하드룰 추가 | 96개 stage 잔재 archive 이동 |
 | 2026-05-15 | `syhlabtop_live_guarded_rollout.py` 에 `--readback-stride`, `--hold-last-action` 추가 | 모션 끊김 해소 |
 | 2026-05-15 | Track B `full_folding` 004000 학습 완료, replay gate FAIL | A6000 측 작업 |

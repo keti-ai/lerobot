@@ -32,6 +32,13 @@
 Recipe PASS checkpoint가 없으므로 replay gate는 실행하지 않았다.
 `001000`~`012000` 모두 deploy candidate가 아니다.
 
+2026-05-18 D-10c 진단에서 이 판정은 current `stage29/stage22` gate 기준의
+false-negative 가능성이 높다고 재해석했다. 해당 gate는 relstats dataset의
+already-relative action을 다시 `action - state` 로 처리하고, RABC 기록 위치도
+현재 `sample_weighting` contract가 아닌 top-level `use_rabc` 로 기대한다. 따라서
+이 표는 “current gate 결과”로만 보존하고, deploy 여부는 relstats-aware gate/replay
+재판정 전까지 미정이다.
+
 주요 실패는 두 가지다.
 
 - `rabc_recorded_in_train_config`: 저장된 `train_config.json` 에 gate가 기대하는 RABC 기록이 없다.

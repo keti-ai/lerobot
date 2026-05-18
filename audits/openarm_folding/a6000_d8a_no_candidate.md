@@ -4,6 +4,11 @@
 
 D-8a `003000` continuation 산출 checkpoint `001000`~`012000` 중 deploy 후보는 없다.
 
+2026-05-18 D-10c 진단 후 이 문서의 의미를 좁힌다. 여기서 말한 no-candidate는
+current `stage29/stage22` gate 기준이며, 해당 gate는 relstats-aware contract와 맞지
+않는 false-negative 가능성이 높다. 최종 deploy 후보 여부는 relstats-aware
+recipe/replay 재판정 전까지 미정이다.
+
 ## 근거
 
 - 학습은 `012000` checkpoint까지 저장한 뒤 step 12120 부근에서 `FrameTimestampError` 로 종료했다.

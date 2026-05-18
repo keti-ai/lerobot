@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-18 (D-8a gate 완료, deploy 후보 없음)
+**마지막 갱신:** 2026-05-18 (D-10c 완료, serving 복구)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -9,8 +9,8 @@
 
 | Track | 상태 | 다음 행동 |
 |---|---|---|
-| **A** — syhlabtop level2 라이브 롤아웃 | 120s closed-loop 인프라 준비 완료, draft는 A6000 serving health 대기 | serving 복구 후 envelope 재생성, 이후 operator 입회 실행 |
-| **B** — full_folding 재학습 | **D-8a NO CANDIDATE** | D-8a 재시도 vs D-8b fold-only vs postprocessor/RABC 원인 조사 결정 |
+| **A** — syhlabtop level2 라이브 롤아웃 | 120s closed-loop 인프라 준비 완료, A6000 8766/8765 serving 복구됨 | envelope 재생성, 이후 operator 입회 실행 |
+| **B** — full_folding 재학습 | **D-10c COMPLETE — gate false-negative** | D-8a 001000~012000 relstats-aware gate/replay 재판정 |
 | **C** — full_folding ckpt 002000/003000 replay 비교 | **COMPLETE** | ckpt 002000/003000/004000 모두 replay FAIL → deploy 후보 없음 |
 | **D** — 축 probe + base 카메라 정렬 | read-only 결과 보존, 단일 조인트 probe/side-by-side 후속 폐기 | closed-loop 긴 타임시퀀스 평가로 전환 |
 
@@ -26,9 +26,10 @@
    - 산출물: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/full_folding_dataset_replay_{002000,003000}.{md,json}`
    - D-8a config: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/d8a_full_folding_continue_003000_torch27_pyav_config_20260515.json`
    - D-8a command: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/audits/d8a_full_folding_continue_003000_torch27_pyav_command_20260515.md`
-   - D-8a gate: `001000`~`012000` 모두 recipe FAIL. replay gate는 SKIPPED. deploy 후보 없음.
-   - 공통 실패: `rabc_recorded_in_train_config`, `postprocessor_action_stats_are_relative_for_arm_joints`; rel_q01_err 40.268 deg, rel_q99_err 39.561 deg, span_ratio 12.932.
+   - D-8a current gate: `001000`~`012000` 모두 recipe FAIL, replay SKIPPED. D-10c에서 false-negative 가능성이 높다고 판정.
+   - D-10c 결론: full_folding 003000과 D-8a 012000의 postprocessor stats diff는 0.0. RABC는 `sample_weighting` 에 기록되어 있다. current `stage29/stage22` gate가 relstats-aware contract와 맞지 않는다.
    - D-8a summary: `audits/openarm_folding/a6000_d8a_gate_summary.md`, `audits/openarm_folding/a6000_d8a_no_candidate.md`
+   - D-10c diagnosis: `audits/openarm_folding/a6000_d10c_postprocessor_rabc_diagnosis_20260518.md`
 
 2. **base 카메라 FOV/scale 미스매치 — side-by-side 후속 폐기**
    - D3 live capture: `/tmp/openarm_folding_policy_input_viewer/policy_input_view_20260515_144933/`
@@ -65,8 +66,11 @@
    - 실패 파일: `videos/observation.images.right_wrist/chunk-000/file-557.mp4`, queried timestamp 1352.2334 vs loaded 1352.2333 근방, tolerance 0.0001 초과.
    - 생성된 001000~012000 checkpoint는 recipe gate 모두 FAIL. replay는 실행하지 않았다. deploy 후보 없음.
 
-6. **Track A closed-loop dry-run envelope 대기 — A6000 serving down**
-   - `http://10.252.205.103:8766/health`, `http://10.252.205.103:8765/health` 모두 connection refused
+6. **RESOLVED — A6000 serving 복구**
+   - `http://10.252.205.103:8766/health`, `http://10.252.205.103:8765/health` 모두 OK
+   - 8766 live: level2 corrected 004000, `send_allowed=false`, `motion_allowed=false`
+   - 8765 snapshot: level2 corrected 004000, `send_allowed=false`, `motion_allowed=false`
+   - 산출물: `audits/openarm_folding/a6000_serving_restored_20260518.md`
    - dry-run trial: `/home/syhlabtop/openarm_folding_20260512/rollout_trial_20260515_164553_closed_loop_dryrun/`
    - summary: `live_session/summary.json`
    - 결과: `execute_requested=false`, `actuator_commands_sent=false`, `command_path=not_run`, `chunks_accepted=0`, `torque_disable_complete=true`
@@ -85,14 +89,14 @@
    - 실행 직전 A6000 serving health 확인 후 120s/180chunk draft envelope 를 재생성한다.
    - `--execute` 는 operator 입회, power abort, approval phrase 확인 후 별도 세션에서만 실행한다.
 
-2. **D-8 다음 방향 결정**
-   - D-8a recipe 보존 설정 재시도, D-8b fold-only subset, postprocessor/RABC 원인 조사 중 하나를 선택한다.
-   - 현재 D-8a 산출물은 deploy 후보가 아니다.
+2. **D-8a relstats-aware gate/replay 재판정**
+   - current `stage29/stage22` gate 결과를 deploy 판정에 쓰지 않는다.
+   - D-8a `001000`~`012000` 을 relstats-aware recipe/replay gate로 다시 판정한다.
 
-3. **A6000 serving 복구**
-   - Track A draft envelope 생성을 위해 port 8766 `/health` 를 복구한다.
+3. **Track A draft envelope 재생성**
+   - A6000 8766 `/health` 복구 상태에서 120s/180chunk draft envelope 를 재생성한다.
 
-4. **선택 후 D-8b 또는 D-8a 재시도 실행**
+4. **재판정 후 D-8a 재시도 또는 D-8b 결정**
 
 ---
 
