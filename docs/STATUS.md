@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-18 (Track A 첫 closed-loop 120s 완주 + A6000 RTC health 노출 + D-8a relaware 재판정)
+**마지막 갱신:** 2026-05-18 (Track A RTC ON 두 번째 120s 완주 + D-8a relaware no-candidate)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -9,7 +9,7 @@
 
 | Track | 상태 | 다음 행동 |
 |---|---|---|
-| **A** — syhlabtop level2 라이브 롤아웃 | **첫 120s closed-loop 완주** | 실행 로그/시각 결과 기반 다음 파라미터 조정 |
+| **A** — syhlabtop level2 라이브 롤아웃 | **첫 120s closed-loop PASS, 두 번째 RTC ON 120s 완주** | operator 시각 리뷰 반영 후 RTC 파라미터 유지/조정 결정 |
 | **B** — full_folding 재학습 | **D-8a relaware COMPLETE — no deploy candidate** | D-8b fold-only 또는 추가 step 여부 결정 |
 | **C** — full_folding ckpt 002000/003000 replay 비교 | **COMPLETE** | ckpt 002000/003000/004000 모두 replay FAIL → deploy 후보 없음 |
 | **D** — 축 probe + base 카메라 정렬 | read-only 결과 보존, 단일 조인트 probe/side-by-side 후속 폐기 | closed-loop 긴 타임시퀀스 평가로 전환 |
@@ -69,7 +69,7 @@
    - 생성된 001000~012000 checkpoint는 current gate 기준 recipe FAIL이었으나 relaware gate 기준 recipe PASS로 복구.
    - relaware replay는 001000~012000 모두 FAIL. deploy 후보 없음.
 
-6. **RESOLVED — A6000 serving 복구 + Track A 첫 closed-loop 완주**
+6. **RESOLVED — A6000 serving 복구 + Track A RTC ON 두 번째 closed-loop 완주**
    - `http://10.252.205.103:8766/health`, `http://10.252.205.103:8765/health` 모두 OK
    - 8766 live: level2 corrected 004000, `send_allowed=false`, `motion_allowed=false`
    - 8766 RTC: `rtc_enabled=true`, `rtc_execution_horizon=20`, `rtc_max_guidance_weight=10.0`, `rtc_prefix_attention_schedule=EXP`, `use_relative_actions=true`
@@ -81,6 +81,10 @@
    - 이벤트: `hard_block=0`, proposal validation warning `0`
    - saturations: clipped `805`, gripper `648`, joint4 `0`, joint_limit `3049`
    - 결과 문서: `audits/openarm_folding/trackA_first_closed_loop_run_20260518_131627.md`
+   - RTC ON second trial: `/home/syhlabtop/openarm_folding_20260512/rollout_trial_20260518_141401_rtc_on/`
+   - RTC ON 결과: `stop_reason=max_session_duration_s`, `actions_executed=2907`, `chunks_accepted=135`, `torque_disable_complete=true`, `cleanup_errors=[]`
+   - transition proxy: chunk 직후 첫 5 action jerk proxy mean `2687.141` → `971.120` (`-63.9%`), p95 `15071.648` → `3609.263` (`-76.1%`)
+   - RTC ON 결과 문서: `audits/openarm_folding/trackA_rtc_on_run_20260518_183440.md`
 
 7. **a6000(ketiserver) 측 워크트리 동기화 부재 — 참고만**
    - a6000 Codex 세션이 본 워크트리에는 audits/openarm_folding/ 의 현역 md/py 일부가 untracked/누락 상태였음
@@ -91,17 +95,16 @@
 
 ## 다음 N개 작업 (우선순위 순)
 
-1. **Track A 실행 로그 분석 — saturation 상위 feature/구간 집계**
-   - 입력: `/home/syhlabtop/openarm_folding_20260512/rollout_trial_20260518_131245_level2_messy_shirt_retry_no_readback_fix/live_session/events.ndjson`
-   - 목표: joint_limit/gripper saturation 이 높은 원인을 feature 별로 나눠 다음 파라미터 조정을 정한다.
-
-2. **Track B 다음 방향 결정**
+1. **Track B 다음 방향 결정**
    - D-8a relaware 결과도 no-candidate.
    - D-8b fold-only subset 재학습 또는 D-8a 추가 step 중 하나를 사용자 결정으로 선택한다.
 
-3. **Track A 두 번째 120s 실행 준비**
-   - 같은 120s/180chunk 설정을 기본값으로 유지한다.
-   - scene 초기조건과 shirt 중심 위치를 더 일관되게 맞춘 뒤 새 envelope 를 생성한다.
+2. **필요 시 RTC parameter tuning**
+   - operator 리뷰가 `유사` 또는 `악화` 이면 `max_guidance_weight 5 vs 10 vs 15` 를 우선 비교한다.
+   - 필요 시 `execution_horizon 15 vs 20` 을 비교한다.
+
+3. **시나리오 다양화**
+   - shirt 위치, 초기 구김 정도, 조명 변화를 작게 나눠 Track A 반복성을 본다.
 
 4. **full_folding gate 산출물 기준 정리**
    - D-8a relaware 결과를 README/PLAN 의 다음 결정 항목과 일치시킨다.
@@ -141,6 +144,27 @@ cleanup_errors: []
 판정: 첫 120초 closed-loop 는 runtime 막힘 없이 완주했다. eval frame 5개 샘플 중
 시작 이후 4개 샘플에서 양팔 접근/접촉과 셔츠 형태 변화가 보인다. 완성 fold 는
 아니며, 다음 작업은 saturation feature 분석과 scene 초기조건 개선이다.
+
+---
+
+## Track A RTC ON 두 번째 closed-loop 120s 실행 결과 (syhlabtop 세션, 2026-05-18)
+
+```text
+trial: /home/syhlabtop/openarm_folding_20260512/rollout_trial_20260518_141401_rtc_on/
+report: audits/openarm_folding/trackA_rtc_on_run_20260518_183440.md
+rtc_envelope_commit: 547419d9
+stop_reason: max_session_duration_s
+actions_executed: 2907
+chunks_accepted: 135
+torque_disable_complete: true
+cleanup_errors: []
+```
+
+판정: RTC ON 상태에서 두 번째 120초 closed-loop 도 runtime 막힘 없이 완주했다.
+events 에 full 16D action vector 가 없어 실제 벡터 jerk 는 재구성할 수 없고,
+`max_abs_commanded_delta_deg` 기반 proxy 로 비교했다. chunk 직후 첫 5 action 의
+jerk proxy mean 은 `2687.141` → `971.120` 으로 `-63.9%`, p95 는 `15071.648` →
+`3609.263` 으로 `-76.1%` 감소했다. operator 시각 리뷰는 사용자 확인 대기다.
 
 ---
 
