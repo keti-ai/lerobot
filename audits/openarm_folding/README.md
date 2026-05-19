@@ -17,6 +17,9 @@
 - `a6000_snapshot_policy_server.py` — A6000 snapshot policy server, port 8765
 - `a6000_*.md` — a6000 측 진행/진단 ping 파일
 
+a6000 측 운영: tmux 일회성 세션으로 학습/서빙 기동. 자동화 daemon 사용 안 함.
+학습-gate-서빙 사이클은 수동 트리거 + 수동 결과 commit 으로 운영.
+
 ## Archive 기준
 
 2026-05-19 이후 syhlabtop custom rollout harness, viewer/client, Track A trial report,
