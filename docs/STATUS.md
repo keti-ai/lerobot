@@ -68,23 +68,26 @@
 
 ## 다음 N개 작업 (우선순위 순)
 
-1. **Phase 2 Dataset Registry 총망라 작성**
+1. **Phase 1 follow-up: feasibility 목표 재정의 + §7-bis 판정 기준**
+   - 이 commit 으로 종결한다.
+
+2. **Phase 2 Dataset Registry 총망라 작성**
    - `level2_final_quality3_t_0_hil_data_c`, `lerobot/full_folding`, A6000 relstats datasets, D-8a continuation dataset/config 를 한 표로 정리한다.
    - fps, camera, action/state contract, relative/absolute semantics, curation, SARM/RABC, gate/replay 결과를 포함한다.
 
-2. **Phase 2 Model Registry v2 재스터디**
+3. **Phase 2 Model Registry v2 재스터디**
    - A6000 level2 corrected 004000, A6000 8766/8765 serving, `lerobot/folding_latest`, public folding 후보, base/pretrain 후보를 tier 로 분류한다.
    - 각 모델을 `official rollout 후보`, `serving truth source`, `metadata/gate only`, `reference only`, `not deploy` 로 구분한다.
 
-3. **Phase 3 OpenArm follower connect side-effect 최소 패치**
+4. **Phase 3 OpenArm follower connect side-effect 최소 패치**
    - `configure_on_connect`, `set_zero_position_on_connect`, `enable_torque_on_connect` config flag 를 추가한다.
    - 기본값은 upstream 동작 유지, OpenArm folding 실험 명령에서만 side effect 를 끈다.
 
-4. **Phase 3 공식 `lerobot-rollout` preflight/load test**
+5. **Phase 3 공식 `lerobot-rollout` preflight/load test**
    - `uv run lerobot-rollout --help`, config parse, policy metadata load, camera config, A6000 checkpoint local materialization 여부를 확인한다.
    - 실제 모션 없이 수행한다.
 
-5. **operator 입회 후 official rollout 첫 모션 테스트**
+6. **operator 입회 후 official rollout 첫 모션 테스트**
    - operator 현장 입회, power abort, E-stop 준비를 확인한 뒤 실행한다.
    - 첫 실행 결과는 visual/task success, chunk transition, grasp 안정성, camera cable risk 중심으로 평가한다.
 

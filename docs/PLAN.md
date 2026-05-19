@@ -8,19 +8,16 @@
 
 ## 1. 최종 목표
 
-이 레포는 upstream LeRobot 위에 OpenArm 폴딩 실험을 얹은 포크다. 목표는
-Hugging Face cloth-folding 계열 데이터셋과 A6000 재학습 산출물을 OpenArm 16D 양팔
-하드웨어에서 공식 `lerobot-rollout` 실행 경로로 평가하고, 안정적인 폴딩 후보를
-선정하는 것이다.
+이 레포는 `lerobot` 포크다. **현재 단계는 운영이 아니라 feasibility 검증**이다:
+HuggingFace 의 cloth-folding 모델군 (PI0.5 `folding_latest`, ablation 시리즈,
+자체 재학습 ckpt) 중 어떤 후보가 OpenArm 16D 양팔에서 "양팔이 옷에 접촉하고
+폴딩스러운 시퀀스를 시도" 하는지를 짧게 여러 번 돌려서 확인한다.
 
-태스크 텍스트: `Fold the T-shirt properly`.
+운영 후보 선정은 feasibility 결과를 본 다음 사이클의 결정 사항.
+특정 ckpt (예: level2 corrected 004000) 의 task success 자체가 목표가 아니라
+여러 후보의 동작 패턴 탐색이 목표.
 
-현재 deploy 가능성이 남아 있는 운영 후보는 **level2 corrected checkpoint 004000**
-이다. 이 후보는 recipe PASS + replay PASS 이며, 현재 A6000 `8766` live server 와
-`8765` snapshot server 에서 서빙 중이다.
-
-`full_folding` 계열 `002000`, `003000`, `004000`, D-8a continuation `001000`~`012000`
-은 replay gate FAIL 이므로 현재 deploy 후보가 아니다.
+라이브 baseline: 공식 `lerobot-rollout` + operator 입회 + power abort / E-stop.
 
 ---
 
@@ -226,6 +223,47 @@ Custom syhlabtop rollout, Track A trial report, viewer/client, historical Track 
 ```
 
 ---
+
+## 7-bis. Feasibility 판정 기준
+
+현재 단계의 라이브 세션은 task success 가 아니라 folding 시도 패턴을
+관찰하는 feasibility test 다. 세 역할이 같은 기준을 공유한다.
+
+### 정성 (operator 가 라이브 직후 1줄 평가)
+
+- 양팔이 testing zone 안에서 옷에 **접근** 했는가
+- gripper open/close 가 **옷 잡기 의도** 로 보이는가
+- 한쪽이 옷을 들고 다른 쪽이 **받는 패턴** 이 시도되는가
+- 폴딩 동작 (대각선 접기 / 가운데 접기) 의 **일부** 라도 보이는가
+
+### 정량 (study assistant 가 summary.json 에서 추출)
+
+- `actions_executed`, `chunks_accepted` — runtime PASS proxy
+- gripper close 횟수 — 옷 잡기 시도 빈도 proxy
+- left-right joint trajectory 의 상관 계수 — 양팔 협응 proxy
+- hard saturation count — 정책이 한계에 박혀 있는지
+
+### 판정 라벨
+
+- **PROMISING** — 폴딩 시도 동작 일부 관찰. 시간 더 투자할 가치
+- **AMBIGUOUS** — 양팔은 움직이나 의도 불명. 다른 ckpt 우선 시도
+- **REJECTED** — 옷 근처에 안 감 / 명백히 다른 task / 즉시 폐기
+
+### 역할별 사용법
+
+- **operator**: 라이브 세션 직후 정성 4항목 체크 + 라벨 1개 + 1줄 코멘트.
+  `audits/openarm_folding/feasibility_runs_<date>.md` 에 append.
+- **planner**: feasibility_runs 누적 → PROMISING 후보의 학습 방향 / 다음
+  실험 큐 결정. PLAN.md §5 결정 항목 (D-13 등) 에 반영.
+- **study assistant** (Registry/Codex): 정량 지표 추출 자동화. Registry §8/§9
+  의 `feasibility_test_priority` 컬럼 갱신 입력으로 사용.
+
+### 결과 누적 위치
+
+- 텍스트 보고서 (정성/정량 요약, 1세션당 수 KB): syhlabtop git tracked
+  `audits/openarm_folding/feasibility_runs_<YYYYMMDD>.md` 한 파일에 일자별 append
+- 영상 / 카메라 frame / eval_frames 대용량: `/home/syhlabtop/openarm_folding_20260512/feasibility/<trial>/`
+  (git ignore 영역, 필요 시 rsync 로 a6000 NAS 동기화)
 
 ## 7. 변경 이력
 
