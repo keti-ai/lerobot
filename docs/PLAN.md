@@ -1,6 +1,6 @@
 # OpenArm 폴딩 재학습/롤아웃 플랜 (SSOT)
 
-**마지막 갱신:** 2026-05-19 (custom rollout archive, `lerobot-rollout` baseline 전환 준비)  
+**마지막 갱신:** 2026-05-19 (Dataset/Model Registry Phase 2 반영)
 **브랜치:** `audit/openarm-folding-baseline`  
 **용도:** 이 레포에 들어오는 세션이 현재 전략, 결정 항목, 데이터셋/모델 registry 위치를 한 문서에서 확인하게 한다.
 
@@ -14,8 +14,8 @@ HuggingFace 의 cloth-folding 모델군 (PI0.5 `folding_latest`, ablation 시리
 폴딩스러운 시퀀스를 시도" 하는지를 짧게 여러 번 돌려서 확인한다.
 
 운영 후보 선정은 feasibility 결과를 본 다음 사이클의 결정 사항.
-특정 ckpt (예: level2 corrected 004000) 의 task success 자체가 목표가 아니라
-여러 후보의 동작 패턴 탐색이 목표.
+특정 ckpt (예: level2 corrected 004000) 의 성공률을 고정 목표로 삼지 않고
+여러 후보의 동작 패턴을 탐색하는 것이 목표.
 
 라이브 baseline: 공식 `lerobot-rollout` + operator 입회 + power abort / E-stop.
 
@@ -180,9 +180,9 @@ P3 (Phase 3):
 | **D-8** | OPEN | full_folding no-candidate 이후 다음 재학습 방향 | D-8a relaware 결과도 no-candidate. D-8b fold-only 또는 curated mix 는 Phase 2 이후 결정한다. |
 | **D-9** | RESOLVED | A6000 cuDNN 환경 | option (i) torch 2.7.x + cu126 venv, smoke PASS. |
 | **D-10** | RESOLVED | D-8a gate false-negative 진단 | case gamma 완료. relaware recipe PASS, replay FAIL, deploy 후보 없음. |
-| **D-11** | NEW | official `lerobot-rollout` OpenArm 안전 connect 패치 | `OpenArmFollower.connect()` 의 configure/set_zero/enable_torque side effect 를 config flag 로 제어한다. |
-| **D-12** | NEW | Dataset Registry 총망라 | 데이터셋, 전처리, RABC/SARM, gate/replay 관계를 Phase 2 문서 본문으로 채운다. |
-| **D-13** | NEW | Model Registry v2 재스터디 | public 후보 + A6000 후보를 dataset/gate/replay/rollout role 기준으로 재분류한다. |
+| **D-11** | NEW | Phase 3 serving adapter 위치 | `lerobot-rollout` 전환 시 A6000 HTTP 서빙 호환 adapter 를 server 쪽에 둘지 client 쪽에 둘지 별도 결정한다. |
+| **D-12** | NEW | OpenArmFollower 안전 패치 default | upstream 유지 vs 안전 모드 default 여부는 Phase 3 에서 별도 결정한다. |
+| **D-13** | OPEN | feasibility 첫 live P1 ckpt 큐 선정 | 사용자가 §9 의 P1 row 중 N개를 직접 골라 큐를 정의한다. 자동 추천은 하지 않는다. |
 
 ---
 
@@ -269,6 +269,7 @@ Custom syhlabtop rollout, Track A trial report, viewer/client, historical Track 
 
 | 날짜 | 변경 | 비고 |
 |---|---|---|
+| 2026-05-19 | Dataset Registry §8, Model Registry v2 §9 작성 | Phase 2 |
 | 2026-05-19 | AGENTS hard rules 제거, custom syhlabtop rollout archive, official `lerobot-rollout` baseline 전환 준비 | Phase 1 |
 | 2026-05-18 | A6000 8766/8765 serving 복구. D-10c postprocessor/RABC 진단 완료, case gamma current gate false-negative 판정 | A6000 측 작업 |
 | 2026-05-18 | D-8a relaware gate/replay 재판정. 001000~012000 recipe PASS, replay FAIL, no deploy candidate | A6000 측 작업 |
@@ -279,28 +280,82 @@ Custom syhlabtop rollout, Track A trial report, viewer/client, historical Track 
 
 ---
 
-## 8. Dataset Registry (Phase 2 placeholder)
+## 8. Dataset Registry
 
-Phase 2 에서 다음 컬럼으로 본문을 채운다.
+`feasibility_test_priority` 는 "이 dataset 기반으로 학습 없이 지금 시도 가능한
+OpenArm 16D ckpt 가 있는가" 기준이다. P1 row 가 있더라도 첫 live 큐는 §9
+Decision Inputs 의 D-13 에 따라 사용자가 직접 고른다.
 
-| dataset | source/path | level/task | episodes/frames | fps | cameras | action/state contract | action representation | curation | SARM/RABC | trained models | gate/replay result | deployment relevance |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `level2_final_quality3_t_0_hil_data_c` | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
-| `lerobot/full_folding` | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
-| A6000 level2 relstats chunk30 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
-| A6000 full_folding relstats chunk30 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
-| D-8a continuation dataset/config | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| dataset | source/path | level/task | episodes/frames | fps | cameras | action/state contract | action representation | curation | SARM/RABC | trained models (which checkpoints used this) | gate/replay result | deployment relevance | feasibility_test_priority |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `lerobot/full_folding` | HF public; local source mirror `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/datasets/full_folding_novideo` | full folding public mix; `Fold the T-shirt properly` 4100 eps, layout-then-fold 1561 eps, `Fold` 27 eps | 5688 episodes / 14,129,038 frames | 30 | left_wrist, right_wrist 720x1280; base 480x640 | OpenArm `openarms_follower`; 16D state/action, degrees | source action rows are absolute targets; A6000 relstats derivative converts arm 14D to relative chunk30, grippers excluded/absolute | no correction_report; broad full dataset; fold-only 4100 eps is D-1 candidate | SARM rows 14,129,038; downstream full_folding training uses RABC sample_weighting | A6000 full_folding 001000-004000; D-8a continuation 001000-012000 | relaware recipe PASS, replay FAIL for available full_folding ckpts | important training source, but no current deploy ckpt | P3 |
+| `lerobot-data-collection/level2_final_quality3_t_0_hil_data_c` | HF public; local root `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/datasets/level2_final_quality3_t_0_hil_data_c` | Level 2 high-quality / HIL folding data | 1319 episodes / 3,414,338 frames | 30 | left_wrist, right_wrist 720x1280; base 480x640 | OpenArm `openarms_follower`; 16D state/action, degrees | source action rows are absolute targets; relstats derivative used for training | correction_report present; HQ/HIL subset | SARM progress used by folding/latest lineage and corrected relstats training; RABC in trained configs | public `folding_latest` lineage; A6000 level2 corrected 004000 | level2 corrected 004000 recipe PASS, replay PASS; legacy public folding_latest gate/replay FAIL | current live baseline source, not final goal | P1 |
+| A6000 level2 relstats chunk30 | `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/datasets/level2_final_quality3_t_0_hil_data_c_relative_stats_chunk30` | Level 2 HQ/HIL relstats derivative | 1319 episodes / 3,414,338 frames | 30 | left_wrist, right_wrist 720x1280; base 480x640 | OpenArm 16D state/action, degrees | `use_relative_actions=true`, `chunk_size=30`, 14 arm dims relative, grippers excluded/absolute | corrected relstats derivative of HQ level2 | `sample_weighting.type=rabc`, progress from level2 SARM | `pi05_openarm_relstats_full_nocompile_bsz4_20260512/checkpoints/004000` | recipe PASS, replay PASS, relaware recheck PASS | immediate feasibility baseline candidate | P1 |
+| A6000 full_folding_relative_stats_chunk30 | `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/datasets/full_folding_relative_stats_chunk30` | full_folding relstats derivative | 5688 episodes / 14,129,038 frames; 13,964,086 valid relative chunks | 30 | left_wrist, right_wrist 720x1280; base 480x640 | OpenArm 16D state/action, degrees | `use_relative_actions=true`, `chunk_size=30`, 14 arm dims relative, grippers excluded/absolute | relstats recompute PASS; source has 3 task variants | SARM rows 14,129,038; RABC progress path local `sarm_progress.parquet`; kappa 0.0265 | full_folding 001000-004000; D-8a 001000-012000 | relaware recipe PASS; replay FAIL for checked ckpts | valuable training source, but current ckpts not deploy | P3 |
+| D-8a continuation dataset/config | config `/data/.../full_folding_parallel_20260514/audits/d8a_full_folding_continue_003000_torch27_pyav_config_20260515.json`; dataset root same full_folding relstats chunk30 | continuation from full_folding 003000 toward 012000 | same as full_folding relstats | 30 | left_wrist, right_wrist 720x1280; base 480x640 | OpenArm 16D state/action, degrees | relative chunk30, grippers excluded/absolute; video_backend `pyav` | continuation config only; no new dataset curation | RABC sample_weighting kept; local SARM progress path | `pi05_openarm_full_folding_continue003000_torch27_pyav_20260515/checkpoints/001000..012000` | 001000-012000 relaware recipe PASS, replay FAIL | no deploy candidate; informs D-8 next training choice | P3 |
+| `lerobot-data-collection/folding_final10` | public model/checkpoint repo; local metadata cache `/data/.../candidate_recipe_gate_cache/lerobot-data-collection__folding_final10` | public folding candidate lineage; train_config points to level2 final quality data | dataset details inherited from level2 lineage where recorded | 30 in gate metadata | OpenArm 3cam contract in candidate config | OpenArm 16D; PI0.5 action/state metadata present | relative action config present but processor stats failed legacy gate | public checkpoint candidate, not curated local dataset | RABC/SARM metadata needs relaware recheck | `lerobot/folding_latest` records this as repo_id/output lineage | legacy gate FAIL: postprocessor relative stats mismatch | metadata/gate-only public candidate | P2 |
+| `lerobot-data-collection/folding_final` | public model/checkpoint repo; local metadata cache `/data/.../candidate_recipe_gate_cache/lerobot-data-collection__folding_final` | public folding candidate; train_config points to `level2_final_quality3` lineage | not fully revalidated in Phase 2 | 30 in gate metadata | OpenArm 3cam contract in candidate config | OpenArm 16D metadata present | relative action config present but stats mismatch in legacy gate | public checkpoint candidate | RABC/SARM metadata needs relaware recheck | pretrained/base path for `folding_latest` lineage | legacy gate FAIL: dataset mismatch + postprocessor stats mismatch | metadata/gate-only public candidate | P2 |
+| `lerobot-data-collection/ablation2-5_0` | public model/checkpoint repo; local metadata cache `/data/.../candidate_recipe_gate_cache/lerobot-data-collection__ablation2-5_0` | robot-folding ablation candidate | not fully revalidated in Phase 2 | 30 in gate metadata | OpenArm 3cam contract in candidate config | OpenArm 16D metadata present | relative action config present but stats mismatch in legacy gate | ablation candidate, not current local training data | RABC/SARM metadata needs relaware recheck | public ablation candidate only | legacy gate FAIL: dataset mismatch + postprocessor stats mismatch | metadata/gate-only public candidate | P2 |
+| public legacy ablation group: `ablation1-7_2`, `ablation1-5_9`, `ablation1_3_17_q` | public metadata cache under `/data/.../candidate_recipe_gate_cache/` | older ablation configs | not applicable | unknown/varies | not verified for current OpenArm rollout path | config decode errors use legacy `use_delta_actions` / `delta_exclude_joints` fields | historical reference only | not verified | none in current deploy path | legacy expanded gate ERROR for PI05Config decode | not a feasibility candidate without migration/re-export | X |
+
+### Dataset Findings
+
+- 공식 robot-folding recipe 에서는 고품질·일관 데이터가 핵심 lever 로 보인다.
+- full dataset only 는 Level 2 동작에 약할 수 있다. full_folding 은 더 크지만 task variant 가 섞여 있고, 현재 replay PASS ckpt 가 없다.
+- HQ + relative + RABC fine-tune 이 개선 핵심으로 보인다. 현재 PASS path 는 level2 HQ/HIL relstats + RABC 004000 이다.
+- chunk=45 는 개선 없음으로 기록한다. 현재 registry 의 즉시 후보는 chunk30 기준으로 둔다.
+- 현재 Track A 실패는 runtime 문제만이 아니라 데이터 / 분포 / OOD 가능성이 크다.
+- 다음 후보는 네 갈래로 정리한다:
+  (1) D-8b fold-only 4100 eps,
+  (2) curated mix: level2 + full_folding 선별,
+  (3) `lerobot/folding_latest` 재 metadata 확인,
+  (4) 데이터 추가 수집.
 
 ---
 
-## 9. Model Registry v2 (Phase 2 placeholder)
+## 9. Model Registry v2
 
-Phase 2 에서 public 후보와 A6000 후보를 같은 표에서 재분류한다.
+`feasibility_test_priority` 는 모델/ckpt row 별 분류다. P1 은 조건 충족 여부를
+나타낼 뿐이며, 첫 live 세션 큐 순서는 자동으로 정하지 않는다.
 
-| tier | model/checkpoint | source | training dataset | policy_type | chunk | relative_actions | RABC/SARM | processor/action_normalization_id | gate | replay | rollout role |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| Tier 1 | A6000 level2 corrected 004000 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | PASS | PASS | official rollout 후보 |
-| Tier 1 | A6000 8766 live serving | TODO | TODO | TODO | TODO | TODO | TODO | TODO | PASS | PASS | serving truth source |
-| Tier 1 | `lerobot/folding_latest` | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | public reference |
-| Tier 2 | `folding_final10` / `folding_final` / `ablation2-5_0` | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | metadata/gate only |
-| Tier 2 | base/pretrain models | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | reference only |
+| tier | model/checkpoint | source | training dataset | policy_type | chunk | relative_actions | RABC/SARM | processor/action_normalization_id | gate | replay | rollout role | feasibility_test_priority |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Tier 1 | A6000 8766 live | `http://10.252.205.103:8766`; ckpt `/data/.../pi05_openarm_relstats_full_nocompile_bsz4_20260512/checkpoints/004000/pretrained_model` | level2 relstats chunk30 | pi05 | 30 | true; gripper excluded | RABC sample_weighting + SARM progress | `processor_sha256:94f781979263ad3f6d85df772d790d3d6909e6379ee47aa8e38491056082c67f`; RTC ON | PASS | PASS | 즉시 실행 | P1 |
+| Tier 1 | A6000 8765 snapshot | `http://10.252.205.103:8765`; same level2 corrected 004000 lineage when restored | level2 relstats chunk30 | pi05 | 30 | true; gripper excluded | RABC sample_weighting + SARM progress | same ckpt/processor lineage as 8766; verify `/health` before use | PASS | PASS | 즉시 실행 | P1 |
+| Tier 1 | A6000 local level2 corrected 004000 | `/data/.../pi05_openarm_relstats_full_nocompile_bsz4_20260512/checkpoints/004000/pretrained_model` | level2 relstats chunk30 | pi05 | 30 | true; gripper excluded | `sample_weighting.type=rabc`, kappa 0.0265, level2 SARM progress | same processor as 8766 live | PASS | PASS | 즉시 실행 | P1 |
+| Tier 1 | `lerobot/folding_latest` | local mirror `/data/.../models/folding_latest`; cache `/data/.../candidate_recipe_gate_cache/lerobot__folding_latest` | train_config records `level2_final_quality3_t_0_hil_data_c`; repo lineage `folding_final10` | pi05 | 30 | true; gripper excluded | metadata present but legacy gate mismatch | local processor exists; legacy stats mismatch requires relaware recheck | legacy FAIL | legacy replay FAIL / mismatch | metadata/gate only | P2 |
+| Tier 2 | `lerobot-data-collection/folding_final10` | local cache `/data/.../candidate_recipe_gate_cache/lerobot-data-collection__folding_final10` | level2 final quality lineage | pi05 | 30 | likely true; metadata cache present | needs relaware RABC/SARM recheck | processor exists in cache; legacy stats mismatch | legacy FAIL | not current replay PASS | metadata/gate only | P2 |
+| Tier 2 | `lerobot-data-collection/folding_final` | local cache `/data/.../candidate_recipe_gate_cache/lerobot-data-collection__folding_final` | `level2_final_quality3` lineage in legacy gate | pi05 | 30 | likely true; metadata cache present | needs relaware RABC/SARM recheck | processor exists in cache; legacy stats mismatch | legacy FAIL | not current replay PASS | metadata/gate only | P2 |
+| Tier 2 | `lerobot-data-collection/ablation2-5_0` | local cache `/data/.../candidate_recipe_gate_cache/lerobot-data-collection__ablation2-5_0` | `level2_final_quality3` lineage in legacy gate | pi05 | 30 | likely true; metadata cache present | needs relaware RABC/SARM recheck | processor exists in cache; legacy stats mismatch | legacy FAIL | not current replay PASS | metadata/gate only | P2 |
+| Tier 2 | full_folding 002000/003000/004000 | `/data/.../pi05_openarm_full_folding_relstats_chunk30_20260514/checkpoints/{002000,003000,004000}/pretrained_model` | full_folding relstats chunk30 | pi05 | 30 | true; gripper excluded | RABC + local full_folding SARM progress | processor exists; relaware gate validates stats | relaware PASS | FAIL for 002000/003000/004000 | not deploy | P3 |
+| Tier 2 | D-8a continuation 001000-012000 | `/data/.../pi05_openarm_full_folding_continue003000_torch27_pyav_20260515/checkpoints/{001000..012000}/pretrained_model` | full_folding relstats chunk30 continuation from 003000 | pi05 | 30 | true; gripper excluded | RABC + local full_folding SARM progress | processor carried from 003000; no reset evidence | relaware PASS | FAIL for all 001000-012000 | not deploy | P3 |
+| Tier 2 | `lerobot/pi05_base` | HF base/pretrain reference | broad pretraining, not OpenArm folding fine-tune | pi05 | not folding-specific | not OpenArm folding contract | none for current task | no OpenArm folding processor/action normalization | not run | not run | reference only | X |
+| Tier 2 | `lerobot/pi0_base` | HF base/pretrain reference | broad pretraining, not OpenArm folding fine-tune | pi0 | not folding-specific | not OpenArm PI0.5 16D | none for current task | no OpenArm folding processor/action normalization | not run | not run | reference only | X |
+| Tier 2 | `lerobot/pi05_libero_base` | HF/base reference | LIBERO/pretraining domain | pi05 | not OpenArm folding-specific | not verified for OpenArm 16D folding | none for current task | no OpenArm folding processor/action normalization | not run | not run | reference only | X |
+| Tier 2 | `lerobot/xvla-folding` | HF reference / docs source | XVLA folding reference | xvla | not PI0.5 OpenArm contract | not OpenArm PI0.5 16D direct deploy | not applicable | not compatible with current PI0.5 serving path | not run | not run | reference only | X |
+
+### Decision Inputs (사용자 결정 입력용)
+
+- **D-13 입력**:
+  feasibility 첫 라이브 세션에서 시도할 P1 ckpt 큐는 사용자가 직접 선정한다.
+  자동 추천은 하지 않는다.
+  사용자가 §9 의 P1 row 중 N개를 골라 큐를 정의한다.
+
+- **D-1 (fold-only 4100 eps)**:
+  Registry 분석 결과로 진행 가치 평가만 한다.
+  자동 결정하지 않는다.
+
+- **D-2 (curated mix)**:
+  Registry 분석 결과로 진행 가치 평가만 한다.
+  자동 결정하지 않는다.
+
+- **D-8 (다음 학습 후보)**:
+  P1 live 결과가 PROMISING / AMBIGUOUS / REJECTED 중 어디로 쌓이는지 본 뒤 결정한다.
+  P1 이 모두 REJECTED 면 P2 재검증, P3 학습 추가, 또는 데이터 추가 수집으로 넘어간다.
+
+- **D-11 (Phase 3 serving adapter 위치)**:
+  `lerobot-rollout` 전환 시 A6000 HTTP 서빙 호환 adapter 를 server 쪽에 둘지 client 쪽에 둘지
+  Phase 3 에서 별도 결정한다.
+
+- **D-12 (OpenArmFollower 안전 패치 default)**:
+  upstream 유지 vs 안전 모드 default 여부는 Phase 3 에서 별도 결정한다.
