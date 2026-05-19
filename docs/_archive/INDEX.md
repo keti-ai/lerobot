@@ -12,7 +12,7 @@ action contract 진단, 학습 recovery, 그리고 Stage35–40 packet 단위 fi
 - `docs/PLAN.md` — 단일 진실 공급원 (SSOT)
 - `docs/STATUS.md` — 현재 상태
 - `AGENTS.md` — 운영 룰
-- `audits/openarm_folding/` — 현역 운영 문서 + 스크립트
+- `audits/openarm_folding/` — 현역 gate 도구 + A6000 ping 파일
 
 ## 카테고리
 
@@ -55,6 +55,24 @@ action contract 진단, 학습 recovery, 그리고 Stage35–40 packet 단위 fi
 - `stage39_*` (3개) — packet write #3
 - `stage40_*` (3개) — packet write #4 (Stage 시리즈 종료)
 
+### Track A custom rollout (deprecated 2026-05-19)
+- `syhlabtop_live_guarded_rollout.py` — syhlabtop custom closed-loop rollout harness
+- `syhlabtop_live_policy_input_viewer.py` — 3-camera read-only live viewer
+- `syhlabtop_snapshot_policy_client.py` — snapshot policy client
+- `openarm_limit_axis_audit.py` — joint readback + software limit margin read-only audit
+- `run_rsusb_py312.sh` — RSUSB pyrealsense2 wrapper
+- `trackA_level2_live_test_plan_2026-05-14.md` — custom Track A command template
+- `trackA_first_closed_loop_run_20260518_131627.md` — first 120s custom closed-loop result
+- `trackA_rtc_on_run_20260518_183440.md` — RTC ON second custom closed-loop result
+- `trackA_rtc_on_repeat_partial_20260518_184402.md` — RTC ON repeat partial run, cable disconnect
+- `trackA_rtc_on_repeat3_20260518_185509.md` — RTC ON repeat3 120s result + operator review
+- `visual_dataset_alignment_and_full_folding_retrain_plan_2026-05-14.md` — visual alignment and retrain plan
+- `openpi_lerobot_live_pipeline_check_2026-05-14.md` — OpenPI vs LeRobot live pipeline comparison
+- `damiao_setup_axis_alignment_review_2026-05-14.md` — Damiao setup/axis alignment review
+- `limit_axis_physical_check_plan_2026-05-14.md` — physical axis check plan
+- `openarm_follower_j4_5cm_fabrication_order_2026-05-14.md` — OpenArm J4 extension fabrication order
+- `live_deploy_technique_applicability_2026-05-14.md` — live deploy technique applicability notes
+
 ### Handoff prompts — syhlabtop ↔ A6000 인계 (종료)
 - `syhlabtop_a6000_served_snapshot_handoff_prompt_2026-05-12.md`
 - `syhlabtop_agent_ready_prompt_2026-05-11.md`
@@ -75,7 +93,7 @@ action contract 진단, 학습 recovery, 그리고 Stage35–40 packet 단위 fi
 - `stage30_relative_recipe_reference.py` — 상대 recipe 참조 계산
 - `stage35_no_execute_writer_validation.py`, `stage35_guarded_actual_actuator_write.py` — Stage35 first write 도구
 - `stage37/38/39/40_guarded_served_proposal_write.py` (4개) — served packet write
-- `rollout_trial_guarded_session.py` — 구버전 rollout 세션 (현역은 `audits/openarm_folding/syhlabtop_live_guarded_rollout.py`)
+- `rollout_trial_guarded_session.py` — 구버전 rollout 세션
 - `create_no_send_snapshot_trial.py` — no-send snapshot 생성기
 
 ### JSON 산출물 (8개) — 게이트/probe 출력
@@ -108,4 +126,4 @@ git mv 로 옮겼으므로 `git log --follow docs/_archive/openarm_folding/<파�
 history 추적 가능. 필요 시 `git mv docs/_archive/openarm_folding/<파일> audits/openarm_folding/`
 로 복원 가능.
 
-총 archive 파일 수: **96개** (md 71 + py 17 + json 8).
+총 archive 파일 수: **112개** (md 82 + py 21 + json 8 + sh 1).
