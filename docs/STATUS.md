@@ -45,13 +45,11 @@
    - syhlabtop 측 기존 capture 는 640x480 을 사용했고 server 는 1280x720 으로 resize 후 모델 입력을 구성했다.
    - 공식 `lerobot-rollout` baseline 에서는 training recipe 와 맞는 camera config 를 Phase 3 preflight 에서 다시 확정해야 한다.
 
-5. **RESOLVED — D-9 cuDNN 환경 결정 완료, option (i), D-8a no-candidate**
-   - A6000 torch `2.11.0+cu128` / CUDA `12.8` / cuDNN `91900` 환경에서 cuDNN enabled Conv2d 가 `CUDNN_STATUS_NOT_INITIALIZED` 로 실패했다.
-   - 사용자 결정: option (i) torch 2.7.x + 호환 cuDNN 새 venv.
-   - 새 venv: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/venv312_torch27_20260515`
-   - torch `2.7.1+cu126`, CUDA `12.6`, cuDNN `90501`, torchvision `0.22.1+cu126`
-   - cuDNN enabled Conv2d smoke: PASS
-   - 1-step train smoke: PASS with `dataset.video_backend=pyav`
+5. **RESOLVED — D-9 cuDNN 환경 결정 갱신, D-8a no-candidate**
+   - A6000 torch `2.11.0+cu128` / CUDA `12.8` / cuDNN `91900` 환경은 2026-05-15 cuDNN enabled Conv2d smoke 에서 `CUDNN_STATUS_NOT_INITIALIZED` 로 실패했었다.
+   - 기본 검증 환경은 option (i) torch `2.7.1+cu126`, CUDA `12.6`, cuDNN `90501`, torchvision `0.22.1+cu126` venv 이며, 1-step train smoke 는 `dataset.video_backend=pyav` 로 PASS 했다.
+   - 2026-05-21 현재 torch `2.11.0+cu128`, cuDNN `91900` 에서 cuDNN enabled Conv2d forward/backward multi-shape smoke 가 PASS 했다.
+   - handover alpha 학습은 `uv run --no-sync` 로 환경 재동기화를 막고, 현재 torch 2.11 환경 사용을 허용한다.
    - D-8a relaware replay 는 `001000`~`012000` 모두 FAIL. deploy 후보 없음.
 
 6. **RESOLVED — A6000 serving 복구 + Track A custom RTC ON repeat3 closed-loop 완주**

@@ -90,10 +90,13 @@ driver: 570.133.20
 
 RESOLVED:
   torch 2.11.0+cu128 / CUDA 12.8 / cuDNN 91900 환경은 Conv2d 에서
-  CUDNN_STATUS_NOT_INITIALIZED 로 실패했다.
+  2026-05-15 Conv2d smoke 에서 CUDNN_STATUS_NOT_INITIALIZED 로 실패했다.
 
 결정:
-  option (i) torch 2.7.x + 호환 cuDNN 새 venv.
+  기본 검증 환경은 option (i) torch 2.7.x + 호환 cuDNN 새 venv.
+  단, 2026-05-21 현재 torch 2.11.0+cu128 / cuDNN 91900 환경에서
+  cuDNN enabled Conv2d forward/backward multi-shape smoke 가 PASS 했으므로,
+  handover alpha 학습은 no-sync smoke PASS 조건으로 현재 torch 2.11 환경 사용을 허용한다.
 
 venv:
   /data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/venv312_torch27_20260515
@@ -102,8 +105,11 @@ venv:
   torch 2.7.1+cu126, CUDA 12.6, cuDNN 90501
   cuDNN enabled Conv2d PASS
   1-step train smoke PASS with dataset.video_backend=pyav
+  2026-05-21 torch 2.11.0+cu128, CUDA available, cuDNN 91900
+  cuDNN enabled Conv2d forward/backward multi-shape smoke PASS
 
 주의:
+  uv run 은 --no-sync 로 실행해 학습 중 환경 재동기화를 피한다.
   torchcodec backend FAIL. D-8 계열 config 는 pyav 사용.
   D-8a relaware 재판정 결과는 no-candidate.
 ```
@@ -178,7 +184,7 @@ P3 (Phase 3):
 | **D-6** | DEFERRED | base 카메라 정렬 우선순위 | 별도 side-by-side 후속은 폐기. 첫 official rollout 시각 리뷰로 통합 평가한다. |
 | **D-7** | DEFERRED | 단일 조인트 축 probe | 폐기. 첫 official rollout 시 전체 시퀀스 흐름과 함께 평가한다. |
 | **D-8** | OPEN | full_folding no-candidate 이후 다음 재학습 방향 | D-8a relaware 결과도 no-candidate. D-8b fold-only 또는 curated mix 는 Phase 2 이후 결정한다. |
-| **D-9** | RESOLVED | A6000 cuDNN 환경 | option (i) torch 2.7.x + cu126 venv, smoke PASS. |
+| **D-9** | RESOLVED | A6000 cuDNN 환경 | torch 2.7.x + cu126 venv 가 기본. 2026-05-21 torch 2.11.0+cu128/cuDNN 91900 도 no-sync Conv2d forward/backward smoke PASS 조건으로 handover alpha 학습 허용. |
 | **D-10** | RESOLVED | D-8a gate false-negative 진단 | case gamma 완료. relaware recipe PASS, replay FAIL, deploy 후보 없음. |
 | **D-11** | NEW | Phase 3 serving adapter 위치 | `lerobot-rollout` 전환 시 A6000 HTTP 서빙 호환 adapter 를 server 쪽에 둘지 client 쪽에 둘지 별도 결정한다. |
 | **D-12** | NEW | OpenArmFollower 안전 패치 default | upstream 유지 vs 안전 모드 default 여부는 Phase 3 에서 별도 결정한다. |
