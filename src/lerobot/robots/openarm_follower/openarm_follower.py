@@ -331,15 +331,16 @@ class OpenArmFollower(Robot):
 
         return {f"{motor}.pos": val for motor, val in goal_pos.items()}
 
-    @check_if_not_connected
     def disconnect(self):
         """Disconnect from robot."""
 
         # Disconnect CAN bus
-        self.bus.disconnect(self.config.disable_torque_on_disconnect)
+        if self.bus.is_connected:
+            self.bus.disconnect(self.config.disable_torque_on_disconnect)
 
         # Disconnect cameras
         for cam in self.cameras.values():
-            cam.disconnect()
+            if cam.is_connected:
+                cam.disconnect()
 
         logger.info(f"{self} disconnected.")

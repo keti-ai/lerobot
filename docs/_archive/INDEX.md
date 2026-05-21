@@ -73,6 +73,10 @@ action contract 진단, 학습 recovery, 그리고 Stage35–40 packet 단위 fi
 - `openarm_follower_j4_5cm_fabrication_order_2026-05-14.md` — OpenArm J4 extension fabrication order
 - `live_deploy_technique_applicability_2026-05-14.md` — live deploy technique applicability notes
 
+### Banana handover data collection (2026-05-21)
+- `banana_handover_recording_session_2026-05-21.md` — syhlabtop banana handover 20-episode dataset recipe, resume rule, replay command, and safety notes
+- `syhlabtop_banana_handover_handoff_prompt_2026-05-21.md` — main management agent handoff prompt for this session
+
 ### Handoff prompts — syhlabtop ↔ A6000 인계 (종료)
 - `syhlabtop_a6000_served_snapshot_handoff_prompt_2026-05-12.md`
 - `syhlabtop_agent_ready_prompt_2026-05-11.md`
@@ -126,4 +130,4 @@ git mv 로 옮겼으므로 `git log --follow docs/_archive/openarm_folding/<파�
 history 추적 가능. 필요 시 `git mv docs/_archive/openarm_folding/<파일> audits/openarm_folding/`
 로 복원 가능.
 
-총 archive 파일 수: **112개** (md 82 + py 21 + json 8 + sh 1).
+총 archive 파일 수: **114개** (md 84 + py 21 + json 8 + sh 1).

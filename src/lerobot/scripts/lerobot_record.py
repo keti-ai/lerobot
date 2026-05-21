@@ -346,6 +346,35 @@ def record_loop(
         timestamp = time.perf_counter() - start_episode_t
 
 
+def _close_openarm_grippers(robot: Robot, fps: int, duration_s: float = 1.0) -> None:
+    """Close OpenArm grippers without adding frames to the dataset."""
+    if robot.name not in {"openarm_follower", "bi_openarm_follower"}:
+        return
+
+    arms = [robot]
+    if robot.name == "bi_openarm_follower":
+        arms = [robot.left_arm, robot.right_arm]
+
+    connected_arms = [arm for arm in arms if arm.bus.is_connected]
+    if not connected_arms:
+        return
+
+    try:
+        start_positions = [
+            (arm, float(arm.bus.sync_read("Present_Position").get("gripper", 0.0)))
+            for arm in connected_arms
+        ]
+
+        close_steps = max(15, int(duration_s * fps))
+        for step in range(1, close_steps + 1):
+            ratio = step / close_steps
+            for arm, start_pos in start_positions:
+                arm.send_action({"gripper.pos": start_pos + (0.0 - start_pos) * ratio})
+            precise_sleep(1 / fps)
+    except Exception as e:
+        logging.warning(f"Failed to close OpenArm grippers: {e}")
+
+
 @parser.wrap()
 def record(
     cfg: RecordConfig,
@@ -438,6 +467,7 @@ def record(
             )
 
         robot.connect()
+        _close_openarm_grippers(robot, cfg.dataset.fps)
         if teleop is not None:
             teleop.connect()
 
@@ -466,6 +496,7 @@ def record(
                     display_data=cfg.display_data,
                     display_compressed_images=display_compressed_images,
                 )
+                _close_openarm_grippers(robot, cfg.dataset.fps)
 
                 # Execute a few seconds without recording to give time to manually reset the environment
                 # Skip reset for the last episode to be recorded

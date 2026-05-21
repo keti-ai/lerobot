@@ -1,6 +1,6 @@
 # OpenArm 폴딩 재학습/롤아웃 플랜 (SSOT)
 
-**마지막 갱신:** 2026-05-19 (Dataset/Model Registry Phase 2 반영)
+**마지막 갱신:** 2026-05-21 (banana handover dataset 수집 + OpenArm record safety 반영)
 **브랜치:** `audit/openarm-folding-baseline`  
 **용도:** 이 레포에 들어오는 세션이 현재 전략, 결정 항목, 데이터셋/모델 registry 위치를 한 문서에서 확인하게 한다.
 
@@ -269,6 +269,7 @@ Custom syhlabtop rollout, Track A trial report, viewer/client, historical Track 
 
 | 날짜 | 변경 | 비고 |
 |---|---|---|
+| 2026-05-21 | `KETI-IRRC/openarm_handover_v0_20260521_202117` banana handover 20 episodes 수집, resume/root 레시피와 OpenArm record safety 패치 기록 | syhlabtop live data collection |
 | 2026-05-19 | Dataset Registry §8, Model Registry v2 §9 작성 | Phase 2 |
 | 2026-05-19 | AGENTS hard rules 제거, custom syhlabtop rollout archive, official `lerobot-rollout` baseline 전환 준비 | Phase 1 |
 | 2026-05-18 | A6000 8766/8765 serving 복구. D-10c postprocessor/RABC 진단 완료, case gamma current gate false-negative 판정 | A6000 측 작업 |
@@ -288,6 +289,7 @@ Decision Inputs 의 D-13 에 따라 사용자가 직접 고른다.
 
 | dataset | source/path | level/task | episodes/frames | fps | cameras | action/state contract | action representation | curation | SARM/RABC | trained models (which checkpoints used this) | gate/replay result | deployment relevance | feasibility_test_priority |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `KETI-IRRC/openarm_handover_v0_20260521_202117` | HF private; local root `/home/syhlabtop/.cache/huggingface/lerobot/KETI-IRRC/openarm_handover_v0_20260521_202117` | banana bimanual handover; `Pick the banana, hand it over to the other arm, and place it at the target.` | 20 episodes / 17,944 frames | 30 | left_wrist D405 `315122270766`, right_wrist D405 `230322273311`, base D435I `213622075840`; 640x480 RGB AV1 | `bi_openarm_follower`; 16D state/action, degrees, right joints/gripper then left joints/gripper | absolute target rows from `openarm_mini` teleop; runtime `max_relative_target=5`; gripper `0` closed | single syhlabtop live session; first 7 episodes survived a right_wrist timeout, then 13 episodes appended with `--resume=true` and explicit `--dataset.root` | none yet | none yet | metadata counts verified; rerun replay command recorded, visual replay pending for final review | new task-specific handover source for future training/eval | P2 |
 | `lerobot/full_folding` | HF public; local source mirror `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/datasets/full_folding_novideo` | full folding public mix; `Fold the T-shirt properly` 4100 eps, layout-then-fold 1561 eps, `Fold` 27 eps | 5688 episodes / 14,129,038 frames | 30 | left_wrist, right_wrist 720x1280; base 480x640 | OpenArm `openarms_follower`; 16D state/action, degrees | source action rows are absolute targets; A6000 relstats derivative converts arm 14D to relative chunk30, grippers excluded/absolute | no correction_report; broad full dataset; fold-only 4100 eps is D-1 candidate | SARM rows 14,129,038; downstream full_folding training uses RABC sample_weighting | A6000 full_folding 001000-004000; D-8a continuation 001000-012000 | relaware recipe PASS, replay FAIL for available full_folding ckpts | important training source, but no current deploy ckpt | P3 |
 | `lerobot-data-collection/level2_final_quality3_t_0_hil_data_c` | HF public; local root `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/datasets/level2_final_quality3_t_0_hil_data_c` | Level 2 high-quality / HIL folding data | 1319 episodes / 3,414,338 frames | 30 | left_wrist, right_wrist 720x1280; base 480x640 | OpenArm `openarms_follower`; 16D state/action, degrees | source action rows are absolute targets; relstats derivative used for training | correction_report present; HQ/HIL subset | SARM progress used by folding/latest lineage and corrected relstats training; RABC in trained configs | public `folding_latest` lineage; A6000 level2 corrected 004000 | level2 corrected 004000 recipe PASS, replay PASS; legacy public folding_latest gate/replay FAIL | current live baseline source, not final goal | P1 |
 | A6000 level2 relstats chunk30 | `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/datasets/level2_final_quality3_t_0_hil_data_c_relative_stats_chunk30` | Level 2 HQ/HIL relstats derivative | 1319 episodes / 3,414,338 frames | 30 | left_wrist, right_wrist 720x1280; base 480x640 | OpenArm 16D state/action, degrees | `use_relative_actions=true`, `chunk_size=30`, 14 arm dims relative, grippers excluded/absolute | corrected relstats derivative of HQ level2 | `sample_weighting.type=rabc`, progress from level2 SARM | `pi05_openarm_relstats_full_nocompile_bsz4_20260512/checkpoints/004000` | recipe PASS, replay PASS, relaware recheck PASS | immediate feasibility baseline candidate | P1 |

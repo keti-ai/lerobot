@@ -198,6 +198,9 @@ class DamiaoMotorsBus(MotorsBusBase):
 
             logger.debug(f"{self.__class__.__name__} connected via {self.can_interface}.")
         except Exception as e:
+            if self.canbus:
+                self.canbus.shutdown()
+                self.canbus = None
             self._is_connected = False
             raise ConnectionError(f"Failed to connect to CAN bus: {e}") from e
 
@@ -258,7 +261,16 @@ class DamiaoMotorsBus(MotorsBusBase):
 
         if disable_torque:
             try:
-                self.disable_torque()
+                # Send more than one disable pulse before shutting down the CAN
+                # socket. The gripper is often the last motor on the bus and can
+                # otherwise miss the final torque-off command during Ctrl-C exits.
+                self.disable_torque(num_retry=1)
+                time.sleep(MEDIUM_TIMEOUT_SEC)
+                self.disable_torque(num_retry=1)
+                if "gripper" in self.motors:
+                    for _ in range(3):
+                        time.sleep(MEDIUM_TIMEOUT_SEC)
+                        self.disable_torque("gripper", num_retry=1)
             except Exception as e:
                 logger.warning(f"Failed to disable torque during disconnect: {e}")
 

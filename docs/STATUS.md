@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-19 (Phase 1 custom rollout archive, official `lerobot-rollout` baseline 전환)  
+**마지막 갱신:** 2026-05-21 (banana handover dataset 수집 완료, OpenArm record safety 패치 적용)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -13,6 +13,7 @@
 | **B** — full_folding 재학습 | **D-8a relaware COMPLETE, no deploy candidate** | Phase 2 Dataset/Model Registry 이후 D-8b 방향 결정 |
 | **C** — full_folding ckpt replay 비교 | **COMPLETE** | 002000/003000/004000 모두 replay FAIL |
 | **D** — 축/카메라 진단 | **custom 후속 폐기** | 첫 official rollout 시각 리뷰로 통합 평가 |
+| **E** — banana handover 데이터 수집 | **COMPLETE** | rerun replay 시각 확인 후 학습/eval 방향 결정 |
 
 ---
 
@@ -94,6 +95,27 @@
 ---
 
 ## 최근 핵심 결과
+
+### Banana handover dataset 수집
+
+```text
+repo_id: KETI-IRRC/openarm_handover_v0_20260521_202117
+local_root: /home/syhlabtop/.cache/huggingface/lerobot/KETI-IRRC/openarm_handover_v0_20260521_202117
+episodes/frames: 20 / 17,944
+task: Pick the banana, hand it over to the other arm, and place it at the target.
+robot: bi_openarm_follower, can0=left, can1=right
+teleop: openarm_mini, mini_set1
+cameras: left_wrist 315122270766, right_wrist 230322273311, base 213622075840
+```
+
+첫 7 episodes 이후 right_wrist `230322273311` frame staleness timeout 이 있었지만
+저장과 push 는 완료됐다. 나머지 13 episodes 는 stamped repo id 와 명시적
+`--dataset.root` 를 사용해 `--resume=true` 로 append 했다. 기록 레시피와
+handoff prompt 는 `docs/_archive/openarm_folding/` 의 2026-05-21 문서를 본다.
+
+OpenArm record 안전 패치도 같이 적용했다: episode 시작/종료 시 follower gripper 를
+천천히 닫고, Ctrl-C/부분 connect 실패 시 CAN bus cleanup 과 gripper torque-off pulse 를
+강화했다. upstream 과의 차이는 OpenArm follower / Damiao / record script 로 제한한다.
 
 ### Track A custom closed-loop 결과 (archive 대상)
 

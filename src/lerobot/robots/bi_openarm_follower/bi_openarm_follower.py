@@ -126,8 +126,12 @@ class BiOpenArmFollower(Robot):
 
     @check_if_already_connected
     def connect(self, calibrate: bool = True) -> None:
-        self.left_arm.connect(calibrate)
-        self.right_arm.connect(calibrate)
+        try:
+            self.left_arm.connect(calibrate)
+            self.right_arm.connect(calibrate)
+        except Exception:
+            self.disconnect()
+            raise
 
     @property
     def is_calibrated(self) -> bool:
@@ -191,7 +195,6 @@ class BiOpenArmFollower(Robot):
 
         return {**prefixed_sent_action_right, **prefixed_sent_action_left}
 
-    @check_if_not_connected
     def disconnect(self):
         self.left_arm.disconnect()
         self.right_arm.disconnect()
