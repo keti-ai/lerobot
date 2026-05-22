@@ -195,7 +195,7 @@ P3 (Phase 3):
 | **D-31** | SUPERSEDED | β 학습 진입 여부 | D-33 (handover relstats 변환 후 α 재학습) 결과 본 뒤 재검토. mixed corpus 는 그 다음 단계. |
 | **D-32** | RESOLVED | α gate REJECTED 원인 진단 | **case α (B-1) 확정**. `use_relative_actions=true` ↔ handover dataset absolute action 미스매치. processor stats 가 absolute 분포 (q01/q99 ≈ -53.7..113.0) 로 학습됨. shortlist 5개 모두 같은 학습이라 동일 결함. → α 학습 자체 SKIP, deploy 불가. 보고서: `audits/openarm_folding/a6000_pi05_handover_alpha_postmortem_case_alpha_*.md` |
 | **D-33** | OPEN | handover dataset relstats 변환 후 α 재학습 | 사용자 결정 = (X) 옵션. level2 와 같은 recipe (chunk30, arm relative, gripper excluded) 로 handover dataset 재가공 → α 재학습. 새 dataset slug = `KETI-IRRC/openarm_handover_v0_relstats_chunk30` (예정). a6000 측 도구 위치 + 변환 명령 정리 필요. |
-| **D-34** | OPEN | dataset ↔ 환경 adaptation 미니 레포 (사이드) | dataset 분포와 운영 환경 (OpenArm + RealSense 3cam) 간극을 메우는 preprocessing 함수 컬렉션. P0 vision (FOV/scale/color/exposure), P1 proprio (joint offset/range/단위), P2 action contract (D-33 의 relstats 변환 일반화). 위치 후보: `src/lerobot/openarm_adaptation/` 또는 `docs/STUDY/openarm_adaptation/`. |
+| **D-34** | OPEN | dataset ↔ 환경 adaptation 미니 레포 (사이드) | dataset 분포와 운영 환경 (OpenArm + RealSense 3cam) 간극을 메우는 preprocessing 함수 컬렉션. P0 vision (FOV/scale/color/exposure), P1 proprio (joint offset/range/단위), P2 action contract (D-33 의 relstats 변환 일반화). 위치 = `src/lerobot/openarm_adaptation/` (모듈) + `docs/STUDY/openarm_adaptation/` (스터디 노트). plan: `docs/STUDY/openarm_adaptation/README.md`. 하위 결정 D-34a/b/c. |
 
 ---
 
