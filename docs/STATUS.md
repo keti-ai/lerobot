@@ -35,6 +35,13 @@
    - **다음 = D-33 (X) handover dataset 의 relstats 변환본 만들기 + α 재학습**
    - 8766 = level2 corrected 004000 유지 (D-29 RESOLVED)
    - α HF push 안 함 (D-28 RESOLVED)
+   - 참조 (a6000 측 commit 5개, origin 박제):
+     - `b8170de4 docs(a6000): start pi05 handover alpha overnight training`
+     - `d3bf4f9a docs(a6000): review pi05 handover alpha training result`
+     - `ca6263f9 ops(a6000): pi05 handover alpha shortlist 5 ckpt recipe + replay gate`
+     - `0595f828 docs(a6000): D-32 alpha postprocessor/action representation diagnosis`
+     - 산출물: `audits/openarm_folding/a6000_pi05_handover_alpha_{status,result,shortlist_gate_20260522,d32_diagnosis_20260522}.md`
+   - M1 (별도 통합 postmortem) SKIP — 위 5 commit 으로 사실관계 박제 완료
 
 1. **`full_folding` replay FAIL 원인 — checkpoint selection 가설 기각**
    - ckpt 002000: ratio 0.220-0.320, raw normalized max error 0.433 -> FAIL
