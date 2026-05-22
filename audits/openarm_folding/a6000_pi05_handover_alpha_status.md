@@ -1,6 +1,6 @@
 # PI0.5 handover alpha overnight train status
 
-마지막 갱신: 2026-05-22T00:43:41+09:00
+마지막 갱신: 2026-05-22T10:25:00+09:00
 머신: ketiserver (a6000)
 세션 시작: 20260522_002624
 
@@ -51,10 +51,13 @@
 
 - Dataset access: PASS
 - 100 step check: PASS
-- Current latest logged metric:
-  - `step:400 smpl:2K ep:2 epch:0.09 loss:0.111 grdn:2.438 lr:1.1e-05 updt_s:1.708 data_s:0.005`
-- Estimated runtime from tqdm: about 9.3 hours remaining at roughly 1.7 sec/step.
-- No OOM, NaN, or traceback after training loop start.
+- Final status: PASS, 20,000 step 정상 종료
+- Final logged metric:
+  - `step:20K smpl:80K ep:89 epch:4.46 loss:0.010 grdn:0.426 lr:2.5e-06 updt_s:1.703 data_s:0.005`
+- Runtime: 9:36:02
+- Checkpoints: `002000`, `004000`, `006000`, `008000`, `010000`, `012000`, `014000`, `016000`, `018000`, `020000`
+- No OOM, NaN, or traceback.
+- Result review: `audits/openarm_folding/a6000_pi05_handover_alpha_result.md`
 
 ## 초기 실패 기록
 
@@ -66,6 +69,6 @@ The current successful run is `20260522_002624`. Earlier attempts did not start 
 
 ## 다음 확인
 
-- Next manual ping: 1-2 hours later or after training finishes.
-- First checkpoint expected at step 2000.
-- Do not restart 8766/8765 while training is running unless the user explicitly stops training.
+- TensorBoard에서 loss/gradient 곡선을 확인하고 평가 대상 checkpoint shortlist를 고른다.
+- `push_to_hub=false`로 저장되어 HF Hub 업로드는 아직 수행되지 않았다.
+- 8766/8765 serving은 학습 전 정지된 상태이며, 재기동은 별도 지시 후 진행한다.
