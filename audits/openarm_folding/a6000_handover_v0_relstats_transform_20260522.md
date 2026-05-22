@@ -134,3 +134,28 @@ Reasons:
 
 - M2b: decide whether to push `KETI-IRRC/openarm_handover_v0_relstats_chunk30` to HF Hub.
 - M3: alpha-prime retraining against the local relstats variant after push/local-path decision.
+
+---
+
+## HF Push (2026-05-22)
+
+- updated: `2026-05-22T21:28:09+09:00`
+- repo: `https://huggingface.co/datasets/KETI-IRRC/openarm_handover_v0_relstats_chunk30`
+- private: `true`
+- upload method: `huggingface_hub.HfApi.upload_folder(..., allow_patterns=["**"], ignore_patterns=[])`
+- source folder: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/handover_alpha_relstats_20260522/datasets/openarm_handover_v0_relstats_chunk30`
+
+Hub verification:
+
+- `whoami`: `syh4661`
+- org access: `KETI-IRRC`
+- file count: `16`
+- `.relstats_complete` in repo files: `True`
+- `meta/stats.json` in repo files: `True`
+- `action.mean[:4]`: `[0.13367731869220734, 0.18775713443756104, 0.18998955190181732, 0.7349516749382019]`
+- `action.q01[:4]`: `[-34.532536155299134, -18.41267444065639, -22.99380534778942, -55.96976826985677]`
+- `action.q99[:4]`: `[34.83729527064731, 19.871198527018223, 35.27242279052731, 64.90286407470694]`
+- converted action mean abs max: `0.7955476641654968`
+- converted action q01/q99 abs max: `64.90286407470694`
+
+M2b 판정: PASS. Dataset HF push completed as private; marker and relstats action stats were verified from the Hub.
