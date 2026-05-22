@@ -188,7 +188,14 @@ P3 (Phase 3):
 | **D-10** | RESOLVED | D-8a gate false-negative 진단 | case gamma 완료. relaware recipe PASS, replay FAIL, deploy 후보 없음. |
 | **D-11** | NEW | Phase 3 serving adapter 위치 | `lerobot-rollout` 전환 시 A6000 HTTP 서빙 호환 adapter 를 server 쪽에 둘지 client 쪽에 둘지 별도 결정한다. |
 | **D-12** | NEW | OpenArmFollower 안전 패치 default | upstream 유지 vs 안전 모드 default 여부는 Phase 3 에서 별도 결정한다. |
-| **D-13** | OPEN | feasibility 첫 live P1 ckpt 큐 선정 | 사용자가 §9 의 P1 row 중 N개를 직접 골라 큐를 정의한다. 자동 추천은 하지 않는다. |
+| **D-13** | RESOLVED | feasibility 첫 live P1 ckpt 큐 선정 | handover α shortlist (10k/12k/14k/16k/18k) 5개 모두 recipe gate REJECTED. 016000 도 deploy 불가. case α 진단 확정 (D-32). |
+| **D-28** | RESOLVED | α HF push 정책 | push 안 함. α 학습 자체 결함 (D-32 case α) 으로 deploy candidate 아님. a6000 local 만 유지. |
+| **D-29** | RESOLVED | A6000 serving 정책 | 8766 = level2 corrected 004000 그대로 유지. 8765 정지 상태 유지. α ckpt 8766 교체 안 함. |
+| **D-30** | DEFERRED | operator 입회 일정 | D-33 재학습 결과 PASS 시점 이후로 보류. |
+| **D-31** | SUPERSEDED | β 학습 진입 여부 | D-33 (handover relstats 변환 후 α 재학습) 결과 본 뒤 재검토. mixed corpus 는 그 다음 단계. |
+| **D-32** | RESOLVED | α gate REJECTED 원인 진단 | **case α (B-1) 확정**. `use_relative_actions=true` ↔ handover dataset absolute action 미스매치. processor stats 가 absolute 분포 (q01/q99 ≈ -53.7..113.0) 로 학습됨. shortlist 5개 모두 같은 학습이라 동일 결함. → α 학습 자체 SKIP, deploy 불가. 보고서: `audits/openarm_folding/a6000_pi05_handover_alpha_postmortem_case_alpha_*.md` |
+| **D-33** | OPEN | handover dataset relstats 변환 후 α 재학습 | 사용자 결정 = (X) 옵션. level2 와 같은 recipe (chunk30, arm relative, gripper excluded) 로 handover dataset 재가공 → α 재학습. 새 dataset slug = `KETI-IRRC/openarm_handover_v0_relstats_chunk30` (예정). a6000 측 도구 위치 + 변환 명령 정리 필요. |
+| **D-34** | OPEN | dataset ↔ 환경 adaptation 미니 레포 (사이드) | dataset 분포와 운영 환경 (OpenArm + RealSense 3cam) 간극을 메우는 preprocessing 함수 컬렉션. P0 vision (FOV/scale/color/exposure), P1 proprio (joint offset/range/단위), P2 action contract (D-33 의 relstats 변환 일반화). 위치 후보: `src/lerobot/openarm_adaptation/` 또는 `docs/STUDY/openarm_adaptation/`. |
 
 ---
 
@@ -275,6 +282,7 @@ Custom syhlabtop rollout, Track A trial report, viewer/client, historical Track 
 
 | 날짜 | 변경 | 비고 |
 |---|---|---|
+| 2026-05-22 | PI0.5 handover α 20k step 학습 완료 → shortlist gate REJECTED (5/5) → D-32 진단 case α 확정 (relative config ↔ absolute dataset 미스매치). D-13/28/29 RESOLVED, D-30 DEFERRED, D-31 SUPERSEDED. D-33 (handover relstats 변환 후 α 재학습) + D-34 (adaptation 미니 레포 사이드) OPEN | a6000 측 학습 + syhlabtop 측 결정 |
 | 2026-05-21 | `KETI-IRRC/openarm_handover_v0_20260521_202117` banana handover 20 episodes 수집, resume/root 레시피와 OpenArm record safety 패치 기록 | syhlabtop live data collection |
 | 2026-05-19 | Dataset Registry §8, Model Registry v2 §9 작성 | Phase 2 |
 | 2026-05-19 | AGENTS hard rules 제거, custom syhlabtop rollout archive, official `lerobot-rollout` baseline 전환 준비 | Phase 1 |
