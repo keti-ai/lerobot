@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-05-22 (PI0.5 handover α 20k step 학습 완료, shortlist REJECTED, D-32 case α 진단 확정)
+**마지막 갱신:** 2026-06-01 (α′ relstats 30k 학습 PASS but shortlist 5/5 REJECTED, 분기 결정 = U→P→Q→R)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -9,39 +9,41 @@
 
 | Track | 상태 | 다음 행동 |
 |---|---|---|
-| **A** — syhlabtop live rollout | **BLOCKED** | D-33 재학습 PASS 후보 확보까지 보류 |
+| **A** — syhlabtop live rollout | **BLOCKED** | 8766 serving 정지 (D-29 갱신). PASS 후보 확보까지 라이브 X |
 | **B** — full_folding 재학습 | **D-8a relaware COMPLETE, no deploy candidate** | Phase 2 Dataset/Model Registry 이후 D-8b 방향 결정 |
 | **C** — full_folding ckpt replay 비교 | **COMPLETE** | 002000/003000/004000 모두 replay FAIL |
 | **D** — 축/카메라 진단 | **custom 후속 폐기** | 첫 official rollout 시각 리뷰로 통합 평가 |
-| **E** — banana handover 데이터 수집 | **COMPLETE** | 20 ep, KETI-IRRC/openarm_handover_v0_20260521_202117 |
-| **F** — PI0.5 handover α fine-tune | **REJECTED (D-32 case α)** | D-33 = handover relstats 변환 후 α 재학습 (사용자 결정 X 옵션) |
-| **G** — adaptation 미니 레포 (사이드, D-34) | **PROPOSED** | vision P0 → proprio P1 → action contract P2 순서. 위치/구조 사용자 결정 대기 |
+| **E** — banana handover 데이터 수집 | **COMPLETE (v0)** | 20 ep, KETI-IRRC/openarm_handover_v0_20260521_202117. v1 = D-38 (R 단계) |
+| **F** — PI0.5 handover α/α′ fine-tune | **BOTH REJECTED** | α REJECTED (D-32 case α). α′ relstats 30k REJECTED (M4, b7897a06). 다음 = D-35 분기 |
+| **G** — adaptation 미니 레포 (D-34) | **P2 COMPLETE, P0/P1 보류** | S1 scaffold + S2 relstats_transform 완료 (ca532645). P0 vision/P1 proprio 은 D-35 분기 끝나고 |
+| **H** — D-35 분기 (U→P→Q→R) | **OPEN** | (U) episode 분포 진단 → (P) handover gate → (Q) threshold → (R) v1 50-100 ep 수집 |
 
 ---
 
 ## 미해결 이슈
 
-0. **PI0.5 handover α 20k 학습 → shortlist 5개 모두 REJECTED → D-32 진단 case α 확정**
-   - 학습: `pi05_handover_v0_alpha_*` 20,000 step 정상 종료, final loss 0.010
-   - shortlist gate (recipe + replay) 의 5 ckpt (10k/12k/14k/16k/18k) 모두 REJECTED
-   - 진단 (D-32):
-     - `train_config.json`: `use_relative_actions=true`, `relative_action_chunk_size=null`, `relative_exclude_joints=["gripper"]`
-     - dataset = absolute action rows (lerobot-record default, `KETI-IRRC/openarm_handover_v0_20260521_202117`)
-     - alpha016 processor stats = absolute-like (q01/q99 ≈ -53.697..113.035, mean ~55)
-     - level2_004000 processor stats = relative-like (mean ~0, q01/q99 ≈ -42.691..39.028)
-     - dataset row 값 = position-like, relative storage 증거 없음
-   - 결론: 학습 config 와 dataset action 분포가 미스매치 → processor 가 absolute 분포로 학습됨
-   - α step 016000 deploy 불가 = 정당. shortlist 전체 같은 학습이라 동일 결함
-   - **다음 = D-33 (X) handover dataset 의 relstats 변환본 만들기 + α 재학습**
-   - 8766 = level2 corrected 004000 유지 (D-29 RESOLVED)
-   - α HF push 안 함 (D-28 RESOLVED)
-   - 참조 (a6000 측 commit 5개, origin 박제):
-     - `b8170de4 docs(a6000): start pi05 handover alpha overnight training`
-     - `d3bf4f9a docs(a6000): review pi05 handover alpha training result`
-     - `ca6263f9 ops(a6000): pi05 handover alpha shortlist 5 ckpt recipe + replay gate`
-     - `0595f828 docs(a6000): D-32 alpha postprocessor/action representation diagnosis`
-     - 산출물: `audits/openarm_folding/a6000_pi05_handover_alpha_{status,result,shortlist_gate_20260522,d32_diagnosis_20260522}.md`
-   - M1 (별도 통합 postmortem) SKIP — 위 5 commit 으로 사실관계 박제 완료
+0. **α/α′ 두 학습 모두 REJECTED → 분기 결정 D-35 (U→P→Q→R)**
+
+   **α 학습 (2026-05-22, GPU0 20k)** — D-32 case α 확정으로 SKIP
+   - shortlist 5/5 REJECTED. root cause = use_relative_actions=true ↔ handover absolute dataset 미스매치
+   - 참조 commit: b8170de4, d3bf4f9a, ca6263f9, 0595f828 (a6000 측 박제)
+
+   **α′ 학습 (2026-05-22~23, GPU1 30k, relstats variant)** — M4 REJECTED (b7897a06)
+   - 학습 PASS: 30k step, final loss 0.012, 15 ckpts
+   - shortlist 5/5 REJECTED (22k/24k/26k/28k/30k):
+     - **D-32 root cause 해결됨** (`postprocessor_action_stats_are_relative_for_arm_joints` PASS)
+     - 새 FAIL (A) recipe folding-task lock: `dataset_robot_type_openarms_follower`, `camera_keys_and_shapes_match_space_recipe`, `rabc_recorded_in_train_config`
+     - 새 FAIL (B) replay magnitude mismatch: 모델 arm delta best ratio 0.141 (target ~1.0). raw normalized err ~4.84
+   - 참조: `audits/openarm_folding/a6000_pi05_handover_alpha_relstats_shortlist_gate_20260526.md`
+
+   **다음 분기 = D-35 (사용자 결정 2026-06-01)**:
+   - (U) episode 분포 진단 — 모든 ep replay, magnitude 일관성 확인 (~30min Codex a6000)
+   - (P) handover-specific recipe gate — stage29 folding lock 완화 (~2-3h Codex syhlabtop)
+   - (Q) replay threshold task-specific — stage22 threshold 재정의 (~2-3h Codex syhlabtop)
+   - (R) handover v1 50-100 ep 추가 수집 — 사용자 직접 3-5h + 재학습 14h
+   - **순차 진행** (U 결과가 P/Q 디자인 input)
+
+   **운영**: 8766 일단 정지 (D-29 갱신). 다음 사이클 GPU 확보.
 
 1. **`full_folding` replay FAIL 원인 — checkpoint selection 가설 기각**
    - ckpt 002000: ratio 0.220-0.320, raw normalized max error 0.433 -> FAIL
@@ -89,41 +91,44 @@
 
 ---
 
-## 다음 N개 작업 (우선순위 순)
+## 다음 N개 작업 (우선순위 순, D-35 분기)
 
-1. **D-33 handover dataset relstats 변환 (Codex, a6000)**
-   - source: `KETI-IRRC/openarm_handover_v0_20260521_202117` (20 ep, absolute action)
-   - target: 같은 chunk30 + arm relative + gripper excluded recipe (level2 와 동일)
-   - 도구 위치 후보: a6000 측 level2 relstats 만든 스크립트 (도구 path 확인 필요)
-   - 산출물: 새 dataset (slug 후보 `KETI-IRRC/openarm_handover_v0_relstats_chunk30`) + relstats marker
-   - 보고서: `audits/openarm_folding/a6000_handover_v0_relstats_transform_<TS>.md`
+1. **(U) episode 분포 진단 — Codex a6000, ~30min**
+   - stage22 replay 를 모든 ep (0-19) 에 대해 실행, ratio 분포 + raw norm err 표 작성
+   - 목적: magnitude 문제가 ep 0 만인지 전체인지 확인
+   - GPU 안 씀. 8766 정지 후 진행
+   - 산출물: `audits/openarm_folding/a6000_handover_v0_relstats_episode_distribution_<TS>.md`
+   - 입력: U 결과 → P 디자인 + 다음 결정
 
-2. **D-33 α 재학습 (Codex, a6000, overnight)**
-   - 기존 α 명령에서 `--dataset.repo_id` 만 새 relstats dataset 으로 변경
-   - 같은 init (level2 corrected 004000) + 같은 `use_relative_actions=true` recipe
-   - steps=20k (또는 10k 단축 후 결과 보기)
-   - output: `pi05_handover_v0_alpha_relstats_<TS>`
-   - 학습 후 shortlist 같은 방식으로 gate + replay
+2. **8766 serving 정지 (Codex a6000, ~5min)**
+   - 현재 GPU0 에 8766 (level2 corrected 004000). 정지로 GPU 확보
+   - 명령: a6000_live_policy_server.py 프로세스 kill 또는 systemd 정지
+   - baseline 라이브 없어지지만 D-29 갱신 결정 (사용자 동의)
 
-3. **D-32 진단 보고서 commit (Codex, a6000)**
-   - 사전 확인 데이터 (train_config, processor stats 비교, dataset sample) 그대로 보고서로
-   - 산출물: `audits/openarm_folding/a6000_pi05_handover_alpha_postmortem_case_alpha_20260522.md`
-   - 메시지: `ops(a6000): D-32 postmortem — α case α (relative config vs absolute dataset)`
+3. **(P) handover-specific recipe gate (Codex syhlabtop, ~2-3h)**
+   - stage29 의 folding lock 3 항목 완화 또는 별도 gate
+   - 변경: robot_type list 확장 (`bi_openarm_follower` 포함), camera shape lock 자유화, RABC optional
+   - 위치: `audits/openarm_folding/stage29_candidate_recipe_gate.py` task-aware path 또는 신규 `handover_recipe_gate.py`
+   - U 진단 결과 본 뒤 진행
 
-4. **D-34 adaptation 미니 레포 사이드 트랙 — 위치/구조 결정 + 첫 함수 set (사용자 + Codex)**
-   - 메인 트랙 (D-33) 과 병행 가능
-   - 위치 후보: `src/lerobot/openarm_adaptation/` (모듈 + ProcessorStep) vs `docs/STUDY/openarm_adaptation/` (스터디 문서)
-   - P0 vision: camera FOV/scale/color/exposure normalize
-   - P1 proprio: joint offset/range, gripper unit, degrees↔radians
-   - P2 action contract: D-33 의 relstats 변환을 일반화 (any 16D dataset → chunk_N relative)
+4. **(Q) replay threshold task-specific (Codex syhlabtop, ~2-3h)**
+   - stage22 의 ratio/raw threshold 를 handover 분포 기준으로 재정의
+   - U 진단의 분포 표가 입력
+   - P 와 병행 가능
 
-5. **Phase 2 Dataset Registry / Model Registry v2 본문 보강 (DEFERRED)**
-   - D-33 결과 row 추가 시점에 같이 진행
-   - 메인 트랙 (D-33) 우선
+5. **(R) handover v1 50-100 ep 추가 수집 (사용자 직접, 3-5h)**
+   - 미니 리더 + bi_openarm_follower + 동일 카메라
+   - lerobot-record 명령 = handover_v0 와 동일, `--dataset.repo_id=KETI-IRRC/openarm_handover_v1_<TS>`
+   - 사용자 일정 별도 결정
+   - 수집 후 변환 (S2 도구) + 재학습 (a6000 14h GPU)
 
-6. **operator 입회 official rollout 첫 모션 테스트 (DEFERRED — D-33 PASS 후보 확보 후)**
-   - D-33 재학습이 recipe + replay PASS 받으면 진입
-   - 그때 D-30 operator 일정 + D-13 큐 재정의
+6. **D-34 P0 vision/P1 proprio (DEFERRED)**
+   - D-35 분기 끝나고 진행
+   - P0 vision (resize_align, color_match) 가 라이브 시점에 필요
+
+7. **Phase 2 Dataset Registry / Model Registry v2 본문 보강 (DEFERRED)**
+
+8. **operator 입회 official rollout (DEFERRED — D-35 PASS 후보 확보 후)**
 
 ---
 
