@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-01 (α′ relstats 30k 학습 PASS but shortlist 5/5 REJECTED, 분기 결정 = U→P→Q→R)
+**마지막 갱신:** 2026-06-01 (U partial 완료, 카메라 staleness 가설 기각, GPU U-retry 보류 + P 진행 가능)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -36,14 +36,20 @@
      - 새 FAIL (B) replay magnitude mismatch: 모델 arm delta best ratio 0.141 (target ~1.0). raw normalized err ~4.84
    - 참조: `audits/openarm_folding/a6000_pi05_handover_alpha_relstats_shortlist_gate_20260526.md`
 
-   **다음 분기 = D-35 (사용자 결정 2026-06-01)**:
-   - (U) episode 분포 진단 — 모든 ep replay, magnitude 일관성 확인 (~30min Codex a6000)
-   - (P) handover-specific recipe gate — stage29 folding lock 완화 (~2-3h Codex syhlabtop)
-   - (Q) replay threshold task-specific — stage22 threshold 재정의 (~2-3h Codex syhlabtop)
-   - (R) handover v1 50-100 ep 추가 수집 — 사용자 직접 3-5h + 재학습 14h
-   - **순차 진행** (U 결과가 P/Q 디자인 input)
+   **D-35 분기 진행 상황 (2026-06-01)**:
+   - (U) **PARTIAL** (commit 31b42505): CPU fallback 너무 느려 (885초/cell) 100-cell 미완.
+     ep 0 재현 + target-only 분포 완료. **카메라 staleness 가설 기각** (first 7 = 12.609,
+     later 13 = 12.559 평균 recorded arm delta 거의 동일). ep 0 = outlier 아님 (overall mean
+     12.576 안). normalized target outlier 는 ep 10-16 (max 9.702 @ ep 15).
+     → **U-retry**: GPU 가용 시 5 ckpt × 20 ep replay 재실행 권장
+   - (P) **READY** — U 부분 결과만으로 디자인 가능. stage29 의 folding lock 3 항목 완화. Codex syhlabtop ~2-3h
+   - (Q) **BLOCKED** — U GPU 완료 결과 (실제 ratio 분포) 가 threshold 정의의 input. U-retry 후 진행
+   - (R) handover v1 multi-object 50-100 ep — 사용자 직접 진행 가능 (P/Q 와 직교)
 
-   **운영**: 8766 일단 정지 (D-29 갱신). 다음 사이클 GPU 확보.
+   **운영**:
+   - 8766 이미 정지 상태 (D-29 갱신 의도와 일치, 별도 정지 명령 불필요 — 2026-06-01 확인)
+   - 8765 정지 상태 유지
+   - 2026-06-01 nvidia-smi 시점에 a6000 4 GPU 다 동료 KETI 멤버의 별도 DDP 학습으로 점유 (PID 1447660~1447663, lerobot venv, 100% util, ~26GB each). 본 세션 무관. U/P/Q 진행 시 GPU 가용성 영향 — U 는 CPU fallback 가능, P/Q 는 syhlabtop 측 코드라 직교.
 
 1. **`full_folding` replay FAIL 원인 — checkpoint selection 가설 기각**
    - ckpt 002000: ratio 0.220-0.320, raw normalized max error 0.433 -> FAIL
@@ -93,38 +99,33 @@
 
 ## 다음 N개 작업 (우선순위 순, D-35 분기)
 
-1. **(U) episode 분포 진단 — Codex a6000, ~30min**
-   - stage22 replay 를 모든 ep (0-19) 에 대해 실행, ratio 분포 + raw norm err 표 작성
-   - 목적: magnitude 문제가 ep 0 만인지 전체인지 확인
-   - GPU 안 씀. 8766 정지 후 진행
-   - 산출물: `audits/openarm_folding/a6000_handover_v0_relstats_episode_distribution_<TS>.md`
-   - 입력: U 결과 → P 디자인 + 다음 결정
-
-2. **8766 serving 정지 (Codex a6000, ~5min)**
-   - 현재 GPU0 에 8766 (level2 corrected 004000). 정지로 GPU 확보
-   - 명령: a6000_live_policy_server.py 프로세스 kill 또는 systemd 정지
-   - baseline 라이브 없어지지만 D-29 갱신 결정 (사용자 동의)
-
-3. **(P) handover-specific recipe gate (Codex syhlabtop, ~2-3h)**
-   - stage29 의 folding lock 3 항목 완화 또는 별도 gate
+1. **(P) handover-specific recipe gate (Codex syhlabtop, ~2-3h) — READY**
+   - U 부분 결과만으로 디자인 가능. folding lock 3 항목 완화 또는 별도 gate
    - 변경: robot_type list 확장 (`bi_openarm_follower` 포함), camera shape lock 자유화, RABC optional
    - 위치: `audits/openarm_folding/stage29_candidate_recipe_gate.py` task-aware path 또는 신규 `handover_recipe_gate.py`
-   - U 진단 결과 본 뒤 진행
 
-4. **(Q) replay threshold task-specific (Codex syhlabtop, ~2-3h)**
-   - stage22 의 ratio/raw threshold 를 handover 분포 기준으로 재정의
-   - U 진단의 분포 표가 입력
-   - P 와 병행 가능
-
-5. **(R) handover v1 50-100 ep 추가 수집 (사용자 직접, 3-5h)**
+2. **(R) handover v1 multi-object 수집 (사용자 직접, 3-5h) — 진행 가능**
    - 미니 리더 + bi_openarm_follower + 동일 카메라
-   - lerobot-record 명령 = handover_v0 와 동일, `--dataset.repo_id=KETI-IRRC/openarm_handover_v1_<TS>`
-   - 사용자 일정 별도 결정
-   - 수집 후 변환 (S2 도구) + 재학습 (a6000 14h GPU)
+   - 객체 set: banana + bottle + block (사용자 결정), 객체당 25 ep × 3 = 75 ep
+   - dataset slug: `KETI-IRRC/openarm_handover_v1_multi_<TS>`
+   - 단일 dataset multi-task 또는 separate 3 dataset + merge 패턴 결정 필요 (lerobot-record resume task-change 동작 확인)
+   - P 와 직교 (다른 머신)
 
-6. **D-34 P0 vision/P1 proprio (DEFERRED)**
-   - D-35 분기 끝나고 진행
-   - P0 vision (resize_align, color_match) 가 라이브 시점에 필요
+3. **(U-retry) GPU replay matrix (Codex a6000) — BLOCKED**
+   - 5 ckpt × 20 ep = 100 cell replay 재실행
+   - 조건: a6000 의 GPU ≥1 자유. 현재 4 GPU 동료 점유 → 대기
+   - 결과 = Q 의 input
+
+4. **(Q) replay threshold task-specific (Codex syhlabtop, ~2-3h) — BLOCKED on U-retry**
+   - U-retry 의 실제 ratio 분포가 input
+   - 그 전 진행 시 placeholder 만 가능
+
+5. **D-38 (R 의 후속): handover v1 변환 + 재학습 (Codex a6000)**
+   - R 수집 끝나면 S2 도구 (`transform_dataset_to_relative_chunk`) 로 relstats variant 생성
+   - 재학습 GPU 자유 시점에 (현재 동료 점유) 30k overnight
+   - 데이터 부족 가설 검증
+
+6. **D-34 P0 vision/P1 proprio (DEFERRED)** — D-35 분기 끝나고
 
 7. **Phase 2 Dataset Registry / Model Registry v2 본문 보강 (DEFERRED)**
 
