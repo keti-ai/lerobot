@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-01 (U partial 완료, 카메라 staleness 가설 기각, GPU U-retry 보류 + P 진행 가능)
+**마지막 갱신:** 2026-06-02 (R 수집 완료 65 ep / 3 tasks, D-40 Wayland 이슈 추가, 실패 ep review + clean + α'' 학습 펜딩)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -13,10 +13,11 @@
 | **B** — full_folding 재학습 | **D-8a relaware COMPLETE, no deploy candidate** | Phase 2 Dataset/Model Registry 이후 D-8b 방향 결정 |
 | **C** — full_folding ckpt replay 비교 | **COMPLETE** | 002000/003000/004000 모두 replay FAIL |
 | **D** — 축/카메라 진단 | **custom 후속 폐기** | 첫 official rollout 시각 리뷰로 통합 평가 |
-| **E** — banana handover 데이터 수집 | **COMPLETE (v0)** | 20 ep, KETI-IRRC/openarm_handover_v0_20260521_202117. v1 = D-38 (R 단계) |
+| **E** — handover 데이터 수집 | **EXPANDED (v0 multi3)** | 65 ep / 3 tasks (banana 0-19, olive green cup 20-44, blue toothpaste 45-64). 같은 stamped repo KETI-IRRC/openarm_handover_v0_20260521_202117 에 resume 누적. plate skip (작업성). 실패 ep clean 대기. |
 | **F** — PI0.5 handover α/α′ fine-tune | **BOTH REJECTED** | α REJECTED (D-32 case α). α′ relstats 30k REJECTED (M4, b7897a06). 다음 = D-35 분기 |
 | **G** — adaptation 미니 레포 (D-34) | **P2 COMPLETE, P0/P1 보류** | S1 scaffold + S2 relstats_transform 완료 (ca532645). P0 vision/P1 proprio 은 D-35 분기 끝나고 |
-| **H** — D-35 분기 (U→P→Q→R) | **OPEN** | (U) episode 분포 진단 → (P) handover gate → (Q) threshold → (R) v1 50-100 ep 수집 |
+| **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep), P/Q/U-retry 진행 가능 |
+| **I** — D-40 Wayland keyboard patch | **NEW** | pynput global listener Wayland 안 먹힘. 다음 수집 전 patch 필요. ~2-3h Codex syhlabtop |
 
 ---
 
