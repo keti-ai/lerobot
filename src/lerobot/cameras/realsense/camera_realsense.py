@@ -116,7 +116,8 @@ class RealSenseCamera(Camera):
         Args:
             config: The configuration settings for the camera.
         """
-        require_package(pkg_name, extra="intelrealsense", import_name="pyrealsense2")
+        if rs is None:
+            require_package(pkg_name, extra="intelrealsense", import_name="pyrealsense2")
         super().__init__(config)
 
         self.config = config
