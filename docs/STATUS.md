@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-04 (실패 ep [13,24,25,51,55] 확정, A1.5 delete_episodes ready, D-41 NEW open dataset replay sanity)
+**마지막 갱신:** 2026-06-04 (A1.5 clean dataset 완료 60 ep HF push, A2 변환 next, D-41 NEW)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -18,7 +18,7 @@
 | **G** — adaptation 미니 레포 (D-34) | **P2 COMPLETE, P0/P1 보류** | S1 scaffold + S2 relstats_transform 완료 (ca532645). P0 vision/P1 proprio 은 D-35 분기 끝나고 |
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
-| **J** — D-38 후속 (cleaning + α'' 학습) | **A1 DONE** | 실패 ep [13,24,25,51,55] 확정 → A1.5 delete_episodes (Codex syhlabtop) → A2 변환 → A3 α'' 재학습 → A4 P + A5 D-40 + D-41 (A3 중 병행) → A6 gate → A7 분기 |
+| **J** — D-38 후속 (cleaning + α'' 학습) | **A1.5 DONE** | clean dataset = KETI-IRRC/...v0_..._clean (60 ep, HF private). 다음 A2 변환 → A3 α'' 재학습 → A4 P + A5 D-40 + D-41 (A3 중 병행) → A6 gate → A7 분기 |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
@@ -106,11 +106,10 @@
    - 실패 ep 확정 = `[13, 24, 25, 51, 55]` (banana 13 / olive green cup 24,25 / blue toothpaste 51,55)
    - 60 ep clean dataset 진행
 
-0.5. **A1.5 — delete_episodes → clean dataset (Codex syhlabtop) — READY, IMMEDIATE NEXT**
-   - 명령: `lerobot-edit-dataset --repo_id KETI-IRRC/openarm_handover_v0_20260521_202117 --root /home/syhlabtop/.cache/.../v0_20260521_202117 --new_repo_id KETI-IRRC/openarm_handover_v0_20260521_202117_clean --new_root /home/syhlabtop/.cache/.../v0_20260521_202117_clean --operation.type=delete_episodes --operation.episode_indices="[13,24,25,51,55]"`
-   - 결과: 60 ep, tasks.parquet 3 row 유지 (가능)
-   - verification: total_episodes=60, frames ≈ 53,800
-   - HF push: 사용자 확인 후
+0.5. **A1.5 — clean dataset 생성 — DONE 2026-06-04**
+   - HF: `KETI-IRRC/openarm_handover_v0_20260521_202117_clean` (private, 41 files, sha 526acb21)
+   - 60 ep / 53,851 frames / 3 tasks (task_index reindex: toothpaste=0, cup=1, banana=2; string 보존)
+   - commit 3fb1c101 + 4ace9147
 
 1. **A2 — D-38 65 ep relstats 변환 (Codex syhlabtop or a6000) — READY**
    - 도구: S2 `transform_dataset_to_relative_chunk` (commit ca532645)
