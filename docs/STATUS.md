@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-04 (A1.5 clean dataset 완료 60 ep HF push, A2 변환 next, D-41 NEW)
+**마지막 갱신:** 2026-06-05 (A2 verification PASS, mean_abs_max=1.44 vs M2 0.796 multi-object 효과, A3 학습 next)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -18,7 +18,7 @@
 | **G** — adaptation 미니 레포 (D-34) | **P2 COMPLETE, P0/P1 보류** | S1 scaffold + S2 relstats_transform 완료 (ca532645). P0 vision/P1 proprio 은 D-35 분기 끝나고 |
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
-| **J** — D-38 후속 (cleaning + α'' 학습) | **A1.5 DONE** | clean dataset = KETI-IRRC/...v0_..._clean (60 ep, HF private). 다음 A2 변환 → A3 α'' 재학습 → A4 P + A5 D-40 + D-41 (A3 중 병행) → A6 gate → A7 분기 |
+| **J** — D-38 후속 (cleaning + α'' 학습) | **A2 PASS** | clean relstats variant (60 ep, 1.4GB a6000 local). mean_abs_max=1.44 (M2 대비 +81% multi-object 효과), q_max=60.71. HF push 대기. 다음 A3 α'' 재학습 (GPU 자유 시점) → A4+A5+D-41 (A3 중 병행) → A6 gate → A7 분기 |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
