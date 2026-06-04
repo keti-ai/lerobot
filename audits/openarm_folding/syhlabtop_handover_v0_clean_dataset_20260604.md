@@ -93,11 +93,15 @@ Reindex 예:
 
 ## 6. HF push 결정
 
-- HF push: 미실행.
-- 사유: A1.5 지시사항에 따라 검증 PASS 후 사용자 확인을 받아 별도 실행.
-- 예정 dataset URL: `https://huggingface.co/datasets/KETI-IRRC/openarm_handover_v0_20260521_202117_clean`
+- HF push: 실행 완료.
+- 사용자 확인: A1.5 검증 PASS 후 `continue` 지시로 진행.
+- Dataset URL: `https://huggingface.co/datasets/KETI-IRRC/openarm_handover_v0_20260521_202117_clean`
+- HF repo visibility: private
+- HF remote commit SHA: `526acb21eb6a1896c2bf4e4710ad6117aef1fcad`
+- HF file count: `41`
+- HF 확인: `meta/info.json`, `meta/tasks.parquet` 존재 확인.
 
-검증 PASS 후 사용할 명령:
+실행 명령:
 
 ```bash
 huggingface-cli upload \
