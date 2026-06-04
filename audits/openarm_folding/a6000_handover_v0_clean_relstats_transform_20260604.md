@@ -186,10 +186,31 @@ Reasons:
 
 ## 8. 다음 단계
 
-- A2 HF push is pending user confirmation:
-  - repo: `https://huggingface.co/datasets/KETI-IRRC/openarm_handover_v0_clean_relstats_chunk30`
-  - command should use `--repo-type=dataset --private`
-- A3 alpha-double-prime training can use either:
-  - `--dataset.repo_id=KETI-IRRC/openarm_handover_v0_clean_relstats_chunk30` after HF push
-  - `--dataset.root=/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/handover_alpha_relstats_20260522/datasets/openarm_handover_v0_clean_relstats_chunk30` immediately for local training
-- Before A3, check GPU availability again with `nvidia-smi`; A2 did not use GPU.
+- A2b HF push completed on 2026-06-05; details below.
+- A3 alpha-double-prime training started from this clean relstats dataset on GPU1:
+  - status: `audits/openarm_folding/a6000_pi05_handover_v0_clean_alpha2prime_status_20260605_015232.md`
+  - dataset args include both `--dataset.repo_id=KETI-IRRC/openarm_handover_v0_clean_relstats_chunk30` and the local `--dataset.root`.
+
+---
+
+## A2b HF Push (2026-06-05)
+
+- repo: `https://huggingface.co/datasets/KETI-IRRC/openarm_handover_v0_clean_relstats_chunk30`
+- private: `true`
+- upload method: `huggingface-cli upload KETI-IRRC/openarm_handover_v0_clean_relstats_chunk30 <target_root> --repo-type=dataset --private`
+- source folder: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/handover_alpha_relstats_20260522/datasets/openarm_handover_v0_clean_relstats_chunk30`
+
+Hub verification:
+
+- `whoami`: `syh4661`
+- org access: `KETI-IRRC`
+- file count: `42`
+- `.relstats_complete` in repo files: `True`
+- `meta/stats.json` in repo files: `True`
+- `action.mean[:4]`: `[-0.4048439860343933, 0.7029255628585815, 0.3244377672672272, 0.5263494849205017]`
+- `action.q01[:4]`: `[-42.884531908215216, -20.018216276168822, -28.99037908713023, -60.71202855791364]`
+- `action.q99[:4]`: `[36.48783746802285, 29.808138561248754, 33.463866707130656, 55.97401901245114]`
+- converted action mean abs max: `1.4375325441360474`
+- converted action q01/q99 abs max: `60.71202855791364`
+
+A2b 판정: PASS. Dataset HF push completed as private; marker and relstats action stats were verified from the Hub.
