@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-02 (R 수집 완료 65 ep / 3 tasks, D-40 Wayland 이슈 추가, 실패 ep review + clean + α'' 학습 펜딩)
+**마지막 갱신:** 2026-06-04 (cleaning 진행 결정 — 다른 PC review → delete_episodes → A2 변환 → A3 α'' 재학습 trajectory)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -16,8 +16,9 @@
 | **E** — handover 데이터 수집 | **EXPANDED (v0 multi3)** | 65 ep / 3 tasks (banana 0-19, olive green cup 20-44, blue toothpaste 45-64). 같은 stamped repo KETI-IRRC/openarm_handover_v0_20260521_202117 에 resume 누적. plate skip (작업성). 실패 ep clean 대기. |
 | **F** — PI0.5 handover α/α′ fine-tune | **BOTH REJECTED** | α REJECTED (D-32 case α). α′ relstats 30k REJECTED (M4, b7897a06). 다음 = D-35 분기 |
 | **G** — adaptation 미니 레포 (D-34) | **P2 COMPLETE, P0/P1 보류** | S1 scaffold + S2 relstats_transform 완료 (ca532645). P0 vision/P1 proprio 은 D-35 분기 끝나고 |
-| **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep), P/Q/U-retry 진행 가능 |
-| **I** — D-40 Wayland keyboard patch | **NEW** | pynput global listener Wayland 안 먹힘. 다음 수집 전 patch 필요. ~2-3h Codex syhlabtop |
+| **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
+| **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
+| **J** — D-38 후속 (cleaning + α'' 학습) | **READY** | A1 review (다른 PC) → A1.5 delete_episodes → A2 변환 → A3 α'' 재학습 → A4 P + A5 D-40 (A3 중 병행) → A6 gate → A7 분기 (plan §13) |
 
 ---
 
@@ -98,39 +99,59 @@
 
 ---
 
-## 다음 N개 작업 (우선순위 순, D-35 분기)
+## 다음 N개 작업 (우선순위 순, plan §13 trajectory)
 
-1. **(P) handover-specific recipe gate (Codex syhlabtop, ~2-3h) — READY**
-   - U 부분 결과만으로 디자인 가능. folding lock 3 항목 완화 또는 별도 gate
-   - 변경: robot_type list 확장 (`bi_openarm_follower` 포함), camera shape lock 자유화, RABC optional
-   - 위치: `audits/openarm_folding/stage29_candidate_recipe_gate.py` task-aware path 또는 신규 `handover_recipe_gate.py`
+0. **A1 — Cleaning review (사용자 직접, 다른 고성능 PC) — IMMEDIATE NEXT**
+   - HF clone: `huggingface-cli download KETI-IRRC/openarm_handover_v0_20260521_202117 --repo-type=dataset --local-dir=<target>`
+   - 또는 syhlabtop → 다른 PC rsync
+   - `lerobot-dataset-viz --repo-id ... --root ... --episode-index <N>` 로 ep 별 시각 review
+   - blue toothpaste 45-64 중심 (handover 떨어뜨림 추정), olive green cup 20-44 도 sampling
+   - banana 0-19 = D-32/D-33 baseline 보존 (review 만, delete X)
+   - 실패 ep index 목록 본 세션에 보고
 
-2. **(R) handover v1 multi-object 수집 (사용자 직접, 3-5h) — 진행 가능**
-   - 미니 리더 + bi_openarm_follower + 동일 카메라
-   - 객체 set: banana + bottle + block (사용자 결정), 객체당 25 ep × 3 = 75 ep
-   - dataset slug: `KETI-IRRC/openarm_handover_v1_multi_<TS>`
-   - 단일 dataset multi-task 또는 separate 3 dataset + merge 패턴 결정 필요 (lerobot-record resume task-change 동작 확인)
-   - P 와 직교 (다른 머신)
+0.5. **A1.5 — Clean dataset 생성 (Codex syhlabtop) — BLOCKED on A1**
+   - 명령: `lerobot-edit-dataset --repo_id <STAMPED> --root <STAMPED_LOCAL> --new_repo_id <STAMPED>_clean --new_root <CLEAN_LOCAL> --operation.type=delete_episodes --operation.episode_indices="[<list>]"`
+   - 새 slug: `KETI-IRRC/openarm_handover_v0_20260521_202117_clean`
+   - HF push: verification 후 사용자 결정
 
-3. **(U-retry) GPU replay matrix (Codex a6000) — BLOCKED**
-   - 5 ckpt × 20 ep = 100 cell replay 재실행
-   - 조건: a6000 의 GPU ≥1 자유. 현재 4 GPU 동료 점유 → 대기
-   - 결과 = Q 의 input
+1. **A2 — D-38 65 ep relstats 변환 (Codex syhlabtop or a6000) — READY**
+   - 도구: S2 `transform_dataset_to_relative_chunk` (commit ca532645)
+   - source: `KETI-IRRC/openarm_handover_v0_20260521_202117` (현 65 ep)
+   - target: `KETI-IRRC/openarm_handover_v0_multi3_relstats_chunk30`
+   - target_root: 결정 필요 (syhlabtop local 또는 a6000 local)
+   - chunk_size=30, exclude_joint_indices=(7,15)
+   - verification PASS 후 사용자 결정으로 HF push
+   - audit: `a6000_handover_v0_multi3_relstats_transform_<TS>.md`
 
-4. **(Q) replay threshold task-specific (Codex syhlabtop, ~2-3h) — BLOCKED on U-retry**
-   - U-retry 의 실제 ratio 분포가 input
-   - 그 전 진행 시 placeholder 만 가능
+2. **A3 — α'' 재학습 GPU 30k overnight (Codex a6000) — BLOCKED on A2 + GPU 자유**
+   - 명령 = α' 와 동일 + `--dataset.repo_id`/`--output_dir`/`--policy.repo_id` 변경
+   - init = level2 corrected 004000 (α 와 동일)
+   - GPU: a6000 동료 학습 끝난 시점 또는 GPU2/3 가능 시
+   - audit: status/result md
 
-5. **D-38 (R 의 후속): handover v1 변환 + 재학습 (Codex a6000)**
-   - R 수집 끝나면 S2 도구 (`transform_dataset_to_relative_chunk`) 로 relstats variant 생성
-   - 재학습 GPU 자유 시점에 (현재 동료 점유) 30k overnight
-   - 데이터 부족 가설 검증
+3. **A4 — P (handover-specific recipe gate) — A3 중 병행, Codex syhlabtop ~2-3h**
+   - 새 도구 `audits/openarm_folding/handover_recipe_gate.py` 또는 stage29 task-aware path
+   - folding lock 3 항목 (robot_type, camera shape, RABC) 완화
 
-6. **D-34 P0 vision/P1 proprio (DEFERRED)** — D-35 분기 끝나고
+4. **A5 — D-40 Wayland keyboard patch — A3 중 병행, Codex syhlabtop ~2-3h**
+   - pynput → stdin 권장 (가장 단순)
+   - 위치: `src/lerobot/utils/control_utils.py` 의 `init_keyboard_listener`
 
-7. **Phase 2 Dataset Registry / Model Registry v2 본문 보강 (DEFERRED)**
+5. **A6 — α'' shortlist gate + replay (Codex a6000, A3 끝난 후, ~1h)**
+   - A4 의 P 가 active gate
+   - stage22 replay 도 같이
 
-8. **operator 입회 official rollout (DEFERRED — D-35 PASS 후보 확보 후)**
+6. **A7 — 결과 분기 (사용자 결정)**
+   - PASS → D-28''/D-29''/D-30/D-13''
+   - FAIL → D-39 (S/T/R-extend/V) 검토
+
+7. **(Q + U-retry) — a6000 GPU 자유 시점**
+   - Q (replay threshold task-specific) BLOCKED on U-retry
+   - U-retry (5 ckpt × 20 ep GPU replay) BLOCKED on GPU
+
+8. **D-34 P0 vision/P1 proprio (DEFERRED)** — A7 결과 후
+9. **Phase 2 Dataset Registry / Model Registry v2 본문 보강 (DEFERRED)**
+10. **operator 입회 official rollout (DEFERRED — A6 PASS 후보 확보 후)**
 
 ---
 

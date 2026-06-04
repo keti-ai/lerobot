@@ -199,7 +199,7 @@ P3 (Phase 3):
 | **D-35** | OPEN | M4 REJECTED 후 다음 분기 (2026-06-01 결정) | 사용자 결정 = (U) episode 분포 진단 → (P) handover-specific recipe gate → (Q) replay threshold task-specific → (R) handover v1 50-100 ep 추가 수집. 순차 진행. (S) init 변경, (T) task 단순화 는 제외. R 의 사용자 일정은 별도 결정. |
 | **D-36** | OPEN | handover-specific recipe gate (P 단계) | stage29 의 folding lock 3 항목 (robot_type=`openarms_follower` 강제, camera shape lock, RABC 강제) 을 handover task 용으로 완화 또는 별도 gate 작성. 위치 후보: `audits/openarm_folding/stage29_candidate_recipe_gate.py` 의 task-aware path 또는 신규 `handover_recipe_gate.py`. ~2-3h Codex syhlabtop. U 진단 결과 보고 디자인. |
 | **D-37** | OPEN | replay threshold task-specific (Q 단계) | stage22 의 ratio/raw threshold 가 folding 분포 기준. handover 의 ratio 분포 (현재 0.03-0.14) 와 raw normalized error (~4.8) 에 맞춘 task-specific threshold 정의. 단 PASS 자체가 deploy 보장 아님 — 모델이 큰 swing 출력 못 하는 문제는 그대로. ~2-3h Codex syhlabtop. |
-| **D-38** | PROGRESS | handover v0 multi-object 수집 (R 단계, 방식 A) | 2026-06-02 수집 완료. 방식 A (기존 stamped repo 에 resume). 최종 65 ep / 58,340 frames / 3 tasks: banana 0-19 (기존) + olive green cup 20-44 + blue toothpaste 45-64. plate skip (작업성 부족). 짧게 잘린 ep 없음. 실패 ep review + clean dataset 생성 (delete_episodes) 후 재변환 + α'' 재학습 진행 예정. fix commit db4d0a6e (realsense detection). |
+| **D-38** | DETAIL | handover v0 multi-object 수집 + α'' 후속 (R 단계, 방식 A) | 2026-06-02 수집 완료 (65 ep / 58,340 frames / 3 tasks: banana 0-19, olive green cup 20-44, blue toothpaste 45-64). plate skip (작업성). **Cleaning 진행** (사용자 결정 2026-06-04): 다른 고성능 PC 에서 HF clone → lerobot-dataset-viz review → 실패 ep index 식별 → Codex 가 delete_episodes 로 clean dataset 생성 → relstats 재변환 → α'' 재학습. 새 variant slug = `KETI-IRRC/openarm_handover_v0_multi3_clean_relstats_chunk30`. α 시리즈: α=20 ep absolute (D-32 REJECTED), α'=20 ep relstats (M4 REJECTED), α''=clean 65-N ep multi3 relstats (진행 예정). fix commit db4d0a6e. plan: `~/.claude/plans/quizzical-petting-sundae.md` §13. |
 | **D-39** | NEW | (S) init 변경 / (T) task 단순화 추후 검토 | D-38 (handover v1 재학습) 결과 또 REJECTED 인 경우에 (S) base PI0.5 init 또는 (T) single-arm pick & place 시도. 현재 D-38 결과 input 으로 보류. |
 | **D-40** | NEW | Wayland keyboard listener patch | 2026-06-02 R 수집 중 발견. pynput global keyboard listener 가 Wayland (XDG_SESSION_TYPE=wayland) 에서 Esc/Left Arrow 신뢰성 X. 다음 수집 전 patch 필요. 옵션: (a) stdin-based control / (b) evdev 직접 / (c) GUI button click. 위치: `src/lerobot/utils/control_utils.py` 의 `init_keyboard_listener`. ~2-3h Codex syhlabtop. |
 
@@ -288,6 +288,7 @@ Custom syhlabtop rollout, Track A trial report, viewer/client, historical Track 
 
 | 날짜 | 변경 | 비고 |
 |---|---|---|
+| 2026-06-04 | Cleaning 진행 결정 (plan §13 정정). 다른 고성능 PC review → delete_episodes → α''. α 시리즈 명명 명확화 (α/α'/α''). D-38 DETAIL 갱신. | syhlabtop SSOT |
 | 2026-06-02 | R (D-38) 수집 완료. 방식 A, 65 ep, 3 tasks. plate skip (작업성 부족) → blue toothpaste 대체. realsense detection fix db4d0a6e. Wayland keyboard 이슈 발견 → D-40 NEW. 실패 ep review + clean dataset 진행 예정. | syhlabtop R + Codex syhlabtop fix |
 | 2026-06-01 | M4 REJECTED 분석 + 다음 분기 결정 (사용자). D-33 RESOLVED 확정. D-29 갱신 (8766 정지). D-35 분기 = U→P→Q→R 순차. D-36/37/38/39 NEW. | syhlabtop SSOT |
 | 2026-05-26 | D-33 M2b/M3/M4 offline 완료. `KETI-IRRC/openarm_handover_v0_relstats_chunk30` private HF push, α′ relstats 30k 학습 PASS, shortlist 5개 recipe/replay REJECTED → no deploy candidate. | a6000 |
