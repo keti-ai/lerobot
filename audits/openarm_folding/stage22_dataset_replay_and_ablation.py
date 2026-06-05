@@ -78,6 +78,25 @@ LOCKED_FOLDING_RECIPE = {
     "rtc_execution_horizon": 20,
     "action_interpolation_multiplier": 3,
 }
+LOCKED_HANDOVER_RECIPE = {
+    "robot": "bimanual OpenArm / bi_openarm_follower",
+    "hardware": "+5 cm upper arm extension and larger gripper jaws expected for final deployment",
+    "state_action_order": ACTION_NAMES,
+    "camera_keys": IMAGE_KEYS,
+    "camera_shapes": {
+        "observation.images.left_wrist": [480, 640, 3],
+        "observation.images.right_wrist": [480, 640, 3],
+        "observation.images.base": [480, 640, 3],
+    },
+    "model": "pi05",
+    "chunk_size": 30,
+    "n_action_steps": 30,
+    "action_representation": "relative trajectory",
+    "relative_exclude_joints": ["gripper"],
+    "training_techniques": ["fine-tune from level2 corrected 004000"],
+    "rtc_execution_horizon": 20,
+    "action_interpolation_multiplier": 3,
+}
 
 
 @dataclass(frozen=True)
@@ -282,7 +301,7 @@ def abs_max(values: np.ndarray, mask: np.ndarray) -> float:
     return float(np.max(np.abs(values[mask])))
 
 
-def validate_folding_recipe(
+def validate_recipe(
     *,
     cfg: PreTrainedConfig,
     model_dir: Path,
@@ -294,6 +313,10 @@ def validate_folding_recipe(
     action_span_ratio_limit: float,
     action_is_relative: bool,
     action_is_relative_source: str,
+    recipe_locked: dict[str, Any],
+    allowed_robot_types: frozenset[str],
+    expected_image_shapes: dict[str, list[int]],
+    require_rabc: bool = True,
 ) -> dict[str, Any]:
     train_cfg = load_training_config(model_dir)
     train_dataset_repo = train_cfg.get("dataset", {}).get("repo_id")
@@ -326,9 +349,9 @@ def validate_folding_recipe(
         {"train_dataset_repo": train_dataset_repo, "replay_dataset_repo": dataset_repo},
     )
     add_check(
-        "dataset_robot_type_openarms_follower",
-        info.get("robot_type") == "openarms_follower",
-        {"actual": info.get("robot_type")},
+        "dataset_robot_type_supported",
+        info.get("robot_type") in allowed_robot_types,
+        {"actual": info.get("robot_type"), "allowed": sorted(allowed_robot_types)},
     )
     add_check(
         "action_names_match_folding_16d",
@@ -341,9 +364,12 @@ def validate_folding_recipe(
         {"actual": features.get("observation.state", {}).get("names")},
     )
     add_check(
-        "camera_keys_and_shapes_match_space_recipe",
-        all(image_features[key].get("shape") == EXPECTED_IMAGE_SHAPES[key] for key in IMAGE_KEYS),
-        {"actual": {key: image_features[key].get("shape") for key in IMAGE_KEYS}},
+        "camera_keys_and_shapes_match_recipe",
+        all(image_features[key].get("shape") == expected_image_shapes[key] for key in IMAGE_KEYS),
+        {
+            "actual": {key: image_features[key].get("shape") for key in IMAGE_KEYS},
+            "expected": expected_image_shapes,
+        },
     )
     add_check(
         "use_relative_actions_enabled",
@@ -361,17 +387,28 @@ def validate_folding_recipe(
         int(getattr(cfg, "n_action_steps", -1)) == 30,
         {"actual": getattr(cfg, "n_action_steps", None)},
     )
-    sample_weighting_is_rabc = sample_weighting.get("type") == "rabc"
-    add_check(
-        "rabc_recorded_in_train_config",
-        bool(train_cfg.get("use_rabc", False)) or sample_weighting_is_rabc,
-        {
-            "use_rabc": train_cfg.get("use_rabc"),
-            "rabc_kappa": train_cfg.get("rabc_kappa") or sample_weighting.get("kappa"),
-            "rabc_progress_path": train_cfg.get("rabc_progress_path") or sample_weighting.get("progress_path"),
-            "sample_weighting": sample_weighting,
-        },
-    )
+    if require_rabc:
+        sample_weighting_is_rabc = sample_weighting.get("type") == "rabc"
+        add_check(
+            "rabc_recorded_in_train_config",
+            bool(train_cfg.get("use_rabc", False)) or sample_weighting_is_rabc,
+            {
+                "use_rabc": train_cfg.get("use_rabc"),
+                "rabc_kappa": train_cfg.get("rabc_kappa") or sample_weighting.get("kappa"),
+                "rabc_progress_path": train_cfg.get("rabc_progress_path") or sample_weighting.get("progress_path"),
+                "sample_weighting": sample_weighting,
+            },
+        )
+    else:
+        add_check(
+            "rabc_not_required_for_this_task",
+            True,
+            {
+                "use_rabc": train_cfg.get("use_rabc"),
+                "sample_weighting": sample_weighting,
+                "note": "RABC is optional for this recipe",
+            },
+        )
 
     max_post_vs_rel_q01_error = abs_max(q01 - rel_q01, ARM_ACTION_MASK)
     max_post_vs_rel_q99_error = abs_max(q99 - rel_q99, ARM_ACTION_MASK)
@@ -400,9 +437,9 @@ def validate_folding_recipe(
     )
 
     return {
-        "source": FOLDING_RECIPE_SOURCE_MAP["robot_folding_space"],
+        "source": recipe_locked.get("source", FOLDING_RECIPE_SOURCE_MAP["robot_folding_space"]),
         "source_map": FOLDING_RECIPE_SOURCE_MAP,
-        "locked_recipe": LOCKED_FOLDING_RECIPE,
+        "locked_recipe": recipe_locked,
         "summary": {
             "passed": all(check["passed"] for check in checks),
             "failed_checks": [check["name"] for check in checks if not check["passed"]],
@@ -410,18 +447,42 @@ def validate_folding_recipe(
             "action_is_relative_source": action_is_relative_source,
         },
         "expected_runtime": {
-            "robot": "bimanual OpenArm",
-            "action_dim": 16,
-            "camera_keys": IMAGE_KEYS,
-            "model": "pi05",
-            "chunk_size": 30,
-            "rtc_execution_horizon": 20,
-            "action_interpolation_multiplier": 3,
-            "action_representation": "relative trajectory; grippers excluded",
-            "training_techniques": ["SARM", "RABC", "DAgger/HIL", "high-quality data fine-tuning"],
+            "robot": recipe_locked["robot"],
+            "action_dim": len(ACTION_NAMES),
+            "camera_keys": recipe_locked["camera_keys"],
+            "model": recipe_locked["model"],
+            "chunk_size": recipe_locked["chunk_size"],
+            "rtc_execution_horizon": recipe_locked["rtc_execution_horizon"],
+            "action_interpolation_multiplier": recipe_locked["action_interpolation_multiplier"],
+            "action_representation": f"{recipe_locked['action_representation']}; grippers excluded",
+            "training_techniques": recipe_locked["training_techniques"],
         },
         "checks": checks,
     }
+
+
+def validate_folding_recipe(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    """Backward-compatible wrapper. Use validate_recipe() directly."""
+    return validate_recipe(
+        *args,
+        recipe_locked=LOCKED_FOLDING_RECIPE,
+        allowed_robot_types=frozenset({"openarms_follower"}),
+        expected_image_shapes=EXPECTED_IMAGE_SHAPES,
+        require_rabc=True,
+        **kwargs,
+    )
+
+
+def validate_handover_recipe(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    """Handover task variant of validate_recipe."""
+    return validate_recipe(
+        *args,
+        recipe_locked=LOCKED_HANDOVER_RECIPE,
+        allowed_robot_types=frozenset({"openarms_follower", "bi_openarm_follower"}),
+        expected_image_shapes=LOCKED_HANDOVER_RECIPE["camera_shapes"],
+        require_rabc=False,
+        **kwargs,
+    )
 
 
 def parse_frame_indices(raw: str, episode_length: int) -> list[int]:

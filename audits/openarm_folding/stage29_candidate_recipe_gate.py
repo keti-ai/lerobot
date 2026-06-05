@@ -28,6 +28,20 @@ LIGHTWEIGHT_MODEL_PATTERNS = [
     "policy_postprocessor_step_*_unnormalizer_processor.safetensors",
     "README.md",
 ]
+TASK_RECIPES = {
+    "folding": (
+        replay.LOCKED_FOLDING_RECIPE,
+        frozenset({"openarms_follower"}),
+        replay.EXPECTED_IMAGE_SHAPES,
+        True,
+    ),
+    "handover": (
+        replay.LOCKED_HANDOVER_RECIPE,
+        frozenset({"openarms_follower", "bi_openarm_follower"}),
+        replay.LOCKED_HANDOVER_RECIPE["camera_shapes"],
+        False,
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -79,9 +93,13 @@ def gate_candidate(
     action_span_ratio_limit: float,
     action_is_relative: bool,
     action_is_relative_source: str,
+    recipe_locked: dict[str, Any],
+    allowed_robot_types: frozenset[str],
+    expected_image_shapes: dict[str, list[int]],
+    require_rabc: bool,
 ) -> dict[str, Any]:
     cfg = PreTrainedConfig.from_pretrained(candidate.path)
-    gate = replay.validate_folding_recipe(
+    gate = replay.validate_recipe(
         cfg=cfg,
         model_dir=candidate.path,
         dataset_repo=dataset_repo,
@@ -92,6 +110,10 @@ def gate_candidate(
         action_span_ratio_limit=action_span_ratio_limit,
         action_is_relative=action_is_relative,
         action_is_relative_source=action_is_relative_source,
+        recipe_locked=recipe_locked,
+        allowed_robot_types=allowed_robot_types,
+        expected_image_shapes=expected_image_shapes,
+        require_rabc=require_rabc,
     )
     failed_checks = set(gate["summary"]["failed_checks"])
     recipe_failures_without_dataset = sorted(failed_checks - {"model_training_dataset_matches_replay_dataset"})
@@ -172,7 +194,8 @@ def write_markdown(path: Path, payload: dict[str, Any]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Gate OpenArm folding checkpoint candidates without robot IO.")
+    parser = argparse.ArgumentParser(description="Gate OpenArm checkpoint candidates without robot IO.")
+    parser.add_argument("--task", default="folding", choices=["folding", "handover"])
     parser.add_argument("--dataset-repo")
     parser.add_argument("--dataset-root", type=Path)
     parser.add_argument("--dataset-revision")
@@ -206,13 +229,15 @@ def main() -> int:
         dataset_root,
         info,
     )
+    recipe_locked, allowed_robot_types, expected_image_shapes, require_rabc = TASK_RECIPES[args.task]
     args.candidate_cache_dir.mkdir(parents=True, exist_ok=True)
 
     payload: dict[str, Any] = {
+        "task": args.task,
         "dataset_repo": args.dataset_repo,
         "dataset_root": str(dataset_root),
         "source_map": replay.FOLDING_RECIPE_SOURCE_MAP,
-        "locked_recipe": replay.LOCKED_FOLDING_RECIPE,
+        "locked_recipe": recipe_locked,
         "action_is_relative": action_is_relative,
         "action_is_relative_source": action_is_relative_source,
         "candidates": args.candidates or DEFAULT_CANDIDATES,
@@ -238,6 +263,10 @@ def main() -> int:
                     action_span_ratio_limit=args.action_span_ratio_limit,
                     action_is_relative=action_is_relative,
                     action_is_relative_source=action_is_relative_source,
+                    recipe_locked=recipe_locked,
+                    allowed_robot_types=allowed_robot_types,
+                    expected_image_shapes=expected_image_shapes,
+                    require_rabc=require_rabc,
                 )
             )
         except Exception as exc:
