@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-05 (A3 학습 완료 30k step / loss 0.019, A4 P recipe gate next prerequisite, A6 shortlist 대기)
+**마지막 갱신:** 2026-06-05 (A4 P handover gate 완료 0e7bdd34, A6 α'' shortlist gate next)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -18,7 +18,7 @@
 | **G** — adaptation 미니 레포 (D-34) | **P2 COMPLETE, P0/P1 보류** | S1 scaffold + S2 relstats_transform 완료 (ca532645). P0 vision/P1 proprio 은 D-35 분기 끝나고 |
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
-| **J** — D-38 후속 (cleaning + α'' 학습) | **A3 DONE (13d45fcb)** | α'' 30k 완료 (loss 0.019 / grad_norm 0.637, α' 대비 ×1.9 magnitude effect 일치, healthy). run_dir 343G, 15 ckpts (002000~030000), error 없음. 다음 A4 P recipe gate (Option D refactor) → A6 shortlist gate → A7 분기 |
+| **J** — D-38 후속 (cleaning + α'' 학습) | **A4 DONE (0e7bdd34)** | α'' 30k + handover recipe gate (Option D generic refactor + LOCKED_HANDOVER_RECIPE) 모두 완료. 다음 A6 shortlist gate (stage29 --task=handover, 5 ckpt) → A7 분기 |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
