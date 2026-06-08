@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-05 (D-42 NEW: 70% real-world pick & place 새 north star + Track K, A6 baseline 병행)
+**마지막 갱신:** 2026-06-05 (단순화 — α'' 030000 직접 deploy + N=20 trial 70% target. 부수 폐기, audit 13 archive)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -18,8 +18,8 @@
 | **G** — adaptation 미니 레포 (D-34) | **P2 COMPLETE, P0/P1 보류** | S1 scaffold + S2 relstats_transform 완료 (ca532645). P0 vision/P1 proprio 은 D-35 분기 끝나고 |
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
-| **J** — D-38 후속 (cleaning + α'' 학습) | **A4 DONE (0e7bdd34)** | α'' 30k + P handover gate 완료. 다음 A6 shortlist gate (handover baseline 고정 용도) |
-| **K** — D-42 70% real-world pick & place | **NEW (north star)** | metric: operator 판정 N=20-30 trial ≥70%. Track K1 (live infra) → K2 (trim, 옵션) → K3 (α''') → K4 (live eval). A6 와 병행 |
+| **J** — D-38 후속 (cleaning + α'' 학습) | **CLOSED** | α'' 030000 final ckpt = deploy target. A6 SKIP (사용자 결정). gate 도구 (P, commit 0e7bdd34) 는 future use 으로 보존 |
+| **K** — D-42 70% real-world success | **ACTIVE single focus** | α'' 030000 직접 lerobot-rollout deploy. N=20 trial 14+/20 = 70%. K1 (rollout setup) → K4 (operator eval) 만. plan: `~/.claude/plans/k4_live_eval.md` |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---

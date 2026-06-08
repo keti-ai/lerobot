@@ -203,7 +203,7 @@ P3 (Phase 3):
 | **D-39** | NEW | (S) init 변경 / (T) task 단순화 추후 검토 | D-38 (handover v1 재학습) 결과 또 REJECTED 인 경우에 (S) base PI0.5 init 또는 (T) single-arm pick & place 시도. 현재 D-38 결과 input 으로 보류. |
 | **D-40** | NEW | Wayland keyboard listener patch | 2026-06-02 R 수집 중 발견. pynput global keyboard listener 가 Wayland (XDG_SESSION_TYPE=wayland) 에서 Esc/Left Arrow 신뢰성 X. 다음 수집 전 patch 필요. 옵션: (a) stdin-based control / (b) evdev 직접 / (c) GUI button click. 위치: `src/lerobot/utils/control_utils.py` 의 `init_keyboard_listener`. ~2-3h Codex syhlabtop. |
 | **D-41** | NEW | Open dataset replay sanity check (2026-06-04 사용자 회고 의견) | α/α' 평가 전 했어야 한다는 회고. 두 sub-task: **D-41a** stage22 gate 의 known-good 조합 (level2 corrected 004000 + level2_relative_stats_chunk30) replay PASS 확인 → gate 도구 자체 sanity. **D-41b** HF `lerobot/folding_latest` ckpt + dataset replay → PI0.5 자체 capability 검증, handover 가 PI0.5 한계인지 data/training 문제인지 분리 (D-39 V 옵션 input). A3 학습 중 병행 가능 (~1h Codex a6000). |
-| **D-42** | NEW | 70% real-world pick & place success — 새 north star (2026-06-05 사용자) | metric: operator 판정 binary, N=20-30 trial 중 ≥70% 성공 (객체가 target zone 안착, trial < 60s). task 정의 유연 (handover 그대로 OR trim 해서 pick & place 단순화 OR 새 task). data: 기존 60 ep clean handover dataset 의 pick+place 부분만 trim 재활용 권장 (옵션 X). Track K: K1 (live infra) → K2 (trim, 옵션) → K3 (α''') → K4 (live eval). plan §14. |
+| **D-42** | ACTIVE (single focus) | 70% real-world success on handover 3 task — α'' 030000 직접 deploy | **사용자 결정 단순화 (2026-06-05, plan §15)**: 부수 작업 (A6/D-40/D-41/K2/K3) 모두 SKIP/폐기. α'' final ckpt `030000` 그대로 lerobot-rollout deploy. operator N=20 trial 평가, 14+/20 (=70%) PASS. 객체 = handover 3 task (banana / olive green cup / blue toothpaste). audit `audits/openarm_folding/feasibility_runs_<date>.md`. 분기: PASS → scale, FAIL → data 보강/α'''/policy 변경. **Active plan**: `~/.claude/plans/k4_live_eval.md` (200줄 이하). 기존 `quizzical-petting-sundae.md` ARCHIVED. |
 
 ---
 
@@ -290,6 +290,7 @@ Custom syhlabtop rollout, Track A trial report, viewer/client, historical Track 
 
 | 날짜 | 변경 | 비고 |
 |---|---|---|
+| 2026-06-05 | **D-42 단순화 + 레포 정리** (plan §15). 부수 작업 모두 폐기 (A6/D-40/D-41/K2/K3), audit md 13 archive (folding 7 + 사이드 6). 새 plan 파일 `k4_live_eval.md` 200줄 이하. K1 lerobot-rollout setup → K4 N=20 trial 70% target. | syhlabtop SSOT |
 | 2026-06-05 | A3 α'' 30k 학습 완료 (loss 0.019). A4 P handover gate (Option D refactor) 완료 0e7bdd34. **D-42 NEW** (70% real-world pick & place — 새 north star). Track K (K1 live infra → K2 trim → K3 α''' → K4 live eval). plan §14. | syhlabtop SSOT |
 | 2026-06-04 | Cleaning ep 결정 (사용자 review 결과 [13, 24, 25, 51, 55] 제외 → 60 ep). D-41 NEW (open dataset replay sanity, α/α' 평가 전 했어야 한다는 회고). | syhlabtop SSOT |
 | 2026-06-04 | Cleaning 진행 결정 (plan §13 정정). 다른 고성능 PC review → delete_episodes → α''. α 시리즈 명명 명확화 (α/α'/α''). D-38 DETAIL 갱신. | syhlabtop SSOT |
