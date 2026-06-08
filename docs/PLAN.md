@@ -203,6 +203,7 @@ P3 (Phase 3):
 | **D-39** | NEW | (S) init 변경 / (T) task 단순화 추후 검토 | D-38 (handover v1 재학습) 결과 또 REJECTED 인 경우에 (S) base PI0.5 init 또는 (T) single-arm pick & place 시도. 현재 D-38 결과 input 으로 보류. |
 | **D-40** | NEW | Wayland keyboard listener patch | 2026-06-02 R 수집 중 발견. pynput global keyboard listener 가 Wayland (XDG_SESSION_TYPE=wayland) 에서 Esc/Left Arrow 신뢰성 X. 다음 수집 전 patch 필요. 옵션: (a) stdin-based control / (b) evdev 직접 / (c) GUI button click. 위치: `src/lerobot/utils/control_utils.py` 의 `init_keyboard_listener`. ~2-3h Codex syhlabtop. |
 | **D-41** | NEW | Open dataset replay sanity check (2026-06-04 사용자 회고 의견) | α/α' 평가 전 했어야 한다는 회고. 두 sub-task: **D-41a** stage22 gate 의 known-good 조합 (level2 corrected 004000 + level2_relative_stats_chunk30) replay PASS 확인 → gate 도구 자체 sanity. **D-41b** HF `lerobot/folding_latest` ckpt + dataset replay → PI0.5 자체 capability 검증, handover 가 PI0.5 한계인지 data/training 문제인지 분리 (D-39 V 옵션 input). A3 학습 중 병행 가능 (~1h Codex a6000). |
+| **D-42** | NEW | 70% real-world pick & place success — 새 north star (2026-06-05 사용자) | metric: operator 판정 binary, N=20-30 trial 중 ≥70% 성공 (객체가 target zone 안착, trial < 60s). task 정의 유연 (handover 그대로 OR trim 해서 pick & place 단순화 OR 새 task). data: 기존 60 ep clean handover dataset 의 pick+place 부분만 trim 재활용 권장 (옵션 X). Track K: K1 (live infra) → K2 (trim, 옵션) → K3 (α''') → K4 (live eval). plan §14. |
 
 ---
 
@@ -289,6 +290,7 @@ Custom syhlabtop rollout, Track A trial report, viewer/client, historical Track 
 
 | 날짜 | 변경 | 비고 |
 |---|---|---|
+| 2026-06-05 | A3 α'' 30k 학습 완료 (loss 0.019). A4 P handover gate (Option D refactor) 완료 0e7bdd34. **D-42 NEW** (70% real-world pick & place — 새 north star). Track K (K1 live infra → K2 trim → K3 α''' → K4 live eval). plan §14. | syhlabtop SSOT |
 | 2026-06-04 | Cleaning ep 결정 (사용자 review 결과 [13, 24, 25, 51, 55] 제외 → 60 ep). D-41 NEW (open dataset replay sanity, α/α' 평가 전 했어야 한다는 회고). | syhlabtop SSOT |
 | 2026-06-04 | Cleaning 진행 결정 (plan §13 정정). 다른 고성능 PC review → delete_episodes → α''. α 시리즈 명명 명확화 (α/α'/α''). D-38 DETAIL 갱신. | syhlabtop SSOT |
 | 2026-06-02 | R (D-38) 수집 완료. 방식 A, 65 ep, 3 tasks. plate skip (작업성 부족) → blue toothpaste 대체. realsense detection fix db4d0a6e. Wayland keyboard 이슈 발견 → D-40 NEW. 실패 ep review + clean dataset 진행 예정. | syhlabtop R + Codex syhlabtop fix |
