@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-09 (D07c — grasp 정상 (cmd -50~-55 + motor 도달). 덜컥 = queue_empty 19 starvation. K10 interpolation multiplier 3)
+**마지막 갱신:** 2026-06-09 (D07d — interpolation queue_empty 19→0. 툭툭 잔존 = execution_horizon 20 과대 (docs 10). K11 horizon 튜닝)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -19,7 +19,7 @@
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
 | **J** — D-38 후속 (cleaning + α'' 학습) | **CLOSED** | α'' 030000 final ckpt = deploy target. A6 SKIP (사용자 결정). gate 도구 (P, commit 0e7bdd34) 는 future use 으로 보존 |
-| **K** — D-42 70% real-world success | **덜컥 = queue starvation, K10 interp** | D07c (15853d77): **grasp 정상** (cmd right -50.3/left -55.2, motor readback -50.0/-55.0 도달 = K9 약한-close 가설 기각). 진짜 병목 = **덜컥 = queue_empty 19회** (D07b 1, RTC 없음 0) = queue starvation. 사용자 결정: K10 = **action_interpolation_multiplier=3** (robot-folding recipe, RTC chunk blend 와 별개 control rate ↑ buffer 여유). ActionInterpolator robot_client 통합 (K5 부활, RTC 와 보완) → D07d. plan §17 |
+| **K** — D-42 70% real-world success | **K11 RTC horizon 튜닝 → D07e** | D07c: grasp 정상. K10 interpolation (d3d04cd4) → D07d (4b258a56): **queue_empty 19→0** (starvation 해결). 단 chunk 사이 툭툭 잔존. lerobot RTC docs: "async+RTC 함께 = max smooth" (우리 맞음) + **execution_horizon typical 8-12, 우리 20 과대** (20+latency delay = 과blend = reactivity↓ 툭툭). K11 = **execution_horizon 20→10** (server RTCConfig) + inference_delay 확인. guidance 10.0/EXP 유지 → D07e. plan §17 |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
