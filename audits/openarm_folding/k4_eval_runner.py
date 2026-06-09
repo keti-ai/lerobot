@@ -78,6 +78,15 @@ PROFILES: dict[str, ProfileSpec] = {
         clamp_log_suppression="all",
         write_diagnostic_csv=True,
     ),
+    # D07h: full cap but keep interpolation x3 (isolate cap effect on grasp,
+    # holding smoothness constant vs diag_arm_cap).
+    "diag_full_cap_smooth": ProfileSpec(
+        arm_max_relative_target=65.0,
+        gripper_max_relative_target=65.0,
+        action_interpolation_multiplier=3,
+        clamp_log_suppression="all",
+        write_diagnostic_csv=True,
+    ),
     "diag_queue_smooth": ProfileSpec(
         gripper_max_relative_target=65.0,
         chunk_size_threshold=0.9,
