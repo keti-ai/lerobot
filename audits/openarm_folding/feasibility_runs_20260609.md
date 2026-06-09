@@ -215,13 +215,14 @@ Official 01-02 vs D02:
 | queue empty | 3 | 0 | 0 | queue starvation was not the D02 bottleneck |
 | clamp events | 1318 | 898 | 426 | lower absolute count, but D02 was 30 s vs official 60 s |
 | gripper clamp | present in prior logs | present in prior logs | 0 counted | gripper cap 65 removed gripper relative-target clamps |
-| operator grasp | fail | almost none | no | grasp did not return |
+| operator grasp | fail | almost none | no attempt | run did not reach a meaningful grasp attempt |
 
 Operator observation:
 
-- Grasp result: `no`.
+- Grasp result: `no attempt`.
 - Motion was still choppy.
-- There was still residual stutter/slip, and gripper motion looked awkward.
+- The robot did not reach a meaningful grasping phase at all.
+- There was still residual stutter/slip, and gripper motion looked awkward when it moved.
 
 Clamp analysis:
 
@@ -236,10 +237,10 @@ Clamp analysis:
 
 Decision:
 
-- Gripper cap mismatch is confirmed as a real mismatch, because gripper
+- Gripper cap mismatch is confirmed at the clamp layer, because gripper
   clamps disappeared under cap `65.0`.
 - It is not sufficient as the primary root cause of K4 failure: the gripper
-  still did not produce a useful grasp, motion stayed choppy, max latency
+  did not reach a meaningful grasp attempt, motion stayed choppy, max latency
   remained over `1000 ms`, and arm clamp events remained high.
 - Do not resume official K4 N=20 from this result.
 
