@@ -123,6 +123,76 @@ Prior D07c evidence shows the same robot/control stack can close both grippers:
 
 This makes the replay-specific gripper failure actionable: compare replay/probe command, sent action, and readback under the same local robot path.
 
+## LR Gripper Probe Result
+
+Probe command:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/replay_runner.py \
+  --episode 0 \
+  --gripper-probe \
+  --probe-values=-20,-45,0 \
+  --gripper-trace /home/syhlabtop/k4_logs/lr_gripper_probe_episode0.csv
+```
+
+Outputs:
+
+- log: `/home/syhlabtop/k4_logs/lr_gripper_probe_episode0.log`
+- trace: `/home/syhlabtop/k4_logs/lr_gripper_probe_episode0.csv`
+- summary: `/home/syhlabtop/k4_logs/replay_summary_episode_0.json`
+
+Result:
+
+- completed `90` probe frames
+- clamp events: `0`
+- post-disconnect CAN: `can0/can1 UP`
+
+Trace summary:
+
+| side | target | sent last | readback first | readback last | readback mean |
+|---|---:|---:|---:|---:|---:|
+| right | -20 | -20.0 | -0.011 | -20.097 | -19.481 |
+| right | -45 | -45.0 | -20.097 | -45.036 | -44.266 |
+| right | 0 | 0.0 | -45.036 | -0.098 | -2.035 |
+| left | -20 | -20.0 | -0.011 | -19.944 | -19.268 |
+| left | -45 | -45.0 | -19.966 | -45.014 | -44.185 |
+| left | 0 | 0.0 | -45.014 | -0.011 | -1.947 |
+
+Decision:
+
+- The local replay robot path can close and open both grippers.
+- The gripper cap, motor mapping, and readback path are not the blocker.
+- The remaining replay failure is more likely replay timing/fidelity, grasp phase timing, object alignment, or the fact that the original wrapper replayed at about `18 FPS` instead of the dataset `30 FPS`.
+
+## Action-Only Replay Next
+
+The first physical replays followed upstream `lerobot-replay` and called `robot.get_observation()` every frame. On this setup that reads 3 cameras, so `897` dataset frames took about `49s` instead of the expected `29.9s`. That changes the demonstration timebase.
+
+`replay_runner.py` now supports:
+
+```text
+--action-only
+```
+
+This mode sends the 16D dataset action sequence without per-frame camera observation. If trace is enabled, it reads only gripper motor positions through the CAN bus, so it can preserve the dataset FPS much more closely.
+
+Next physical replay command:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/replay_runner.py \
+  --episode 0 \
+  --action-only \
+  --gripper-trace /home/syhlabtop/k4_logs/lr_replay_action_only_trace_episode0.csv
+```
+
+Expected checks:
+
+- `effective_control_fps` close to `30`
+- gripper trace reaches the dataset close ranges (`right ~= -46.8`, `left ~= -54.8`)
+- operator verifies whether approach/grasp/place now matches the clean dataset demonstration better
+
+## Trace Tools
+
 `replay_runner.py` supports optional replay gripper trace logging:
 
 ```bash
