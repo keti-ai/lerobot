@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-09 (K7 RTC 코드 통합 완료 e9cb3230 + server 재기동 8081. D07 operator live RTC 검증 next)
+**마지막 갱신:** 2026-06-09 (D07 RTC client stall + latency 2.7s 노출. K6 latency 진단 critical — 2.7s cold/real 규명)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -19,7 +19,7 @@
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
 | **J** — D-38 후속 (cleaning + α'' 학습) | **CLOSED** | α'' 030000 final ckpt = deploy target. A6 SKIP (사용자 결정). gate 도구 (P, commit 0e7bdd34) 는 future use 으로 보존 |
-| **K** — D-42 70% real-world success | **K7 코드 완료, D07 live next** | cap 진단 종결 (arm15/grip65). K7 RTC 코드 통합 완료 (e9cb3230, policy_server +194줄, RTCConfig horizon20/guidance10/EXP + reanchor) + server 재기동 8081 (RTC-capable). RTC 실작동은 client load lazy → **D07 operator live** (RTC server + arm15/grip65 + banana, vs D04/D05 smooth+grasp). PASS → K4 N=20 재개. K6 latency 병행. plan §17 |
+| **K** — D-42 70% real-world success | **D07 RTC stall — K6 latency critical** | D07 (027ce0bf): RTC client stall — server 가 chunk 2679ms 늦게 전송 → client 이미 #29 실행 → stale chunk → receiver IndexError → motion 정지. valid RTC 검증 X. 두 문제: (A) client receiver IndexError 방어 (B) **근본 latency 2.7s** (RTC 가정 latency<chunk 초과). 사용자 결정: **K6 latency 진단 먼저** (2.7s cold/real 규명, D04/D05 588 vs D07 2679 차이). plan §17 |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
