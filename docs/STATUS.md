@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-10 (D07j: **joint_4 cap 가설 확정** — arm cap 15→65 풀자 clamp 0 + **top-down 각 재현**. 새 증상: gripper cap65 라 팡 닫혀 banana 침 + 쫌 덜컥. 다음 D07k=diag_wrist_free_gentle_grip(arm65/grip20/interp3) 로 gentle close. 서버 bf16 GPU1 안정)
+**마지막 갱신:** 2026-06-10 (D07k/l: cap 튜닝으로 **pick 해결** (top-down 각+gentle grip+per-joint smooth, D07l=diag_perjoint_smooth j4/5=65 j1-3=25 grip20). 잔여: pick 랜덤성 약간 + **handover(양팔 협응) 실패** = 지배 블로커. gripper clamp 1072(handover 구간 cap20 throttle) = pick gentle vs handover decisive 그리퍼 cap 모순. 전략 분기: handover 계속 vs single-arm pick&place 단순화(north star=pick&place 70%, handover 아님))
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
