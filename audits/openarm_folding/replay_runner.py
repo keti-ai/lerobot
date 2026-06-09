@@ -1,0 +1,334 @@
+#!/usr/bin/env python
+"""Safe physical replay for the OpenArm handover clean dataset.
+
+This wrapper is intentionally narrower than ``lerobot-replay``:
+- it reuses the K4-tested bimanual OpenArm follower configuration,
+- it requires a positive max_relative_target cap, and
+- it verifies dataset action order before any motion.
+
+Physical replay still requires an on-site operator with power abort / E-stop.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import logging
+import re
+import subprocess
+import time
+from collections import Counter
+from dataclasses import asdict
+from pathlib import Path
+from pprint import pformat
+from typing import Any
+
+from lerobot.cameras.realsense import RealSenseCameraConfig
+from lerobot.datasets import LeRobotDataset
+from lerobot.processor import make_default_robot_action_processor
+from lerobot.robots import (  # noqa: F401
+    bi_openarm_follower,
+    make_robot_from_config,
+    openarm_follower,
+)
+from lerobot.robots.bi_openarm_follower.config_bi_openarm_follower import BiOpenArmFollowerConfig
+from lerobot.robots.openarm_follower.config_openarm_follower import OpenArmFollowerConfigBase
+from lerobot.utils.constants import ACTION
+from lerobot.utils.import_utils import register_third_party_plugins
+from lerobot.utils.robot_utils import precise_sleep
+from lerobot.utils.utils import init_logging, log_say
+
+DATASET_REPO_ID = "KETI-IRRC/openarm_handover_v0_20260521_202117_clean"
+LOG_DIR = Path("/home/syhlabtop/k4_logs")
+
+ARM_MOTORS = tuple(f"joint_{idx}" for idx in range(1, 8))
+ALL_MOTORS = (*ARM_MOTORS, "gripper")
+EXPECTED_ACTION_NAMES = tuple(
+    [f"right_joint_{idx}.pos" for idx in range(1, 8)]
+    + ["right_gripper.pos"]
+    + [f"left_joint_{idx}.pos" for idx in range(1, 8)]
+    + ["left_gripper.pos"]
+)
+
+
+class ClampCounterHandler(logging.Handler):
+    """Counts OpenArm max_relative_target clamp warnings without changing behavior."""
+
+    _joint_re = re.compile(r"'([^']+)': \{")
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.WARNING)
+        self.events = 0
+        self.joint_counts: Counter[str] = Counter()
+
+    def emit(self, record: logging.LogRecord) -> None:
+        message = record.getMessage()
+        if "Relative goal position magnitude had to be clamped to be safe" not in message:
+            return
+        self.events += 1
+        for joint in self._joint_re.findall(message):
+            self.joint_counts[joint] += 1
+
+
+def positive_float(value: str) -> float:
+    parsed = float(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("cap values must be positive; cap=None/0 is refused")
+    return parsed
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Safe OpenArm dataset action replay with capped steps.")
+    parser.add_argument("--episode", type=int, default=0, help="Dataset episode to replay.")
+    parser.add_argument("--fps", type=float, default=None, help="Replay FPS. Defaults to dataset fps.")
+    parser.add_argument("--max-arm-cap", type=positive_float, default=15.0, help="Arm per-step cap in degrees.")
+    parser.add_argument("--max-grip-cap", type=positive_float, default=65.0, help="Gripper per-step cap in degrees.")
+    parser.add_argument("--dry-run", action="store_true", help="Load dataset and verify mappings; do not connect.")
+    parser.add_argument(
+        "--gripper-trace",
+        type=Path,
+        default=None,
+        help="Optional CSV path for per-frame gripper command/sent/readback trace.",
+    )
+    parser.add_argument("--play-sounds", action="store_true", help="Use system speech for start messages.")
+    return parser.parse_args()
+
+
+def build_max_relative_target(max_arm_cap: float, max_grip_cap: float) -> dict[str, float]:
+    return {
+        **{motor_name: max_arm_cap for motor_name in ARM_MOTORS},
+        "gripper": max_grip_cap,
+    }
+
+
+def build_robot_config(max_relative_target: dict[str, float]) -> BiOpenArmFollowerConfig:
+    if not max_relative_target:
+        raise ValueError("max_relative_target is required for physical replay safety")
+
+    return BiOpenArmFollowerConfig(
+        id="openarm_bimanual_follower",
+        left_arm_config=OpenArmFollowerConfigBase(
+            port="can0",
+            side="left",
+            max_relative_target=max_relative_target,
+        ),
+        right_arm_config=OpenArmFollowerConfigBase(
+            port="can1",
+            side="right",
+            max_relative_target=max_relative_target,
+        ),
+        cameras={
+            "left_wrist": RealSenseCameraConfig(
+                serial_number_or_name="315122270766",
+                width=640,
+                height=480,
+                fps=30,
+                warmup_s=3,
+            ),
+            "right_wrist": RealSenseCameraConfig(
+                serial_number_or_name="230322273311",
+                width=640,
+                height=480,
+                fps=30,
+                warmup_s=3,
+            ),
+            "base": RealSenseCameraConfig(
+                serial_number_or_name="213622075840",
+                width=640,
+                height=480,
+                fps=30,
+                warmup_s=3,
+            ),
+        },
+    )
+
+
+def get_action_names(dataset: LeRobotDataset) -> tuple[str, ...]:
+    action_feature = dataset.features.get(ACTION)
+    if not isinstance(action_feature, dict) or "names" not in action_feature:
+        raise ValueError(f"Dataset action feature does not expose names: {action_feature!r}")
+    return tuple(action_feature["names"])
+
+
+def verify_action_mapping(dataset_action_names: tuple[str, ...], robot_action_names: tuple[str, ...]) -> None:
+    problems: list[str] = []
+    if dataset_action_names != EXPECTED_ACTION_NAMES:
+        problems.append(
+            "dataset action names do not match expected OpenArm order:\n"
+            f"expected={EXPECTED_ACTION_NAMES}\nactual={dataset_action_names}"
+        )
+    if robot_action_names != EXPECTED_ACTION_NAMES:
+        problems.append(
+            "robot action names do not match expected OpenArm order:\n"
+            f"expected={EXPECTED_ACTION_NAMES}\nactual={robot_action_names}"
+        )
+    if dataset_action_names != robot_action_names:
+        problems.append(
+            "dataset and robot action names differ:\n"
+            f"dataset={dataset_action_names}\nrobot={robot_action_names}"
+        )
+    if problems:
+        raise ValueError("\n\n".join(problems))
+
+
+def countdown(play_sounds: bool) -> None:
+    log_say(
+        "Operator must be present with power abort ready. Replay starts after countdown.",
+        play_sounds,
+        blocking=False,
+    )
+    logging.warning("Physical replay starts in 3 seconds. First frames may ramp toward dataset start pose.")
+    for remaining in (3, 2, 1):
+        logging.warning("Starting in %s...", remaining)
+        time.sleep(1.0)
+
+
+def write_summary(path: Path, summary: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(summary, indent=2, sort_keys=True, default=str), encoding="utf-8")
+
+
+def scalar(value: Any) -> float:
+    if hasattr(value, "item"):
+        return float(value.item())
+    return float(value)
+
+
+def log_can_state(context: str) -> None:
+    for interface in ("can0", "can1"):
+        result = subprocess.run(
+            ["ip", "-br", "link", "show", interface],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        output = result.stdout.strip() or result.stderr.strip()
+        logging.info("%s CAN state %s: %s", context, interface, output or f"missing rc={result.returncode}")
+
+
+def replay(args: argparse.Namespace) -> None:
+    init_logging()
+    logging.info("Safe replay args:\n%s", pformat(vars(args)))
+
+    max_relative_target = build_max_relative_target(args.max_arm_cap, args.max_grip_cap)
+    robot_config = build_robot_config(max_relative_target)
+    logging.info("Robot config max_relative_target: %s", max_relative_target)
+
+    dataset = LeRobotDataset(DATASET_REPO_ID, episodes=[args.episode])
+    actions = dataset.select_columns(ACTION)
+    dataset_action_names = get_action_names(dataset)
+
+    robot = make_robot_from_config(robot_config)
+    robot_action_names = tuple(robot.action_features)
+    verify_action_mapping(dataset_action_names, robot_action_names)
+
+    replay_fps = args.fps if args.fps is not None else float(dataset.fps)
+    if replay_fps <= 0:
+        raise ValueError(f"Replay FPS must be positive, got {replay_fps}")
+
+    mapping_info = {
+        "dataset_repo_id": DATASET_REPO_ID,
+        "episode": args.episode,
+        "num_frames": dataset.num_frames,
+        "dataset_fps": dataset.fps,
+        "replay_fps": replay_fps,
+        "action_names": dataset_action_names,
+        "max_relative_target": max_relative_target,
+        "robot_config": asdict(robot_config),
+    }
+    logging.info("Mapping verified:\n%s", pformat(mapping_info))
+
+    if args.dry_run:
+        write_summary(LOG_DIR / f"replay_dry_episode_{args.episode}.json", mapping_info)
+        logging.info("Dry-run complete; no robot connection or motion was attempted.")
+        return
+
+    clamp_counter = ClampCounterHandler()
+    logging.getLogger().addHandler(clamp_counter)
+    robot_action_processor = make_default_robot_action_processor()
+    sent_frames = 0
+    started_at = time.time()
+    trace_file = None
+    trace_writer = None
+    if args.gripper_trace is not None:
+        args.gripper_trace.parent.mkdir(parents=True, exist_ok=True)
+        trace_file = args.gripper_trace.open("w", newline="", encoding="utf-8")
+        trace_writer = csv.DictWriter(
+            trace_file,
+            fieldnames=[
+                "frame",
+                "right_cmd",
+                "right_processed",
+                "right_sent",
+                "right_readback_before",
+                "right_readback_after",
+                "left_cmd",
+                "left_processed",
+                "left_sent",
+                "left_readback_before",
+                "left_readback_after",
+            ],
+        )
+        trace_writer.writeheader()
+
+    log_can_state("pre-connect")
+    robot.connect()
+    try:
+        countdown(args.play_sounds)
+        log_say("Replaying clean dataset episode", args.play_sounds, blocking=False)
+        for idx in range(dataset.num_frames):
+            start_frame_t = time.perf_counter()
+
+            action_array = actions[idx][ACTION]
+            action = {name: action_array[i] for i, name in enumerate(dataset_action_names)}
+            robot_obs = robot.get_observation()
+            processed_action = robot_action_processor((action, robot_obs))
+            sent_action = robot.send_action(processed_action)
+            if trace_writer is not None:
+                readback_after = robot.get_observation()
+                trace_writer.writerow(
+                    {
+                        "frame": idx,
+                        "right_cmd": scalar(action["right_gripper.pos"]),
+                        "right_processed": scalar(processed_action["right_gripper.pos"]),
+                        "right_sent": scalar(sent_action["right_gripper.pos"]),
+                        "right_readback_before": scalar(robot_obs["right_gripper.pos"]),
+                        "right_readback_after": scalar(readback_after["right_gripper.pos"]),
+                        "left_cmd": scalar(action["left_gripper.pos"]),
+                        "left_processed": scalar(processed_action["left_gripper.pos"]),
+                        "left_sent": scalar(sent_action["left_gripper.pos"]),
+                        "left_readback_before": scalar(robot_obs["left_gripper.pos"]),
+                        "left_readback_after": scalar(readback_after["left_gripper.pos"]),
+                    }
+                )
+            sent_frames += 1
+
+            elapsed = time.perf_counter() - start_frame_t
+            precise_sleep(max(1.0 / replay_fps - elapsed, 0.0))
+    finally:
+        if trace_file is not None:
+            trace_file.close()
+        robot.disconnect()
+        log_can_state("post-disconnect")
+        logging.getLogger().removeHandler(clamp_counter)
+
+        summary = {
+            **mapping_info,
+            "sent_frames": sent_frames,
+            "elapsed_s": time.time() - started_at,
+            "clamp_events": clamp_counter.events,
+            "clamp_joint_counts": dict(sorted(clamp_counter.joint_counts.items())),
+            "gripper_trace": str(args.gripper_trace) if args.gripper_trace is not None else None,
+        }
+        write_summary(LOG_DIR / f"replay_summary_episode_{args.episode}.json", summary)
+        logging.info("Replay summary:\n%s", pformat(summary))
+
+
+def main() -> None:
+    register_third_party_plugins()
+    replay(parse_args())
+
+
+if __name__ == "__main__":
+    main()
