@@ -165,3 +165,89 @@ uv run python audits/openarm_folding/k4_eval_runner.py --config-only --trial CFG
 ```
 
 Result: PASS. Config-only did not connect hardware or server.
+
+## D02 Result
+
+Run:
+
+```text
+trial: D02
+profile: diag_gripper_cap
+object: banana
+duration: 30 s
+summary: /home/syhlabtop/k4_logs/summary_trial_D02.json
+queue: /home/syhlabtop/k4_logs/queue_trial_D02.json
+diagnostic CSV: /home/syhlabtop/k4_logs/diagnostic_results.csv
+```
+
+There was one pre-motion invalid setup attempt at 16:11 KST where left-arm
+CAN handshake failed on `joint_1`. Those sidecar files were archived with
+`.invalid_setup_20260609_161342`. The valid D02 retry completed the 30 s
+control window and did not touch `/home/syhlabtop/k4_logs/trial_results.csv`.
+
+Summary metrics:
+
+```json
+{
+  "status": "completed_control_window",
+  "last_avg_fps": 19.86,
+  "max_net_latency_ms": 1164.84,
+  "queue_empty_cnt": 0,
+  "clamp_events": 426,
+  "clamp_joint_counts": {
+    "joint_1": 136,
+    "joint_2": 53,
+    "joint_3": 65,
+    "joint_4": 204,
+    "joint_5": 138,
+    "joint_6": 18,
+    "joint_7": 119
+  }
+}
+```
+
+Official 01-02 vs D02:
+
+| metric | trial 01 | trial 02 | D02 | interpretation |
+|---|---:|---:|---:|---|
+| last Avg FPS | 21.69 | 4.75 | 19.86 | recovered vs trial 02, but still below resume threshold `>=20` |
+| max latency | 813.71 ms | 1151.12 ms | 1164.84 ms | still above resume threshold `<1000 ms` |
+| queue empty | 3 | 0 | 0 | queue starvation was not the D02 bottleneck |
+| clamp events | 1318 | 898 | 426 | lower absolute count, but D02 was 30 s vs official 60 s |
+| gripper clamp | present in prior logs | present in prior logs | 0 counted | gripper cap 65 removed gripper relative-target clamps |
+| operator grasp | fail | almost none | no | grasp did not return |
+
+Operator observation:
+
+- Grasp result: `no`.
+- Motion was still choppy.
+- There was still residual stutter/slip, and gripper motion looked awkward.
+
+Clamp analysis:
+
+- `diag_gripper_cap` did what it was designed to do at the clamp layer:
+  `clamp_joint_counts` has no `gripper` entry.
+- The remaining clamp load is arm-only and still high, led by `joint_4`
+  (`204`), `joint_5` (`138`), `joint_1` (`136`), and `joint_7` (`119`).
+- Normalized by duration, D02 still has about `14.2` clamp events/s
+  (`426 / 30`), close to trial 02's about `15.0` clamp events/s
+  (`898 / 60`). The gripper fix did not remove the broader live-control
+  saturation problem.
+
+Decision:
+
+- Gripper cap mismatch is confirmed as a real mismatch, because gripper
+  clamps disappeared under cap `65.0`.
+- It is not sufficient as the primary root cause of K4 failure: the gripper
+  still did not produce a useful grasp, motion stayed choppy, max latency
+  remained over `1000 ms`, and arm clamp events remained high.
+- Do not resume official K4 N=20 from this result.
+
+Next branch:
+
+- Run D03 `diag_queue_smooth` to test whether threshold/aggregation reduces
+  the remaining choppy motion.
+- If D03 does not restore smooth approach and close behavior, add a new arm-cap
+  diagnostic profile before official resume. The current evidence suggests
+  arm `max_relative_target=5.0` may also be too tight for handover swing, even
+  after gripper cap is fixed.
