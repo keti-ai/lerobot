@@ -63,6 +63,7 @@ from lerobot.transport import (
     services_pb2_grpc,  # type: ignore
 )
 from lerobot.transport.utils import grpc_channel_options, send_bytes_in_chunks
+from lerobot.utils.action_interpolator import ActionInterpolator
 from lerobot.utils.import_utils import register_third_party_plugins
 
 from .configs import RobotClientConfig
@@ -126,6 +127,7 @@ class RobotClient:
         self.action_queue_lock = threading.Lock()  # Protect queue operations
         self.action_queue_size = []
         self.start_barrier = threading.Barrier(2)  # 2 threads: action receiver, control loop
+        self.interpolator = ActionInterpolator(config.action_interpolation_multiplier)
 
         # FPS measurement
         self.fps_tracker = FPSTracker(target_fps=self.config.fps)
@@ -163,6 +165,7 @@ class RobotClient:
             self.stub.SendPolicyInstructions(policy_setup)
 
             self.shutdown_event.clear()
+            self.interpolator.reset()
 
             return True
 
@@ -176,6 +179,8 @@ class RobotClient:
 
         self.robot.disconnect()
         self.logger.debug("Robot disconnected")
+
+        self.interpolator.reset()
 
         self.channel.close()
         self.logger.debug("Client stopped, channel closed")
@@ -395,8 +400,14 @@ class RobotClient:
 
     def actions_available(self):
         """Check if there are actions available in the queue"""
+        if self.interpolator.enabled and not self.interpolator.needs_new_action():
+            return True
         with self.action_queue_lock:
             return not self.action_queue.empty()
+
+    def get_control_interval(self) -> float:
+        """Return the current control interval, including optional interpolation."""
+        return self.interpolator.get_control_interval(self.config.fps)
 
     def _action_tensor_to_action_dict(self, action_tensor: torch.Tensor) -> dict[str, float]:
         action = {key: action_tensor[i].item() for i, key in enumerate(self.robot.action_features)}
@@ -407,25 +418,49 @@ class RobotClient:
 
         # Lock only for queue operations
         get_start = time.perf_counter()
-        with self.action_queue_lock:
-            self.action_queue_size.append(self.action_queue.qsize())
-            # Get action from queue
-            timed_action = self.action_queue.get_nowait()
+        timed_action = None
+        if self.interpolator.enabled:
+            if self.interpolator.needs_new_action():
+                with self.action_queue_lock:
+                    self.action_queue_size.append(self.action_queue.qsize())
+                    # Get action from queue
+                    timed_action = self.action_queue.get_nowait()
+                self.interpolator.add(timed_action.get_action())
+            else:
+                with self.action_queue_lock:
+                    self.action_queue_size.append(self.action_queue.qsize())
+
+            action_tensor = self.interpolator.get()
+            if action_tensor is None:
+                raise RuntimeError("Interpolator had no action despite actions_available() being true.")
+        else:
+            with self.action_queue_lock:
+                self.action_queue_size.append(self.action_queue.qsize())
+                # Get action from queue
+                timed_action = self.action_queue.get_nowait()
+            action_tensor = timed_action.get_action()
         get_end = time.perf_counter() - get_start
 
-        _performed_action = self.robot.send_action(
-            self._action_tensor_to_action_dict(timed_action.get_action())
-        )
-        with self.latest_action_lock:
-            self.latest_action = timed_action.get_timestep()
+        _performed_action = self.robot.send_action(self._action_tensor_to_action_dict(action_tensor))
+        if timed_action is not None:
+            with self.latest_action_lock:
+                self.latest_action = timed_action.get_timestep()
 
         if verbose:
             with self.action_queue_lock:
                 current_queue_size = self.action_queue.qsize()
 
+            if timed_action is not None:
+                timestamp = timed_action.get_timestamp()
+                timestep = timed_action.get_timestep()
+            else:
+                timestamp = None
+                with self.latest_action_lock:
+                    timestep = self.latest_action
+
             self.logger.debug(
-                f"Ts={timed_action.get_timestamp()} | "
-                f"Action #{timed_action.get_timestep()} performed | "
+                f"Ts={timestamp} | "
+                f"Action #{timestep} performed | "
                 f"Queue size: {current_queue_size}"
             )
 
@@ -434,6 +469,9 @@ class RobotClient:
             )
 
         return _performed_action
+
+    def _has_interpolated_action_pending(self) -> bool:
+        return self.interpolator.enabled and not self.interpolator.needs_new_action()
 
     def _ready_to_send_observation(self):
         """Flags when the client is ready to send an observation"""
@@ -461,7 +499,11 @@ class RobotClient:
 
             # If there are no actions left in the queue, the observation must go through processing!
             with self.action_queue_lock:
-                observation.must_go = self.must_go.is_set() and self.action_queue.empty()
+                observation.must_go = (
+                    self.must_go.is_set()
+                    and self.action_queue.empty()
+                    and not self._has_interpolated_action_pending()
+                )
                 current_queue_size = self.action_queue.qsize()
 
             _ = self.send_observation(observation)
@@ -511,7 +553,7 @@ class RobotClient:
 
             self.logger.debug(f"Control loop (ms): {(time.perf_counter() - control_loop_start) * 1000:.2f}")
             # Dynamically adjust sleep time to maintain the desired control frequency
-            time.sleep(max(0, self.config.environment_dt - (time.perf_counter() - control_loop_start)))
+            time.sleep(max(0, self.get_control_interval() - (time.perf_counter() - control_loop_start)))
 
         return _captured_observation, _performed_action
 

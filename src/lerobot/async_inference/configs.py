@@ -136,6 +136,10 @@ class RobotClientConfig:
     # Control behavior configuration
     chunk_size_threshold: float = field(default=0.5, metadata={"help": "Threshold for chunk size control"})
     fps: int = field(default=DEFAULT_FPS, metadata={"help": "Frames per second"})
+    action_interpolation_multiplier: int = field(
+        default=1,
+        metadata={"help": "Nx control rate frame interpolation (1=off). robot-folding=3"},
+    )
 
     # Aggregate function configuration (CLI-compatible)
     aggregate_fn_name: str = field(
@@ -176,6 +180,12 @@ class RobotClientConfig:
         if self.fps <= 0:
             raise ValueError(f"fps must be positive, got {self.fps}")
 
+        if self.action_interpolation_multiplier <= 0:
+            raise ValueError(
+                "action_interpolation_multiplier must be positive, "
+                f"got {self.action_interpolation_multiplier}"
+            )
+
         if self.actions_per_chunk <= 0:
             raise ValueError(f"actions_per_chunk must be positive, got {self.actions_per_chunk}")
 
@@ -196,6 +206,7 @@ class RobotClientConfig:
             "client_device": self.client_device,
             "chunk_size_threshold": self.chunk_size_threshold,
             "fps": self.fps,
+            "action_interpolation_multiplier": self.action_interpolation_multiplier,
             "actions_per_chunk": self.actions_per_chunk,
             "task": self.task,
             "debug_visualize_queue_size": self.debug_visualize_queue_size,

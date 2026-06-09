@@ -269,6 +269,64 @@ def test_ready_to_send_observation_with_varying_threshold(robot_client, g_thresh
     assert robot_client._ready_to_send_observation() is expected
 
 
+def test_action_interpolation_multiplier_expands_control_steps(monkeypatch):
+    """With multiplier=3, one queued target action is sent as three interpolated controls."""
+    from lerobot.async_inference.configs import RobotClientConfig
+    from lerobot.async_inference.robot_client import RobotClient
+    from tests.mocks.mock_robot import MockRobotConfig
+
+    config = RobotClientConfig(
+        robot=MockRobotConfig(),
+        server_address="localhost:9999",
+        policy_type="test",
+        pretrained_name_or_path="test",
+        actions_per_chunk=20,
+        action_interpolation_multiplier=3,
+    )
+    client = RobotClient(config)
+    sent_actions = []
+
+    def record_action(action):
+        sent_actions.append(dict(action))
+        return action
+
+    monkeypatch.setattr(client.robot, "send_action", record_action)
+
+    first_action, second_action = _make_actions(start_ts=time.time(), start_t=0, count=2)
+    second_action.action = torch.full_like(second_action.get_action(), 3.0)
+    client.action_queue.put(first_action)
+    client.action_queue.put(second_action)
+
+    client.control_loop_action()
+    assert len(sent_actions) == 1
+    assert client.latest_action == 0
+    assert client.action_queue.qsize() == 1
+
+    client.control_loop_action()
+    assert len(sent_actions) == 2
+    assert client.latest_action == 1
+    assert client.action_queue.qsize() == 0
+    assert client.actions_available()
+
+    client.control_loop_action()
+    assert len(sent_actions) == 3
+    assert client.latest_action == 1
+    assert client.action_queue.qsize() == 0
+    assert client.actions_available()
+
+    client.control_loop_action()
+    assert len(sent_actions) == 4
+    assert client.latest_action == 1
+    assert client.action_queue.qsize() == 0
+    assert not client.actions_available()
+
+    motor_1_positions = [action["motor_1.pos"] for action in sent_actions]
+    assert motor_1_positions == [0.0, 1.0, 2.0, 3.0]
+    assert client.get_control_interval() == pytest.approx(1 / (config.fps * 3))
+
+    client.stop()
+
+
 # -----------------------------------------------------------------------------
 # Regression test: robot type registry populated by robot_client imports
 # -----------------------------------------------------------------------------

@@ -49,6 +49,7 @@ class ProfileSpec:
     gripper_max_relative_target: float = 5.0
     chunk_size_threshold: float = 0.5
     aggregate_fn_name: str = "weighted_average"
+    action_interpolation_multiplier: int = 1
     clamp_log_suppression: str = "console"
     write_diagnostic_csv: bool = False
 
@@ -67,6 +68,7 @@ PROFILES: dict[str, ProfileSpec] = {
     "diag_arm_cap": ProfileSpec(
         arm_max_relative_target=15.0,
         gripper_max_relative_target=65.0,
+        action_interpolation_multiplier=3,
         clamp_log_suppression="all",
         write_diagnostic_csv=True,
     ),
@@ -312,6 +314,7 @@ def build_config(task: str, profile: ProfileSpec) -> RobotClientConfig:
         client_device="cpu",
         chunk_size_threshold=profile.chunk_size_threshold,
         fps=30,
+        action_interpolation_multiplier=profile.action_interpolation_multiplier,
         aggregate_fn_name=profile.aggregate_fn_name,
     )
 
@@ -373,15 +376,13 @@ def run_control_loop(
                         gripper_trace.write_step(client, client.latest_action)
             with client.latest_action_lock:
                 action_started = client.latest_action >= 0
-            with client.action_queue_lock:
-                queue_empty = client.action_queue.empty()
-            metrics.record_queue_state(action_started=action_started, queue_empty=queue_empty)
+            metrics.record_queue_state(action_started=action_started, queue_empty=not client.actions_available())
             if client._ready_to_send_observation():
                 client.control_loop_observation(task, verbose)
             client.logger.debug(
                 f"Control loop (ms): {(time.perf_counter() - control_loop_start) * 1000:.2f}"
             )
-            time.sleep(max(0, client.config.environment_dt - (time.perf_counter() - control_loop_start)))
+            time.sleep(max(0, client.get_control_interval() - (time.perf_counter() - control_loop_start)))
     except Exception as exc:
         errors.append(repr(exc))
         client.logger.exception("K4 control loop failed.")
