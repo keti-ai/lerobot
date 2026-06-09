@@ -26,6 +26,7 @@ python -m lerobot.async_inference.policy_server \
 
 import logging
 import math
+import os
 import pickle  # nosec
 import threading
 import time
@@ -69,9 +70,11 @@ from .helpers import (
 _ROBOT_FOLDING_RTC_EXECUTION_HORIZON = 10
 _ROBOT_FOLDING_RTC_MAX_GUIDANCE_WEIGHT = 10.0
 _ROBOT_FOLDING_RTC_PREFIX_ATTENTION_SCHEDULE = RTCAttentionSchedule.EXP
+_TORCH_COMPILE_SERVING_ENV = "LEROBOT_ASYNC_SERVER_TORCH_COMPILE"
 _TORCH_COMPILE_SERVING_POLICY_TYPES = {"pi05"}
 _TORCH_COMPILE_SERVING_MODE = "default"
 _TORCH_COMPILE_RTC_EXTRA_WARMUPS = ((18, 12), (16, 14), (17, 13))
+_TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 
 
 class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
@@ -158,7 +161,21 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             return "nan"
         return f"{duration_s * 1000:.2f}"
 
+    @staticmethod
+    def _env_flag_enabled(name: str, default: bool = False) -> bool:
+        value = os.getenv(name)
+        if value is None:
+            return default
+        return value.strip().lower() in _TRUE_ENV_VALUES
+
     def _should_use_torch_compile(self) -> bool:
+        if not self._env_flag_enabled(_TORCH_COMPILE_SERVING_ENV):
+            self.logger.info(
+                "K15 torch.compile serving disabled by default | "
+                f"set {_TORCH_COMPILE_SERVING_ENV}=1 to opt in"
+            )
+            return False
+
         device_is_cuda = self.device is not None and str(self.device).startswith("cuda")
         return (
             self.policy_type in _TORCH_COMPILE_SERVING_POLICY_TYPES
