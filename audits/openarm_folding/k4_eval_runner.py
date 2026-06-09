@@ -52,6 +52,10 @@ class ProfileSpec:
     action_interpolation_multiplier: int = 1
     clamp_log_suppression: str = "console"
     write_diagnostic_csv: bool = False
+    # Optional per-joint cap overrides (motor name -> cap), applied on top of the
+    # uniform arm/gripper caps. Lets the wrist (joint_4/5) stay agile while
+    # proximal joints are capped lower for smoothness.
+    per_joint_overrides: dict[str, float] | None = None
 
 
 PROFILES: dict[str, ProfileSpec] = {
@@ -93,6 +97,23 @@ PROFILES: dict[str, ProfileSpec] = {
     "diag_wrist_free_gentle_grip": ProfileSpec(
         arm_max_relative_target=65.0,
         gripper_max_relative_target=20.0,
+        action_interpolation_multiplier=3,
+        clamp_log_suppression="all",
+        write_diagnostic_csv=True,
+    ),
+    # D07l: per-joint caps. Wrist (joint_4/5) stays free at 65 (top-down angle),
+    # forearm (joint_6/7) moderate, proximal shoulder/elbow (joint_1/2/3) capped
+    # at 25 to smooth gross motion (residual 덜컥 from arm65 big jumps). Gentle
+    # gripper (20) kept from D07k.
+    "diag_perjoint_smooth": ProfileSpec(
+        arm_max_relative_target=25.0,
+        gripper_max_relative_target=20.0,
+        per_joint_overrides={
+            "joint_4": 65.0,
+            "joint_5": 65.0,
+            "joint_6": 40.0,
+            "joint_7": 40.0,
+        },
         action_interpolation_multiplier=3,
         clamp_log_suppression="all",
         write_diagnostic_csv=True,
@@ -277,12 +298,16 @@ def parse_args() -> argparse.Namespace:
 
 
 def build_max_relative_target(profile: ProfileSpec) -> float | dict[str, float]:
-    if profile.arm_max_relative_target == profile.gripper_max_relative_target:
+    if (
+        profile.per_joint_overrides is None
+        and profile.arm_max_relative_target == profile.gripper_max_relative_target
+    ):
         return profile.arm_max_relative_target
-    return {
-        **{motor_name: profile.arm_max_relative_target for motor_name in ARM_MOTORS},
-        "gripper": profile.gripper_max_relative_target,
-    }
+    caps = {motor_name: profile.arm_max_relative_target for motor_name in ARM_MOTORS}
+    caps["gripper"] = profile.gripper_max_relative_target
+    if profile.per_joint_overrides:
+        caps.update(profile.per_joint_overrides)
+    return caps
 
 
 def build_config(
