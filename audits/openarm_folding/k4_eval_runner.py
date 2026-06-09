@@ -118,6 +118,22 @@ PROFILES: dict[str, ProfileSpec] = {
         clamp_log_suppression="all",
         write_diagnostic_csv=True,
     ),
+    # D07n: same per-joint smoothing as diag_perjoint_smooth, but gripper cap 40
+    # (middle): gentle enough for pick (no fling), decisive enough for the
+    # handover receive (left gripper catches the banana instead of throttling).
+    "diag_handover_grip": ProfileSpec(
+        arm_max_relative_target=25.0,
+        gripper_max_relative_target=40.0,
+        per_joint_overrides={
+            "joint_4": 65.0,
+            "joint_5": 65.0,
+            "joint_6": 40.0,
+            "joint_7": 40.0,
+        },
+        action_interpolation_multiplier=3,
+        clamp_log_suppression="all",
+        write_diagnostic_csv=True,
+    ),
     "diag_queue_smooth": ProfileSpec(
         gripper_max_relative_target=65.0,
         chunk_size_threshold=0.9,
