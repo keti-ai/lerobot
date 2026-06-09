@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-09 (K4 official 01-02 banana 둘 다 FAIL → paused. clamp/gripper 미스매치 진단, D02 먼저)
+**마지막 갱신:** 2026-06-09 (D02 결과 — gripper cap 부수적, arm clamp+latency 진짜 병목. D04 arm cap 완화 다음)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -19,7 +19,7 @@
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
 | **J** — D-38 후속 (cleaning + α'' 학습) | **CLOSED** | α'' 030000 final ckpt = deploy target. A6 SKIP (사용자 결정). gate 도구 (P, commit 0e7bdd34) 는 future use 으로 보존 |
-| **K** — D-42 70% real-world success | **K4 PAUSED (진단 중)** | official 01-02 (banana) 둘 다 FAIL. clamp 폭증 (1318/898), avg_fps 4.75-21.69 (target 30). 근본 = max_relative_target=5.0 ↔ 학습 recipe (gripper 절대값) 미스매치. 사용자 결정: D02 (gripper cap 65) 먼저 + cap 을 recipe 맞춰 완화. runner=k4_eval_runner.py (--profile), audit=feasibility_runs_20260609.md (52d7af21) |
+| **K** — D-42 70% real-world success | **K4 PAUSED (진단 중)** | official 01-02 FAIL. D02 (gripper cap 65, d9d2675e): gripper clamp 제거됐으나 grasp attempt 미도달. **진짜 병목 = arm clamp (joint_4=204 등 14.2/s) + latency 1.16s**. 사용자 결정: D04 arm cap 완화 profile (arm 5→15-20, gripper 65) 먼저. runner=k4_eval_runner.py. audit=feasibility_runs_20260609.md |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
