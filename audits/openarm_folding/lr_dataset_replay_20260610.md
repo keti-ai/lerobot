@@ -97,9 +97,9 @@ Read-only analysis of episode `0` shows the clean dataset does contain close com
 
 So the immediate failure is not explained by missing gripper close commands in the dataset.
 
-## Diagnosis
+## Initial Diagnosis
 
-Replay result: **FAIL**.
+Initial upstream-style replay result: **FAIL**.
 
 Reason:
 
@@ -108,7 +108,7 @@ Reason:
 - Dataset episode includes substantial gripper close commands.
 - Operator observed no physical gripper actuation.
 
-This points to a remaining live gripper actuation / readback / motor-control path issue for replay, rather than a policy-only issue. The dataset has close actions, but the current replay path did not produce visible gripper closure.
+This initial diagnosis was later narrowed by the gripper probe and action-only replay. The dataset has close actions, the gripper motor path works, and action-only replay sends/executes those close commands. The remaining replay sensitivity is start pose / object pose / open-loop timing alignment, not gripper cap or motor mapping.
 
 ## Follow-Up
 
@@ -164,7 +164,7 @@ Decision:
 - The gripper cap, motor mapping, and readback path are not the blocker.
 - The remaining replay failure is more likely replay timing/fidelity, grasp phase timing, object alignment, or the fact that the original wrapper replayed at about `18 FPS` instead of the dataset `30 FPS`.
 
-## Action-Only Replay Next
+## Action-Only Replay Result
 
 The first physical replays followed upstream `lerobot-replay` and called `robot.get_observation()` every frame. On this setup that reads 3 cameras, so `897` dataset frames took about `49s` instead of the expected `29.9s`. That changes the demonstration timebase.
 
@@ -176,7 +176,7 @@ The first physical replays followed upstream `lerobot-replay` and called `robot.
 
 This mode sends the 16D dataset action sequence without per-frame camera observation. If trace is enabled, it reads only gripper motor positions through the CAN bus, so it can preserve the dataset FPS much more closely.
 
-Next physical replay command:
+Action-only replay command:
 
 ```bash
 UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/replay_runner.py \
@@ -185,11 +185,66 @@ UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/replay_runner.py
   --gripper-trace /home/syhlabtop/k4_logs/lr_replay_action_only_trace_episode0.csv
 ```
 
+Outputs:
+
+- log: `/home/syhlabtop/k4_logs/lr_replay_action_only_episode0.log`
+- trace: `/home/syhlabtop/k4_logs/lr_replay_action_only_trace_episode0.csv`
+- summary: `/home/syhlabtop/k4_logs/replay_summary_episode_0.json`
+
+Result:
+
+- sent frames: `897/897`
+- control elapsed: `30.02s`
+- effective control FPS: `29.88`
+- clamp events: `3` (`joint_4:1`, `joint_7:2`), all at the start ramp
+- post-disconnect CAN: `can0/can1 UP`
+
+Gripper trace:
+
+| side | cmd min | sent min | readback min | close frame count |
+|---|---:|---:|---:|---:|
+| right | -46.782 | -46.782 | -46.785 | `cmd <= -30`: 396 |
+| left | -54.777 | -54.777 | -54.413 | `cmd <= -30`: 314 |
+
+Operator observation:
+
+- The robot approached the banana.
+- The gripper actuated.
+- Full grasp/place parity is not yet confirmed.
+
+Decision:
+
+- Action replay timing is now close to the dataset FPS.
+- Gripper command/sent/readback are correct during replay.
+- Remaining mismatch is likely from open-loop start condition: current robot pose and banana pose must match the dataset episode start closely. The safety cap prevents jumps, but it does not make the absolute replay invariant to different initial pose.
+
+## Start Pose Sensitivity
+
+The dataset action sequence is absolute joint target replay. If the current robot starts away from the dataset episode start, the first frames become a cap-limited catch-up ramp. That is safe, but it can shift timing and contact geometry before the grasp phase.
+
+`replay_runner.py` now supports:
+
+```text
+--prealign-start-s
+```
+
+This holds dataset frame `0` for a fixed duration before starting the episode clock and logs start error before/after pre-align.
+
+Next physical replay command:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/replay_runner.py \
+  --episode 0 \
+  --action-only \
+  --prealign-start-s 3 \
+  --gripper-trace /home/syhlabtop/k4_logs/lr_replay_action_only_prealign_trace_episode0.csv
+```
+
 Expected checks:
 
-- `effective_control_fps` close to `30`
-- gripper trace reaches the dataset close ranges (`right ~= -46.8`, `left ~= -54.8`)
-- operator verifies whether approach/grasp/place now matches the clean dataset demonstration better
+- start error after pre-align is smaller than before pre-align
+- `effective_control_fps` remains close to `30`
+- operator verifies approach/grasp/place with banana placed at the dataset-matching start location
 
 ## Trace Tools
 

@@ -78,6 +78,13 @@ def positive_float(value: str) -> float:
     return parsed
 
 
+def nonnegative_float(value: str) -> float:
+    parsed = float(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("value must be non-negative")
+    return parsed
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Safe OpenArm dataset action replay with capped steps.")
     parser.add_argument("--episode", type=int, default=0, help="Dataset episode to replay.")
@@ -100,6 +107,12 @@ def parse_args() -> argparse.Namespace:
         "--action-only",
         action="store_true",
         help="Replay dataset actions without per-frame robot.get_observation(); trace reads only gripper motors.",
+    )
+    parser.add_argument(
+        "--prealign-start-s",
+        type=nonnegative_float,
+        default=0.0,
+        help="Before replay, hold dataset frame-0 action for this many seconds to align the start pose.",
     )
     parser.add_argument(
         "--probe-values",
@@ -278,6 +291,49 @@ def read_gripper_positions(robot: Any) -> dict[str, float | None]:
         }
 
 
+def read_motor_positions(robot: Any) -> dict[str, float]:
+    positions: dict[str, float] = {}
+    for prefix, arm in (("right", robot.right_arm), ("left", robot.left_arm)):
+        try:
+            arm_positions = arm.bus.sync_read("Present_Position")
+        except Exception:
+            logging.exception("Failed to read %s arm motor positions.", prefix)
+            continue
+        for motor_name, position in arm_positions.items():
+            positions[f"{prefix}_{motor_name}.pos"] = scalar(position)
+    return positions
+
+
+def action_from_array(action_array: Any, action_names: tuple[str, ...]) -> dict[str, Any]:
+    return {name: action_array[i] for i, name in enumerate(action_names)}
+
+
+def summarize_start_error(target_action: dict[str, Any], current_positions: dict[str, float]) -> dict[str, Any]:
+    errors: dict[str, float] = {}
+    missing: list[str] = []
+    for name in EXPECTED_ACTION_NAMES:
+        if name not in current_positions:
+            missing.append(name)
+            continue
+        errors[name] = scalar(target_action[name]) - current_positions[name]
+
+    arm_abs = [abs(error) for name, error in errors.items() if "gripper" not in name]
+    gripper_abs = [abs(error) for name, error in errors.items() if "gripper" in name]
+    top_errors = sorted(
+        ({"name": name, "error_deg": error, "abs_error_deg": abs(error)} for name, error in errors.items()),
+        key=lambda item: item["abs_error_deg"],
+        reverse=True,
+    )[:6]
+
+    return {
+        "max_arm_abs_deg": max(arm_abs) if arm_abs else None,
+        "mean_arm_abs_deg": sum(arm_abs) / len(arm_abs) if arm_abs else None,
+        "max_gripper_abs_deg": max(gripper_abs) if gripper_abs else None,
+        "top_errors": top_errors,
+        "missing": missing,
+    }
+
+
 def write_gripper_trace_row(
     trace_writer: csv.DictWriter | None,
     *,
@@ -312,6 +368,42 @@ def write_gripper_trace_row(
             "left_readback_after": maybe_scalar(readback_after, "left_gripper.pos"),
         }
     )
+
+
+def run_start_prealign(
+    *,
+    robot: Any,
+    robot_action_processor: Any,
+    first_action: dict[str, Any],
+    trace_writer: csv.DictWriter | None,
+    hold_s: float,
+    fps: float,
+) -> int:
+    prealign_frames = max(1, int(round(hold_s * fps)))
+    logging.warning(
+        "Pre-aligning to dataset frame-0 action for %.2fs (%d frames).",
+        hold_s,
+        prealign_frames,
+    )
+    for frame_idx in range(prealign_frames):
+        start_frame_t = time.perf_counter()
+        readback_before = read_gripper_positions(robot) if trace_writer is not None else {}
+        processed_action = robot_action_processor((first_action, {}))
+        sent_action = robot.send_action(processed_action)
+        readback_after = read_gripper_positions(robot) if trace_writer is not None else {}
+        write_gripper_trace_row(
+            trace_writer,
+            frame=frame_idx - prealign_frames,
+            phase="prealign",
+            action=first_action,
+            processed_action=processed_action,
+            sent_action=sent_action,
+            readback_before=readback_before,
+            readback_after=readback_after,
+        )
+        elapsed = time.perf_counter() - start_frame_t
+        precise_sleep(max(1.0 / fps - elapsed, 0.0))
+    return prealign_frames
 
 
 def run_gripper_probe(
@@ -417,8 +509,27 @@ def replay(args: argparse.Namespace) -> None:
 
     log_can_state("pre-connect")
     robot.connect()
+    start_error_before: dict[str, Any] | None = None
+    start_error_after: dict[str, Any] | None = None
+    prealign_frames = 0
     try:
         countdown(args.play_sounds)
+        first_action = action_from_array(actions[0][ACTION], dataset_action_names)
+        if not args.gripper_probe:
+            start_error_before = summarize_start_error(first_action, read_motor_positions(robot))
+            logging.info("Start error before pre-align:\n%s", pformat(start_error_before))
+            if args.prealign_start_s > 0:
+                prealign_frames = run_start_prealign(
+                    robot=robot,
+                    robot_action_processor=robot_action_processor,
+                    first_action=first_action,
+                    trace_writer=trace_writer,
+                    hold_s=args.prealign_start_s,
+                    fps=replay_fps,
+                )
+                start_error_after = summarize_start_error(first_action, read_motor_positions(robot))
+                logging.info("Start error after pre-align:\n%s", pformat(start_error_after))
+
         if args.gripper_probe:
             log_say("Running gripper probe", args.play_sounds, blocking=False)
             control_started_at = time.perf_counter()
@@ -438,7 +549,7 @@ def replay(args: argparse.Namespace) -> None:
                 start_frame_t = time.perf_counter()
 
                 action_array = actions[idx][ACTION]
-                action = {name: action_array[i] for i, name in enumerate(dataset_action_names)}
+                action = action_from_array(action_array, dataset_action_names)
                 if args.action_only:
                     robot_obs = {}
                     readback_before = read_gripper_positions(robot) if trace_writer is not None else {}
@@ -481,6 +592,10 @@ def replay(args: argparse.Namespace) -> None:
             "effective_control_fps": (sent_frames / control_elapsed_s)
             if control_elapsed_s and control_elapsed_s > 0
             else None,
+            "prealign_start_s": args.prealign_start_s,
+            "prealign_frames": prealign_frames,
+            "start_error_before": start_error_before,
+            "start_error_after": start_error_after,
             "clamp_events": clamp_counter.events,
             "clamp_joint_counts": dict(sorted(clamp_counter.joint_counts.items())),
             "gripper_trace": str(gripper_trace) if gripper_trace is not None else None,
