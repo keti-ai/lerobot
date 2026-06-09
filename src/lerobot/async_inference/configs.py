@@ -151,6 +151,10 @@ class RobotClientConfig:
     debug_visualize_queue_size: bool = field(
         default=False, metadata={"help": "Visualize the action queue size"}
     )
+    latency_breakdown_csv: str | None = field(
+        default=None,
+        metadata={"help": "Optional CSV path for client-side latency breakdown timing."},
+    )
 
     @property
     def environment_dt(self) -> float:
@@ -210,5 +214,6 @@ class RobotClientConfig:
             "actions_per_chunk": self.actions_per_chunk,
             "task": self.task,
             "debug_visualize_queue_size": self.debug_visualize_queue_size,
+            "latency_breakdown_csv": self.latency_breakdown_csv,
             "aggregate_fn_name": self.aggregate_fn_name,
         }

@@ -266,7 +266,11 @@ def build_max_relative_target(profile: ProfileSpec) -> float | dict[str, float]:
     }
 
 
-def build_config(task: str, profile: ProfileSpec) -> RobotClientConfig:
+def build_config(
+    task: str,
+    profile: ProfileSpec,
+    latency_breakdown_csv: Path | None = None,
+) -> RobotClientConfig:
     max_relative_target = build_max_relative_target(profile)
     return RobotClientConfig(
         policy_type=POLICY_TYPE,
@@ -315,6 +319,7 @@ def build_config(task: str, profile: ProfileSpec) -> RobotClientConfig:
         chunk_size_threshold=profile.chunk_size_threshold,
         fps=30,
         action_interpolation_multiplier=profile.action_interpolation_multiplier,
+        latency_breakdown_csv=str(latency_breakdown_csv) if latency_breakdown_csv else None,
         aggregate_fn_name=profile.aggregate_fn_name,
     )
 
@@ -458,7 +463,8 @@ def append_diagnostic_result(csv_path: Path, summary: dict[str, Any]) -> None:
 
 def run_trial(args: argparse.Namespace) -> int:
     profile = PROFILES[args.profile]
-    cfg = build_config(args.task, profile)
+    latency_breakdown_csv = args.log_dir / "latency_breakdown_K12.csv" if args.trial == "K12" else None
+    cfg = build_config(args.task, profile, latency_breakdown_csv=latency_breakdown_csv)
 
     if args.config_only:
         logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -495,6 +501,7 @@ def run_trial(args: argparse.Namespace) -> int:
         "policy_repo": POLICY_REPO,
         "duration_s": args.duration_s,
         "diagnostic_csv": str(args.diagnostic_csv) if profile.write_diagnostic_csv else None,
+        "latency_breakdown_csv": str(latency_breakdown_csv) if latency_breakdown_csv else None,
         "started_at_unix": time.time(),
         "status": "started",
     }

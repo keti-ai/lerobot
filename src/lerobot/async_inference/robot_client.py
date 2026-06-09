@@ -33,12 +33,14 @@ python src/lerobot/async_inference/robot_client.py \
 ```
 """
 
+import csv
 import logging
 import pickle  # nosec
 import threading
 import time
 from collections.abc import Callable
 from dataclasses import asdict
+from pathlib import Path
 from pprint import pformat
 from queue import Queue
 from typing import Any
@@ -79,6 +81,80 @@ from .helpers import (
     map_robot_keys_to_lerobot_features,
     visualize_action_queue_size,
 )
+
+
+class LatencyBreakdownRecorder:
+    fieldnames = [
+        "step",
+        "obs_capture_ms",
+        "send_ms",
+        "obs_serialize_ms",
+        "obs_grpc_ms",
+        "server_rtt_ms",
+        "deserialize_ms",
+        "queue_update_ms",
+        "total_ms",
+    ]
+
+    def __init__(self, path: str | Path):
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.Lock()
+        self._rows: dict[int, dict[str, Any]] = {}
+        self._write_csv()
+
+    def record_observation(
+        self,
+        *,
+        step: int,
+        obs_capture_ms: float,
+        send_ms: float,
+        obs_serialize_ms: float,
+        obs_grpc_ms: float,
+    ) -> None:
+        self._update(
+            step,
+            obs_capture_ms=obs_capture_ms,
+            send_ms=send_ms,
+            obs_serialize_ms=obs_serialize_ms,
+            obs_grpc_ms=obs_grpc_ms,
+        )
+
+    def record_chunk_receive(
+        self,
+        *,
+        step: int,
+        action_timestamp: float,
+        receive_time: float,
+        deserialize_ms: float,
+        queue_update_ms: float,
+    ) -> None:
+        self._update(
+            step,
+            server_rtt_ms=(receive_time - action_timestamp) * 1000,
+            deserialize_ms=deserialize_ms,
+            queue_update_ms=queue_update_ms,
+        )
+
+    def record_action_apply(self, *, step: int, action_timestamp: float) -> None:
+        self._update(step, total_ms=(time.time() - action_timestamp) * 1000)
+
+    def _update(self, step: int, **values: float) -> None:
+        with self._lock:
+            row = self._rows.setdefault(step, {"step": step})
+            row.update(values)
+            self._write_csv_locked()
+
+    def _write_csv(self) -> None:
+        with self._lock:
+            self._write_csv_locked()
+
+    def _write_csv_locked(self) -> None:
+        with self.path.open("w", newline="", encoding="utf-8") as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=self.fieldnames)
+            writer.writeheader()
+            for step in sorted(self._rows):
+                writer.writerow({field: self._rows[step].get(field, "") for field in self.fieldnames})
 
 
 class RobotClient:
@@ -128,6 +204,11 @@ class RobotClient:
         self.action_queue_size = []
         self.start_barrier = threading.Barrier(2)  # 2 threads: action receiver, control loop
         self.interpolator = ActionInterpolator(config.action_interpolation_multiplier)
+        self.latency_breakdown = (
+            LatencyBreakdownRecorder(config.latency_breakdown_csv)
+            if config.latency_breakdown_csv
+            else None
+        )
 
         # FPS measurement
         self.fps_tracker = FPSTracker(target_fps=self.config.fps)
@@ -203,6 +284,7 @@ class RobotClient:
         self.logger.debug(f"Observation serialization time: {serialize_time:.6f}s")
 
         try:
+            grpc_send_start = time.perf_counter()
             observation_iterator = send_bytes_in_chunks(
                 observation_bytes,
                 services_pb2.Observation,
@@ -210,8 +292,18 @@ class RobotClient:
                 silent=True,
             )
             _ = self.stub.SendObservations(observation_iterator)
+            grpc_send_time = time.perf_counter() - grpc_send_start
             obs_timestep = obs.get_timestep()
             self.logger.debug(f"Sent observation #{obs_timestep} | ")
+            setattr(
+                obs,
+                "_client_send_timing",
+                {
+                    "serialize_ms": serialize_time * 1000,
+                    "grpc_ms": grpc_send_time * 1000,
+                    "send_ms": (serialize_time + grpc_send_time) * 1000,
+                },
+            )
 
             return True
 
@@ -375,6 +467,15 @@ class RobotClient:
                 start_time = time.perf_counter()
                 self._aggregate_action_queues(timed_actions, self.config.aggregate_fn)
                 queue_update_time = time.perf_counter() - start_time
+                if self.latency_breakdown is not None:
+                    first_action = timed_actions[0]
+                    self.latency_breakdown.record_chunk_receive(
+                        step=first_action.get_timestep(),
+                        action_timestamp=first_action.get_timestamp(),
+                        receive_time=receive_time,
+                        deserialize_ms=deserialize_time * 1000,
+                        queue_update_ms=queue_update_time * 1000,
+                    )
 
                 self.must_go.set()  # after receiving actions, next empty queue triggers must-go processing!
 
@@ -445,6 +546,11 @@ class RobotClient:
         if timed_action is not None:
             with self.latest_action_lock:
                 self.latest_action = timed_action.get_timestep()
+            if self.latency_breakdown is not None:
+                self.latency_breakdown.record_action_apply(
+                    step=timed_action.get_timestep(),
+                    action_timestamp=timed_action.get_timestamp(),
+                )
 
         if verbose:
             with self.action_queue_lock:
@@ -507,6 +613,15 @@ class RobotClient:
                 current_queue_size = self.action_queue.qsize()
 
             _ = self.send_observation(observation)
+            if self.latency_breakdown is not None:
+                send_timing = getattr(observation, "_client_send_timing", {})
+                self.latency_breakdown.record_observation(
+                    step=observation.get_timestep(),
+                    obs_capture_ms=obs_capture_time * 1000,
+                    send_ms=send_timing.get("send_ms", 0.0),
+                    obs_serialize_ms=send_timing.get("serialize_ms", 0.0),
+                    obs_grpc_ms=send_timing.get("grpc_ms", 0.0),
+                )
 
             self.logger.debug(f"QUEUE SIZE: {current_queue_size} (Must go: {observation.must_go})")
             if observation.must_go:
