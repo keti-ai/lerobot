@@ -84,6 +84,8 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
         self._predicted_timesteps_lock = threading.Lock()
         self._predicted_timesteps = set()
+        self._observation_enqueue_times_lock = threading.Lock()
+        self._observation_enqueue_times: dict[int, float] = {}
 
         self.last_processed_obs = None
 
@@ -119,6 +121,8 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
         with self._predicted_timesteps_lock:
             self._predicted_timesteps = set()
+        with self._observation_enqueue_times_lock:
+            self._observation_enqueue_times = {}
 
     def _reset_rtc_state(self) -> None:
         """Clear RTC leftovers and latency state without changing the loaded policy."""
@@ -139,6 +143,12 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         if not latency_s:
             return 0
         return max(0, math.ceil(latency_s / self.config.environment_dt))
+
+    @staticmethod
+    def _format_ms(duration_s: float | None) -> str:
+        if duration_s is None:
+            return "nan"
+        return f"{duration_s * 1000:.2f}"
 
     def _configure_rtc_policy(self) -> None:
         """Inject and initialize policy-side RTC when the loaded policy supports it."""
@@ -431,10 +441,23 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             f"Deserialization time: {deserialize_time:.6f}s"
         )
 
-        if not self._enqueue_observation(
+        start_enqueue = time.perf_counter()
+        enqueued = self._enqueue_observation(
             timed_observation  # wrapping a RawObservation
-        ):
+        )
+        enqueue_time = time.perf_counter() - start_enqueue
+        if not enqueued:
             self.logger.debug(f"Observation #{obs_timestep} has been filtered out")
+
+        self.logger.info(
+            "K13 SendObservations timing | "
+            f"obs={obs_timestep} | "
+            f"receive_deserialize_ms={deserialize_time * 1000:.2f} | "
+            f"enqueue_ms={enqueue_time * 1000:.2f} | "
+            f"enqueued={enqueued} | "
+            f"queue_size={self.observation_queue.qsize()} | "
+            f"one_way_ms={(receive_time - obs_timestamp) * 1000:.2f}"
+        )
 
         return services_pb2.Empty()
 
@@ -448,6 +471,14 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         try:
             getactions_starts = time.perf_counter()
             obs = self.observation_queue.get(timeout=self.config.obs_queue_timeout)
+            obs_dequeued_at = time.perf_counter()
+            get_wait_time = obs_dequeued_at - getactions_starts
+            with self._observation_enqueue_times_lock:
+                obs_enqueue_time = self._observation_enqueue_times.pop(id(obs), None)
+            queue_age_time = None
+            if obs_enqueue_time is not None:
+                queue_age_time = obs_dequeued_at - obs_enqueue_time
+
             self.logger.info(
                 f"Running inference for observation #{obs.get_timestep()} (must_go: {obs.must_go})"
             )
@@ -464,11 +495,30 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             serialize_time = time.perf_counter() - start_time
 
             # Create and return the action chunk
+            start_response_message = time.perf_counter()
             actions = services_pb2.Actions(data=actions_bytes)
+            response_message_time = time.perf_counter() - start_response_message
+            response_ready_at = time.perf_counter()
+            sleep_time = max(
+                0,
+                self.config.inference_latency - max(0, response_ready_at - getactions_starts),
+            )
 
             self.logger.info(
                 f"Action chunk #{obs.get_timestep()} generated | "
                 f"Total time: {(inference_time + serialize_time) * 1000:.2f}ms"
+            )
+            self.logger.info(
+                "K13 GetActions timing | "
+                f"obs={obs.get_timestep()} | "
+                f"get_wait_ms={get_wait_time * 1000:.2f} | "
+                f"queue_age_ms={self._format_ms(queue_age_time)} | "
+                f"predict_ms={inference_time * 1000:.2f} | "
+                f"serialize_ms={serialize_time * 1000:.2f} | "
+                f"response_message_ms={response_message_time * 1000:.2f} | "
+                f"sleep_ms={sleep_time * 1000:.2f} | "
+                f"handler_ready_ms={(response_ready_at - getactions_starts) * 1000:.2f} | "
+                "grpc_send_ms=unmeasured_after_return"
             )
 
             self.logger.debug(
@@ -478,9 +528,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
                 f"Total time: {inference_time + serialize_time:.2f}s"
             )
 
-            time.sleep(
-                max(0, self.config.inference_latency - max(0, time.perf_counter() - getactions_starts))
-            )  # sleep controls inference latency
+            time.sleep(sleep_time)  # sleep controls inference latency
 
             return actions
 
@@ -527,10 +575,14 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             # If queue is full, get the old observation to make room
             if self.observation_queue.full():
                 # pops from queue
-                _ = self.observation_queue.get_nowait()
+                removed_obs = self.observation_queue.get_nowait()
+                with self._observation_enqueue_times_lock:
+                    self._observation_enqueue_times.pop(id(removed_obs), None)
                 self.logger.debug("Observation queue was full, removed oldest observation")
 
             # Now put the new observation (never blocks as queue is non-full here)
+            with self._observation_enqueue_times_lock:
+                self._observation_enqueue_times[id(obs)] = time.perf_counter()
             self.observation_queue.put(obs)
             return True
 
@@ -642,7 +694,9 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         start_inference = time.perf_counter()
         action_tensor = self._get_action_chunk(observation)
         inference_time = time.perf_counter() - start_inference
+        start_original_clone = time.perf_counter()
         original_action_tensor = action_tensor.squeeze(0).detach().clone()
+        original_clone_time = time.perf_counter() - start_original_clone
         self.logger.info(
             f"Preprocessing and inference took {inference_time:.4f}s, action shape: {action_tensor.shape}"
         )
@@ -669,18 +723,40 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         postprocess_stops = time.perf_counter()
         postprocessing_time = postprocess_stops - start_postprocess
         total_latency = postprocess_stops - start_prepare
+        start_rtc_merge = time.perf_counter()
         self._merge_rtc_action_chunk(original_action_tensor, action_tensor.detach().clone(), total_latency)
+        rtc_merge_time = time.perf_counter() - start_rtc_merge
 
+        start_detach_cpu = time.perf_counter()
         action_tensor = action_tensor.detach().cpu()
+        detach_cpu_time = time.perf_counter() - start_detach_cpu
 
         """5. Convert to TimedAction list"""
+        start_time_actions = time.perf_counter()
         action_chunk = self._time_action_chunk(
             observation_t.get_timestamp(), list(action_tensor), observation_t.get_timestep()
         )
+        time_actions_time = time.perf_counter() - start_time_actions
+        predict_total_time = time.perf_counter() - start_prepare
 
         self.logger.info(
             f"Observation {observation_t.get_timestep()} | "
             f"Total time: {1000 * (postprocess_stops - start_prepare):.2f}ms"
+        )
+        self.logger.info(
+            "K13 Predict timing | "
+            f"obs={observation_t.get_timestep()} | "
+            f"prepare_ms={prepare_time * 1000:.2f} | "
+            f"preprocess_ms={preprocessing_time * 1000:.2f} | "
+            f"inference_ms={inference_time * 1000:.2f} | "
+            f"original_clone_ms={original_clone_time * 1000:.2f} | "
+            f"postprocess_loop_ms={postprocessing_time * 1000:.2f} | "
+            f"postprocess_per_action_ms={(postprocessing_time / max(chunk_size, 1)) * 1000:.2f} | "
+            f"rtc_merge_ms={rtc_merge_time * 1000:.2f} | "
+            f"detach_cpu_ms={detach_cpu_time * 1000:.2f} | "
+            f"time_actions_ms={time_actions_time * 1000:.2f} | "
+            f"pipeline_core_ms={(postprocess_stops - start_prepare) * 1000:.2f} | "
+            f"predict_total_ms={predict_total_time * 1000:.2f}"
         )
 
         self.logger.debug(
