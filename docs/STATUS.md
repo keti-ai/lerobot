@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-09 (K11 horizon 20→10 완료 + server 재기동. delay 28 > horizon 10 관찰. D07e operator live next)
+**마지막 갱신:** 2026-06-09 (D07e — horizon 10 일부 완화 but latency 900ms 가 근본. K12 client-side breakdown (residual 500 정체))
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -19,7 +19,7 @@
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
 | **J** — D-38 후속 (cleaning + α'' 학습) | **CLOSED** | α'' 030000 final ckpt = deploy target. A6 SKIP (사용자 결정). gate 도구 (P, commit 0e7bdd34) 는 future use 으로 보존 |
-| **K** — D-42 70% real-world success | **K11 완료 → D07e operator live** | grasp 정상 (D07c). queue starvation 해결 (K10, queue_empty 19→0). K11 (5adb3013): RTC execution_horizon 20→10 (docs typical) + server 재기동 8081. **관찰: delay 28 (908ms@30fps) > horizon 10** → RTC start clamp 10, 18 step 무guidance 가능 (D07e 변수). **D07e operator live** (horizon 10 + RTC + arm15/grip65 + interp) → 툭툭 완화 vs D07d 비교. OK → K4 N=20 재개. plan §17 |
+| **K** — D-42 70% real-world success | **latency 900ms 근본 — K12 breakdown** | grasp 정상 + queue starvation 해결. D07e (8b74e637): horizon 10 → 툭툭 일부 완화 but 부족. **latency 900ms 가 근본** (horizon 어떻게 해도 900ms=27step 이 chunk 30 못 덮음). 구성 = server forward 398 + residual ~500 (obs age/gRPC transfer/scheduling/deserialize, K6 미분리). 사용자 결정: **K12 client-side latency breakdown** (residual 500 정체 규명, image transfer 의심) → 큰 component 타겟 (compile/fp16 or image 압축). plan §17 |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
