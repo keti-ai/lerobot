@@ -246,6 +246,77 @@ Expected checks:
 - `effective_control_fps` remains close to `30`
 - operator verifies approach/grasp/place with banana placed at the dataset-matching start location
 
+## Prealign Replay Result
+
+Command:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/replay_runner.py \
+  --episode 0 \
+  --action-only \
+  --prealign-start-s 3 \
+  --gripper-trace /home/syhlabtop/k4_logs/lr_replay_action_only_prealign_trace_episode0.csv
+```
+
+Outputs:
+
+- log: `/home/syhlabtop/k4_logs/lr_replay_action_only_prealign_episode0.log`
+- trace: `/home/syhlabtop/k4_logs/lr_replay_action_only_prealign_trace_episode0.csv`
+- summary: `/home/syhlabtop/k4_logs/replay_summary_episode_0.json`
+
+Result:
+
+- prealign frames: `90`
+- sent frames: `897/897`
+- control elapsed: `30.03s`
+- effective control FPS: `29.87`
+- clamp events: `2` (`joint_4:1`, `joint_7:1`), during prealign
+- post-disconnect CAN: `can0/can1 UP`
+
+Start error:
+
+| metric | before prealign | after prealign |
+|---|---:|---:|
+| max arm abs error | 19.57 deg | 1.07 deg |
+| mean arm abs error | 7.24 deg | 0.30 deg |
+| max gripper abs error | 9.45 deg | 0.08 deg |
+
+Gripper trace during replay:
+
+| side | cmd min | sent min | readback min | close frame count |
+|---|---:|---:|---:|---:|
+| right | -46.782 | -46.782 | -21.933 | `cmd <= -30`: 396 |
+| left | -54.777 | -54.777 | -18.699 | `cmd <= -30`: 314 |
+
+Operator observation:
+
+- The robot approached the banana and the gripper actuated, but the gripper closed outside / beside the banana rather than capturing it cleanly.
+
+Decision:
+
+- Prealign fixed the robot start-pose error.
+- The replay still misses because the object pose is not matching the dataset start condition closely enough.
+- The low gripper readback at high close commands is consistent with contact or mechanical obstruction during a bad approach, not command loss. The separate gripper-only probe closed both grippers to `-45`.
+
+## Object Placement Reference
+
+Reference frames were dumped from dataset episode `0`:
+
+```text
+/home/syhlabtop/k4_logs/lr_episode0_reference_frames/
+```
+
+Contact sheet:
+
+```text
+/home/syhlabtop/k4_logs/lr_episode0_reference_frames/episode0_reference_contact_sheet.png
+```
+
+Use `frame_0000_observation_images_base.png` for banana starting pose. In the dataset start, the banana is on the white table to the left of the blue tray, not centered inside the tray. The later `frame_0300` through `frame_0714` views show the gripper approach/contact geometry. For the next retry, match both:
+
+- robot start pose via `--prealign-start-s 3`
+- banana pose/orientation from the reference base image
+
 ## Trace Tools
 
 `replay_runner.py` supports optional replay gripper trace logging:
