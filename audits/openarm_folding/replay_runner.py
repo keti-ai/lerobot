@@ -136,7 +136,11 @@ def build_max_relative_target(max_arm_cap: float, max_grip_cap: float) -> dict[s
     }
 
 
-def build_robot_config(max_relative_target: dict[str, float]) -> BiOpenArmFollowerConfig:
+def build_robot_config(
+    max_relative_target: dict[str, float],
+    *,
+    include_cameras: bool,
+) -> BiOpenArmFollowerConfig:
     if not max_relative_target:
         raise ValueError("max_relative_target is required for physical replay safety")
 
@@ -152,30 +156,34 @@ def build_robot_config(max_relative_target: dict[str, float]) -> BiOpenArmFollow
             side="right",
             max_relative_target=max_relative_target,
         ),
-        cameras={
-            "left_wrist": RealSenseCameraConfig(
-                serial_number_or_name="315122270766",
-                width=640,
-                height=480,
-                fps=30,
-                warmup_s=3,
-            ),
-            "right_wrist": RealSenseCameraConfig(
-                serial_number_or_name="230322273311",
-                width=640,
-                height=480,
-                fps=30,
-                warmup_s=3,
-            ),
-            "base": RealSenseCameraConfig(
-                serial_number_or_name="213622075840",
-                width=640,
-                height=480,
-                fps=30,
-                warmup_s=3,
-            ),
-        },
+        cameras=build_camera_configs() if include_cameras else {},
     )
+
+
+def build_camera_configs() -> dict[str, RealSenseCameraConfig]:
+    return {
+        "left_wrist": RealSenseCameraConfig(
+            serial_number_or_name="315122270766",
+            width=640,
+            height=480,
+            fps=30,
+            warmup_s=3,
+        ),
+        "right_wrist": RealSenseCameraConfig(
+            serial_number_or_name="230322273311",
+            width=640,
+            height=480,
+            fps=30,
+            warmup_s=3,
+        ),
+        "base": RealSenseCameraConfig(
+            serial_number_or_name="213622075840",
+            width=640,
+            height=480,
+            fps=30,
+            warmup_s=3,
+        ),
+    }
 
 
 def get_action_names(dataset: LeRobotDataset) -> tuple[str, ...]:
@@ -249,6 +257,24 @@ def log_can_state(context: str) -> None:
         )
         output = result.stdout.strip() or result.stderr.strip()
         logging.info("%s CAN state %s: %s", context, interface, output or f"missing rc={result.returncode}")
+
+
+def safe_disconnect(robot: Any) -> str | None:
+    try:
+        robot.disconnect()
+        return None
+    except Exception as exc:
+        logging.exception("robot.disconnect() failed; attempting CAN bus cleanup.")
+        for arm_name in ("left_arm", "right_arm"):
+            arm = getattr(robot, arm_name, None)
+            bus = getattr(arm, "bus", None)
+            if bus is None or not getattr(bus, "is_connected", False):
+                continue
+            try:
+                bus.disconnect(getattr(arm.config, "disable_torque_on_disconnect", True))
+            except Exception:
+                logging.exception("Failed to disconnect %s bus during cleanup.", arm_name)
+        return repr(exc)
 
 
 def make_trace_writer(path: Path) -> tuple[Any, csv.DictWriter]:
@@ -457,8 +483,10 @@ def replay(args: argparse.Namespace) -> None:
     logging.info("Safe replay args:\n%s", pformat(vars(args)))
 
     max_relative_target = build_max_relative_target(args.max_arm_cap, args.max_grip_cap)
-    robot_config = build_robot_config(max_relative_target)
+    include_cameras = not (args.action_only or args.gripper_probe)
+    robot_config = build_robot_config(max_relative_target, include_cameras=include_cameras)
     logging.info("Robot config max_relative_target: %s", max_relative_target)
+    logging.info("Robot config include_cameras: %s", include_cameras)
 
     dataset = LeRobotDataset(DATASET_REPO_ID, episodes=[args.episode])
     actions = dataset.select_columns(ACTION)
@@ -480,6 +508,7 @@ def replay(args: argparse.Namespace) -> None:
         "replay_fps": replay_fps,
         "action_names": dataset_action_names,
         "max_relative_target": max_relative_target,
+        "include_cameras": include_cameras,
         "robot_config": asdict(robot_config),
     }
     logging.info("Mapping verified:\n%s", pformat(mapping_info))
@@ -512,6 +541,7 @@ def replay(args: argparse.Namespace) -> None:
     start_error_before: dict[str, Any] | None = None
     start_error_after: dict[str, Any] | None = None
     prealign_frames = 0
+    disconnect_error = None
     try:
         countdown(args.play_sounds)
         first_action = action_from_array(actions[0][ACTION], dataset_action_names)
@@ -580,7 +610,7 @@ def replay(args: argparse.Namespace) -> None:
     finally:
         if trace_file is not None:
             trace_file.close()
-        robot.disconnect()
+        disconnect_error = safe_disconnect(robot)
         log_can_state("post-disconnect")
         logging.getLogger().removeHandler(clamp_counter)
 
@@ -596,6 +626,7 @@ def replay(args: argparse.Namespace) -> None:
             "prealign_frames": prealign_frames,
             "start_error_before": start_error_before,
             "start_error_after": start_error_after,
+            "disconnect_error": disconnect_error,
             "clamp_events": clamp_counter.events,
             "clamp_joint_counts": dict(sorted(clamp_counter.joint_counts.items())),
             "gripper_trace": str(gripper_trace) if gripper_trace is not None else None,

@@ -317,6 +317,45 @@ Use `frame_0000_observation_images_base.png` for banana starting pose. In the da
 - robot start pose via `--prealign-start-s 3`
 - banana pose/orientation from the reference base image
 
+## Video-Matched Retry
+
+After matching the scene from the replay reference video/images, `retry2` was run with action-only replay and 3s prealign:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/replay_runner.py \
+  --episode 0 \
+  --action-only \
+  --prealign-start-s 3 \
+  --gripper-trace /home/syhlabtop/k4_logs/lr_replay_action_only_prealign_trace_episode0_retry2.csv
+```
+
+The replay completed all action frames, but summary writing was interrupted by a RealSense disconnect exception because the action-only path still had cameras configured. The trace is complete:
+
+| metric | value |
+|---|---:|
+| trace rows | 987 (`90` prealign + `897` replay) |
+| prealign start error, max arm | 19.57 deg -> 1.10 deg |
+| prealign start error, max gripper | 9.45 deg -> 0.08 deg |
+
+Replay gripper trace:
+
+| side | cmd min | sent min | readback min | close frame count | readback at min-cmd frame |
+|---|---:|---:|---:|---:|---:|
+| right | -46.782 | -46.782 | -46.326 | `cmd <= -30`: 396 | -44.577 |
+| left | -54.777 | -54.777 | -54.478 | `cmd <= -30`: 314 | -53.211 |
+
+Decision:
+
+- Dataset action contains strong close commands.
+- The replay path sends those commands without clipping them away.
+- Motor readback reaches the commanded close range when the object pose is matched from reference.
+- Remaining replay success/failure is dominated by physical scene alignment and open-loop sensitivity, not gripper mapping or missing dataset grasp.
+
+Tooling follow-up:
+
+- `--action-only` and `--gripper-probe` now omit camera configuration because neither path needs RealSense observations.
+- Disconnect is wrapped with best-effort CAN cleanup so a camera shutdown exception cannot hide replay trace/summary results.
+
 ## Trace Tools
 
 `replay_runner.py` supports optional replay gripper trace logging:
