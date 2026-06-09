@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-09 (K13 — latency = forward 자체 (413-552, server 나머지 ~20ms). K14 bf16/fp16 서빙 forward 단축)
+**마지막 갱신:** 2026-06-09 (K14 — bf16 서빙 완료 (2e7ad75b). forward 413→396ms (~5%, marginal). bf16 만으로 RTC window 못 들어감 → D07f live 로 툭툭 실측 판단)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -19,7 +19,7 @@
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
 | **J** — D-38 후속 (cleaning + α'' 학습) | **CLOSED** | α'' 030000 final ckpt = deploy target. A6 SKIP (사용자 결정). gate 도구 (P, commit 0e7bdd34) 는 future use 으로 보존 |
-| **K** — D-42 70% real-world success | **latency = forward, K14 bf16 서빙** | grasp 정상 + starvation 해결 + horizon 10. K13 (6473be52): server 내부 non-forward 다 미미 (prepare/preprocess/postprocess/serialize/queue 합 ~20ms). **latency = forward 자체** (413 synthetic / 552 live / 861 spike). postprocess vectorize 5.6ms 미미. compile=false. 사용자 결정: **K14 bf16/fp16 서빙** (A6000 bf16 빠름, forward precision↓ 속도↑). prerequisite α'' train_config dtype 점검. forward 413→? → chunk window 여유 → RTC 작동 → D07f. plan §17 |
+| **K** — D-42 70% real-world success | **K14 bf16 완료 (marginal) → D07f live 판단** | K13 (6473be52): latency = forward 자체 (413 synthetic / 552 live / 861 spike), server 나머지 ~20ms. **K14 bf16 서빙 (2e7ad75b)**: train_config dtype=bfloat16 확인, autocast bf16 적용 (params bf16 3.6B + vision/proj/norm fp32 유지). 결과 = forward 413→396ms (server inference mean), standalone 347→326ms. **~5% (~21ms) marginal — bf16 만으로 forward 가 RTC window (horizon10=333ms, live~530ms) 밑으로 안 들어감.** action sanity max abs diff 0.012 OK. server bf16 재기동 (pid 3925767, 8081). **다음 분기 = (a) D07f live 그대로 (bf16+h10) 로 툭툭 실측 — 끊겨도 70% 가능 철학 §16, OR (b) horizon vs latency 재검토 (delay≈16step > h10 = starvation 보장? folding LOCKED h20 복귀), OR (c) torch.compile/denoise step 축소).** plan §17 |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
