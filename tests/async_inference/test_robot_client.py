@@ -108,6 +108,40 @@ def test_update_action_queue_discards_stale(robot_client):
     assert resulting_timesteps == [5, 6, 7]
 
 
+def test_log_action_queue_update_accepts_empty_new_timesteps(robot_client):
+    """Verbose queue logging must not crash when a fully stale chunk leaves the queue empty."""
+
+    robot_client._log_action_queue_update(
+        latest_action=29,
+        old_timesteps=[],
+        incoming_timesteps=[0, 1, 2, 3],
+        new_timesteps=[],
+        old_size=0,
+        new_size=0,
+        queue_update_time=0.001,
+    )
+
+
+def test_fully_stale_chunk_can_leave_empty_queue_without_log_crash(robot_client):
+    """A delayed chunk that is already consumed should be skipped and still log safely."""
+
+    robot_client.latest_action = 29
+    incoming = _make_actions(start_ts=time.time(), start_t=0, count=4)
+
+    robot_client._aggregate_action_queues(incoming)
+
+    assert robot_client.action_queue.empty()
+    robot_client._log_action_queue_update(
+        latest_action=robot_client.latest_action,
+        old_timesteps=[],
+        incoming_timesteps=[action.get_timestep() for action in incoming],
+        new_timesteps=[],
+        old_size=0,
+        new_size=0,
+        queue_update_time=0.001,
+    )
+
+
 @pytest.mark.parametrize(
     "weight_old, weight_new",
     [

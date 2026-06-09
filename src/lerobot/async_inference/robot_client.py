@@ -221,6 +221,43 @@ class RobotClient:
         self.logger.debug(f"Queue size: {queue_size}, Queue contents: {timestamps}")
         return queue_size, timestamps
 
+    @staticmethod
+    def _format_timestep_range(timesteps: list[int]) -> str:
+        if not timesteps:
+            return "empty"
+        return f"{timesteps[0]}:{timesteps[-1]}"
+
+    def _log_action_queue_update(
+        self,
+        *,
+        latest_action: int,
+        old_timesteps: list[int],
+        incoming_timesteps: list[int],
+        new_timesteps: list[int],
+        old_size: int,
+        new_size: int,
+        queue_update_time: float,
+    ) -> None:
+        try:
+            self.logger.info(
+                f"Latest action: {latest_action} | "
+                f"Old action steps: {self._format_timestep_range(old_timesteps)} | "
+                f"Incoming action steps: {self._format_timestep_range(incoming_timesteps)} | "
+                f"Updated action steps: {self._format_timestep_range(new_timesteps)}"
+            )
+            self.logger.debug(
+                f"Queue update complete ({queue_update_time:.6f}s) | "
+                f"Before: {old_size} items | "
+                f"After: {new_size} items | "
+            )
+            if incoming_timesteps and not new_timesteps and incoming_timesteps[-1] <= latest_action:
+                self.logger.debug(
+                    "Received fully stale action chunk; all incoming timesteps "
+                    f"{self._format_timestep_range(incoming_timesteps)} were already consumed."
+                )
+        except Exception:
+            self.logger.exception("Failed to log action queue update.")
+
     def _aggregate_action_queues(
         self,
         incoming_actions: list[TimedAction],
@@ -285,11 +322,13 @@ class RobotClient:
                 deserialize_start = time.perf_counter()
                 timed_actions = pickle.loads(actions_chunk.data)  # nosec
                 deserialize_time = time.perf_counter() - deserialize_start
+                if not timed_actions:
+                    self.logger.debug("Received empty action chunk from server.")
+                    continue
 
                 # Log device type of received actions
-                if len(timed_actions) > 0:
-                    received_device = timed_actions[0].get_action().device.type
-                    self.logger.debug(f"Received actions on device: {received_device}")
+                received_device = timed_actions[0].get_action().device.type
+                self.logger.debug(f"Received actions on device: {received_device}")
 
                 # Move actions to client_device (e.g., for downstream planners that need GPU)
                 client_device = self.config.client_device
@@ -304,7 +343,7 @@ class RobotClient:
                 self.action_chunk_size = max(self.action_chunk_size, len(timed_actions))
 
                 # Calculate network latency if we have matching observations
-                if len(timed_actions) > 0 and verbose:
+                if verbose:
                     with self.latest_action_lock:
                         latest_action = self.latest_action
 
@@ -312,8 +351,6 @@ class RobotClient:
 
                     # Get queue state before changes
                     old_size, old_timesteps = self._inspect_action_queue()
-                    if not old_timesteps:
-                        old_timesteps = [latest_action]  # queue was empty
 
                     # Log incoming actions
                     incoming_timesteps = [a.get_timestep() for a in timed_actions]
@@ -343,16 +380,14 @@ class RobotClient:
                     with self.latest_action_lock:
                         latest_action = self.latest_action
 
-                    self.logger.info(
-                        f"Latest action: {latest_action} | "
-                        f"Old action steps: {old_timesteps[0]}:{old_timesteps[-1]} | "
-                        f"Incoming action steps: {incoming_timesteps[0]}:{incoming_timesteps[-1]} | "
-                        f"Updated action steps: {new_timesteps[0]}:{new_timesteps[-1]}"
-                    )
-                    self.logger.debug(
-                        f"Queue update complete ({queue_update_time:.6f}s) | "
-                        f"Before: {old_size} items | "
-                        f"After: {new_size} items | "
+                    self._log_action_queue_update(
+                        latest_action=latest_action,
+                        old_timesteps=old_timesteps,
+                        incoming_timesteps=incoming_timesteps,
+                        new_timesteps=new_timesteps,
+                        old_size=old_size,
+                        new_size=new_size,
+                        queue_update_time=queue_update_time,
                     )
 
             except grpc.RpcError as e:
