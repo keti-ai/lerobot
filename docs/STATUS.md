@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-09 (K8 완료 — server warmup post-warm RTC 398ms (cold 2138 제거) + client IndexError 방어. D07 재시도 준비)
+**마지막 갱신:** 2026-06-09 (D07b — execution pipeline 완성 (grasp phase 도달!). 남은 = grasp close strength. K9 gripper 진단)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -19,7 +19,7 @@
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
 | **J** — D-38 후속 (cleaning + α'' 학습) | **CLOSED** | α'' 030000 final ckpt = deploy target. A6 SKIP (사용자 결정). gate 도구 (P, commit 0e7bdd34) 는 future use 으로 보존 |
-| **K** — D-42 70% real-world success | **K8 완료 → D07 재시도 (operator)** | K8a (2c43ac4e): server autograd warmup discard → **post-warm guided RTC 398ms** (cold 2138 제거, pytest 6 pass). K8b (07080ce4): client receiver empty-queue IndexError 방어. server 재기동 8081 warmup 활성. **남은 = D07 operator 재시도** (RTC warm + arm15/grip65 + banana) → smooth + grasp → K4 N=20 재개. plan §17 |
+| **K** — D-42 70% real-world success | **D07b milestone — grasp 품질만 남음** | D07b (e6a6b7c1): execution pipeline 완성 — receiver 생존 (684 samples), latency 685ms, FPS 21.94, clamp 거의 없음, **grasp phase 도달** (D02-D05 미도달 대비 도약). 단 약하게 쥐어 빠짐. cap/latency/receiver/RTC/smooth 전부 정리. 남은 = **grasp close strength** (data 희소 banana close 6.5% or init prior 약). K9 gripper close 진단 (명령 vs motor 도달) → data(b)/init(c) 분기. plan §17 |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
