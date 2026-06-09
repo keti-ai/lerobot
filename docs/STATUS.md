@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-09 (D07d — interpolation queue_empty 19→0. 툭툭 잔존 = execution_horizon 20 과대 (docs 10). K11 horizon 튜닝)
+**마지막 갱신:** 2026-06-09 (K11 horizon 20→10 완료 + server 재기동. delay 28 > horizon 10 관찰. D07e operator live next)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -19,7 +19,7 @@
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
 | **J** — D-38 후속 (cleaning + α'' 학습) | **CLOSED** | α'' 030000 final ckpt = deploy target. A6 SKIP (사용자 결정). gate 도구 (P, commit 0e7bdd34) 는 future use 으로 보존 |
-| **K** — D-42 70% real-world success | **K11 RTC horizon 튜닝 → D07e** | D07c: grasp 정상. K10 interpolation (d3d04cd4) → D07d (4b258a56): **queue_empty 19→0** (starvation 해결). 단 chunk 사이 툭툭 잔존. lerobot RTC docs: "async+RTC 함께 = max smooth" (우리 맞음) + **execution_horizon typical 8-12, 우리 20 과대** (20+latency delay = 과blend = reactivity↓ 툭툭). K11 = **execution_horizon 20→10** (server RTCConfig) + inference_delay 확인. guidance 10.0/EXP 유지 → D07e. plan §17 |
+| **K** — D-42 70% real-world success | **K11 완료 → D07e operator live** | grasp 정상 (D07c). queue starvation 해결 (K10, queue_empty 19→0). K11 (5adb3013): RTC execution_horizon 20→10 (docs typical) + server 재기동 8081. **관찰: delay 28 (908ms@30fps) > horizon 10** → RTC start clamp 10, 18 step 무guidance 가능 (D07e 변수). **D07e operator live** (horizon 10 + RTC + arm15/grip65 + interp) → 툭툭 완화 vs D07d 비교. OK → K4 N=20 재개. plan §17 |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
