@@ -40,6 +40,7 @@ import draccus
 import grpc
 import torch
 
+from lerobot.configs import PreTrainedConfig
 from lerobot.configs.types import RTCAttentionSchedule
 from lerobot.policies import get_policy_class, make_pre_post_processors
 from lerobot.policies.rtc import ActionQueue, LatencyTracker, RTCConfig, reanchor_relative_rtc_prefix
@@ -68,6 +69,9 @@ from .helpers import (
 _ROBOT_FOLDING_RTC_EXECUTION_HORIZON = 10
 _ROBOT_FOLDING_RTC_MAX_GUIDANCE_WEIGHT = 10.0
 _ROBOT_FOLDING_RTC_PREFIX_ATTENTION_SCHEDULE = RTCAttentionSchedule.EXP
+_TORCH_COMPILE_SERVING_POLICY_TYPES = {"pi05"}
+_TORCH_COMPILE_SERVING_MODE = "default"
+_TORCH_COMPILE_RTC_EXTRA_WARMUPS = ((18, 12), (16, 14), (17, 13))
 
 
 class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
@@ -99,6 +103,8 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         self.preprocessor: PolicyProcessorPipeline[dict[str, Any], dict[str, Any]] | None = None
         self.postprocessor: PolicyProcessorPipeline[PolicyAction, PolicyAction] | None = None
         self._serving_autocast_dtype: torch.dtype | None = None
+        self._torch_compile_enabled = False
+        self._torch_compile_mode: str | None = None
 
         self._action_queue: ActionQueue | None = None
         self._latency_tracker = LatencyTracker()
@@ -151,6 +157,58 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         if duration_s is None:
             return "nan"
         return f"{duration_s * 1000:.2f}"
+
+    def _should_use_torch_compile(self) -> bool:
+        device_is_cuda = self.device is not None and str(self.device).startswith("cuda")
+        return (
+            self.policy_type in _TORCH_COMPILE_SERVING_POLICY_TYPES
+            and device_is_cuda
+            and hasattr(torch, "compile")
+        )
+
+    def _load_policy(self, policy_class, pretrained_name_or_path: str):
+        self._torch_compile_enabled = False
+        self._torch_compile_mode = None
+
+        if self._should_use_torch_compile():
+            try:
+                policy_config = PreTrainedConfig.from_pretrained(pretrained_name_or_path)
+                if hasattr(policy_config, "compile_model"):
+                    policy_config.device = self.device
+                    policy_config.compile_model = True
+                    policy_config.compile_mode = _TORCH_COMPILE_SERVING_MODE
+                    torch.set_float32_matmul_precision("high")
+                    self.logger.info(
+                        "K15 torch.compile serving requested | "
+                        f"policy_type={self.policy_type} | mode={policy_config.compile_mode} | "
+                        f"device={policy_config.device}"
+                    )
+                    policy = policy_class.from_pretrained(
+                        pretrained_name_or_path,
+                        config=policy_config,
+                    )
+                    self._torch_compile_enabled = True
+                    self._torch_compile_mode = policy_config.compile_mode
+                    return policy
+
+                self.logger.info(
+                    "K15 torch.compile skipped: loaded policy config has no compile_model flag"
+                )
+            except Exception:
+                self.logger.exception(
+                    "K15 torch.compile policy load failed; reloading without compile"
+                )
+
+        return policy_class.from_pretrained(pretrained_name_or_path)
+
+    def _reload_policy_without_compile(self, policy_class, pretrained_name_or_path: str) -> None:
+        self.logger.warning("K15 torch.compile disabled; reloading policy without compile")
+        self._torch_compile_enabled = False
+        self._torch_compile_mode = None
+        self.policy = policy_class.from_pretrained(pretrained_name_or_path)
+        self.policy.to(self.device)
+        self._configure_serving_precision()
+        self._configure_rtc_policy()
 
     def _configure_serving_precision(self) -> None:
         """Enable explicit server-side autocast when the loaded policy was trained for bf16."""
@@ -302,15 +360,18 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
         return warmup_observation
 
-    def _make_warmup_rtc_prefix(self) -> torch.Tensor | None:
+    def _make_warmup_rtc_prefix(self, prefix_steps: int | None = None) -> torch.Tensor | None:
         rtc_config = self._rtc_config()
         action_feature = getattr(self.policy.config, "action_feature", None)
         if rtc_config is None or action_feature is None:
             return None
 
         action_dim = action_feature.shape[0]
+        if prefix_steps is None:
+            prefix_steps = rtc_config.execution_horizon
+        prefix_steps = max(1, int(prefix_steps))
         prev_actions_absolute = torch.zeros(
-            rtc_config.execution_horizon,
+            prefix_steps,
             action_dim,
             dtype=torch.float32,
             device=torch.device(self.device),
@@ -331,10 +392,10 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             policy_device=torch.device(self.device),
         )
 
-    def _warmup_policy_autograd(self) -> None:
+    def _warmup_policy_autograd(self) -> bool:
         """Run discard-only forwards to pay CUDA/autograd lazy-init before the first client chunk."""
         if self.policy is None or self.preprocessor is None:
-            return
+            return True
 
         try:
             warmup_observation = self._make_warmup_observation()
@@ -349,11 +410,24 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             self._synchronize_policy_device()
             no_prefix_time = time.perf_counter() - start_no_prefix
 
+            rtc_no_leftover_time = None
             guided_rtc_time = None
+            compile_extra_warmup_times: list[tuple[int, int, float]] = []
             if self._rtc_enabled():
+                rtc_config = self._rtc_config()
+                if self._torch_compile_enabled:
+                    start_rtc_no_leftover = time.perf_counter()
+                    _ = self._predict_policy_action_chunk(
+                        preprocessed_observation,
+                        prev_chunk_left_over=None,
+                        inference_delay=0,
+                        execution_horizon=rtc_config.execution_horizon,
+                    )
+                    self._synchronize_policy_device()
+                    rtc_no_leftover_time = time.perf_counter() - start_rtc_no_leftover
+
                 prev_chunk_left_over = self._make_warmup_rtc_prefix()
                 if prev_chunk_left_over is not None:
-                    rtc_config = self._rtc_config()
                     start_guided = time.perf_counter()
                     _ = self._predict_policy_action_chunk(
                         preprocessed_observation,
@@ -364,24 +438,62 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
                     self._synchronize_policy_device()
                     guided_rtc_time = time.perf_counter() - start_guided
 
+                if self._torch_compile_enabled:
+                    action_feature = getattr(self.policy.config, "action_feature", None)
+                    chunk_size = getattr(self.policy.config, "chunk_size", None)
+                    if action_feature is not None and chunk_size is not None:
+                        for prefix_steps, inference_delay in _TORCH_COMPILE_RTC_EXTRA_WARMUPS:
+                            if prefix_steps >= chunk_size:
+                                continue
+                            prev_chunk_left_over = self._make_warmup_rtc_prefix(prefix_steps)
+                            if prev_chunk_left_over is None:
+                                continue
+                            start_extra = time.perf_counter()
+                            _ = self._predict_policy_action_chunk(
+                                preprocessed_observation,
+                                prev_chunk_left_over=prev_chunk_left_over,
+                                inference_delay=inference_delay,
+                                execution_horizon=rtc_config.execution_horizon,
+                            )
+                            self._synchronize_policy_device()
+                            compile_extra_warmup_times.append(
+                                (prefix_steps, inference_delay, time.perf_counter() - start_extra)
+                            )
+
             self._reset_rtc_state()
+
+            compile_extra_summary = (
+                ", ".join(
+                    f"len{prefix_steps}/delay{inference_delay} {extra_time * 1000:.2f}ms"
+                    for prefix_steps, inference_delay, extra_time in compile_extra_warmup_times
+                )
+                or "none"
+            )
 
             if guided_rtc_time is None:
                 self.logger.info(
-                    "Policy warmup: preprocess %.2fms, no-prefix %.2fms, guided RTC skipped",
+                    "Policy warmup: preprocess %.2fms, no-prefix %.2fms, "
+                    "RTC no-leftover %sms, guided RTC skipped, compile extras %s",
                     preprocess_time * 1000,
                     no_prefix_time * 1000,
+                    self._format_ms(rtc_no_leftover_time),
+                    compile_extra_summary,
                 )
             else:
                 self.logger.info(
-                    "Policy warmup: preprocess %.2fms, no-prefix %.2fms, guided RTC %.2fms",
+                    "Policy warmup: preprocess %.2fms, no-prefix %.2fms, "
+                    "RTC no-leftover %sms, guided RTC %.2fms, compile extras %s",
                     preprocess_time * 1000,
                     no_prefix_time * 1000,
+                    self._format_ms(rtc_no_leftover_time),
                     guided_rtc_time * 1000,
+                    compile_extra_summary,
                 )
+            return True
         except Exception:
             self._reset_rtc_state()
             self.logger.exception("Policy warmup failed; continuing without warmup")
+            return False
 
     def Ready(self, request, context):  # noqa: N802
         client_id = context.peer()
@@ -427,7 +539,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         policy_class = get_policy_class(self.policy_type)
 
         start = time.perf_counter()
-        self.policy = policy_class.from_pretrained(policy_specs.pretrained_name_or_path)
+        self.policy = self._load_policy(policy_class, policy_specs.pretrained_name_or_path)
         self.policy.to(self.device)
         self._configure_serving_precision()
         self._configure_rtc_policy()
@@ -444,7 +556,20 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             postprocessor_overrides={"device_processor": device_override},
         )
         self._configure_rtc_processors()
-        self._warmup_policy_autograd()
+        warmup_ok = self._warmup_policy_autograd()
+        if not warmup_ok and self._torch_compile_enabled:
+            self._reload_policy_without_compile(policy_class, policy_specs.pretrained_name_or_path)
+            self.preprocessor, self.postprocessor = make_pre_post_processors(
+                self.policy.config,
+                pretrained_path=policy_specs.pretrained_name_or_path,
+                preprocessor_overrides={
+                    "device_processor": device_override,
+                    "rename_observations_processor": {"rename_map": policy_specs.rename_map},
+                },
+                postprocessor_overrides={"device_processor": device_override},
+            )
+            self._configure_rtc_processors()
+            self._warmup_policy_autograd()
 
         end = time.perf_counter()
 
