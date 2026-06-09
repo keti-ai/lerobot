@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-10 (D07i scene-matched baseline — desk-sweep 은 scene 정렬로 해소(접근 OK), 잔여 실패=**손목/grasp 어긋남**. joint_4 cap(15°) 매 trial ~21회 clamp 수렴 → **joint_4 throttle 가설**. 다음 D07j=diag_full_cap_smooth(arm65/interp3) 로 cap 단독 검증. LS0/LS1(desk-sweep lever) 보류, joint_4 cap+LS2(grasp) 전면)
+**마지막 갱신:** 2026-06-10 (K15 compile live OOM → **compile off, K14 bf16 default 복귀** (0d2bfb8c, opt-in env LEROBOT_ASYNC_SERVER_TORCH_COMPILE=1). 서버 GPU1 pid674148 8081, 메모리 10.5GB 고정. forward~416ms(interp×3 가 smoothness 캐리어라 OK). 다음 D07j retry=joint_4 cap 가설(손목 펴짐) 검증)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
