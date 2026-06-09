@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-09 (K12 — 병목 server-side (client 미미). server_rtt 633 = forward 398 + residual 235. K13 server breakdown)
+**마지막 갱신:** 2026-06-09 (K13 — latency = forward 자체 (413-552, server 나머지 ~20ms). K14 bf16/fp16 서빙 forward 단축)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -19,7 +19,7 @@
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
 | **J** — D-38 후속 (cleaning + α'' 학습) | **CLOSED** | α'' 030000 final ckpt = deploy target. A6 SKIP (사용자 결정). gate 도구 (P, commit 0e7bdd34) 는 future use 으로 보존 |
-| **K** — D-42 70% real-world success | **latency = server-side, K13 breakdown** | grasp 정상 + starvation 해결 + horizon 10. 근본 = latency 900ms. K12 (9ef93205): **client 미미** (obs capture 2/send 34/deserialize 5ms), **병목 server-side** (server_rtt 633 = forward 398 + residual 235, spike 535). 사용자 결정: **K13 server breakdown** (obs receive→queue→preprocess→forward→postprocess→serialize→send). postprocess (chunk30 개별 unnormalize loop) 의심 → 타겟 (compile/fp16 / postprocess vectorize). 목표 latency↓ → chunk window 안 → RTC 작동 → 툭툭 해소 → N=20 재개. plan §17 |
+| **K** — D-42 70% real-world success | **latency = forward, K14 bf16 서빙** | grasp 정상 + starvation 해결 + horizon 10. K13 (6473be52): server 내부 non-forward 다 미미 (prepare/preprocess/postprocess/serialize/queue 합 ~20ms). **latency = forward 자체** (413 synthetic / 552 live / 861 spike). postprocess vectorize 5.6ms 미미. compile=false. 사용자 결정: **K14 bf16/fp16 서빙** (A6000 bf16 빠름, forward precision↓ 속도↑). prerequisite α'' train_config dtype 점검. forward 413→? → chunk window 여유 → RTC 작동 → D07f. plan §17 |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
