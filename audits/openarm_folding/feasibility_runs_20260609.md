@@ -310,3 +310,118 @@ Decision:
 - The immediate blocker is hardware connection reliability on left `joint_1`,
   despite `can0` reporting link `UP`.
 - Retry D04 only after the left-arm `joint_1` power/CAN response is stable.
+
+## D04 Result
+
+Profile used:
+
+| profile | arm max_rel | gripper max_rel | threshold | aggregate | note |
+|---|---:|---:|---:|---|---|
+| `diag_arm_cap` | 15.0 | 65.0 | 0.5 | `weighted_average` | arm + gripper cap relaxed |
+
+Arm cap rationale:
+
+- D02 showed that after gripper cap was relaxed, the remaining clamp pressure
+  was arm-only, led by `joint_4=204`.
+- Relstats frame-delta reference: `mean_abs=1.44`, `q_max=60.7`.
+- `15.0` was chosen as the first safety-biased relaxation:
+  `1.44 << 15.0 << 60.7`. This keeps extreme outliers clamped while allowing
+  normal handover-scale arm motion to pass.
+
+D04 summary:
+
+```json
+{
+  "trial": "D04",
+  "obj": "banana",
+  "profile": "diag_arm_cap",
+  "status": "completed_control_window",
+  "duration_s": 30.0,
+  "last_avg_fps": 19.41,
+  "max_net_latency_ms": 657.05,
+  "queue_empty_cnt": 0,
+  "clamp_events": 14,
+  "clamp_joint_counts": {
+    "joint_1": 2,
+    "joint_3": 2,
+    "joint_4": 10,
+    "joint_5": 2
+  }
+}
+```
+
+D02 vs D04:
+
+| metric | D02 (`arm=5`) | D04 (`arm=15`) | interpretation |
+|---|---:|---:|---|
+| total clamp events | 426 | 14 | arm cap relaxation removed almost all target clamps |
+| `joint_4` clamp | 204 | 10 | dominant D02 arm clamp dropped sharply |
+| last Avg FPS | 19.86 | 19.41 | roughly unchanged; still just below `>=20` resume rule |
+| max latency | 1164.84 ms | 657.05 ms | recovered below `<1000 ms` resume rule |
+| queue empty | 0 | 0 | queue starvation was not the bottleneck |
+| grasp | no attempt | attempted | arm cap relaxation reached grasp behavior |
+
+Operator observation:
+
+- Arm approached the banana and finally entered a grasping behavior.
+- The arms also moved toward each other as if attempting the handover phase.
+- Motion still had visible jitter. Operator described a tendency near chunk
+  boundaries where the robot seemed to move from the end position of one chunk
+  back toward an older chunk's target.
+- Fine banana alignment was still weak; the robot approached and tried to
+  grasp, but the motion was not precise enough.
+- Gripper behavior was still somewhat awkward.
+- No explicit unsafe motion was reported, but smoothness is not sufficient for
+  official K4 resume.
+
+Clamp analysis:
+
+- D04 reduced clamp events from `426` to `14` over the same 30 s diagnostic
+  duration.
+- The D02 bottleneck joint `joint_4` dropped from `204` clamps to `10`.
+- No gripper clamp was counted in D04, so gripper cap `65.0` continued to
+  remove gripper clipping.
+- Residual clamp pressure is now small and isolated: `joint_4=10`,
+  `joint_1=2`, `joint_3=2`, `joint_5=2`.
+
+Decision:
+
+- Arm cap `5.0` was a primary live-control bottleneck. Relaxing arm cap to
+  `15.0` nearly eliminated clamps, brought max latency back under `1000 ms`,
+  and allowed the policy to reach banana approach, grasp behavior, and an
+  attempted handover meeting.
+- Do not resume official K4 N=20 yet. The task reached the right phase, but
+  motion is still too choppy for reliable grasp/handover and FPS is still just
+  below the `>=20` resume rule.
+- The remaining live bottleneck is likely chunk-boundary blending / execution
+  smoothness plus FPS margin, not target clamp alone.
+- The observation that the robot appears to move from a chunk end pose back
+  toward an older chunk target matches a chunk-overlap disagreement symptom.
+  The current async wrapper applies `weighted_average` aggregation, but the
+  locked recipe's RTC `execution_horizon=20` and
+  `action_interpolation_multiplier=3` are still not applied in this live path.
+
+Arm `20.0` escalation:
+
+- Do not jump to `20.0` by default from these metrics. Clamp count is already
+  low at `15.0`.
+- Consider a later `20.0` diagnostic only if operator observation says the arm
+  still visibly under-reaches or clips during approach, and the D04 motion was
+  safe.
+
+Next branch:
+
+- Keep clamp relaxed: arm cap `15.0`, gripper cap `65.0`.
+- First smoothness diagnostic should change blending rather than increase cap:
+  use arm/gripper caps from D04 with a more conservative overlap aggregator.
+  `conservative` keeps more of the existing plan (`0.7 * old + 0.3 * new`)
+  than `weighted_average` (`0.3 * old + 0.7 * new`), so it should reduce
+  visible chunk-boundary target reversals if the old plan is locally stable.
+- Avoid raising `chunk_size_threshold` aggressively while FPS is marginal.
+  Upstream async guidance says higher threshold sends observations more often
+  and increases inference pressure; D04 already has `queue_empty_cnt=0`, so
+  the immediate need is smoothness and FPS margin, not more frequent refresh.
+- The stronger long-term fix is to run the locked recipe through a path that
+  actually applies RTC `execution_horizon=20` and interpolation multiplier `3`,
+  because RTC is designed specifically to align overlapping timesteps across
+  action chunks.
