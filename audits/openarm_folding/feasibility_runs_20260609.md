@@ -792,3 +792,82 @@ Decision:
   - revisiting RTC guidance/horizon parameters,
   - collecting more smooth banana grasp/handover data if infra latency is no
     longer the dominant bottleneck.
+
+## D07e Horizon 10 Result
+
+Setup:
+
+- Server: K11 RTC server at `10.252.205.103:8081`, expected
+  `execution_horizon=10` with warmup. Local syhlabtop confirmed TCP open, but
+  did not directly inspect a6000 tmux logs.
+- Client: `diag_arm_cap` (`arm=15.0`, `gripper=65.0`,
+  `chunk_size_threshold=0.5`, `aggregate=weighted_average`).
+- Client interpolation: `action_interpolation_multiplier=3`.
+- Preflight passed: server open, `can0/can1` UP, RealSense cameras visible,
+  motors `16/16` found.
+
+D07e summary:
+
+```json
+{
+  "trial": "D07e",
+  "obj": "banana",
+  "profile": "diag_arm_cap",
+  "status": "completed_control_window",
+  "duration_s": 30.0,
+  "last_avg_fps": 16.85,
+  "max_net_latency_ms": 898.44,
+  "queue_empty_cnt": 0,
+  "clamp_events": 17,
+  "clamp_joint_counts": {
+    "joint_1": 1,
+    "joint_4": 17
+  },
+  "action_queue_samples": 1278
+}
+```
+
+D07d vs D07e comparison:
+
+| metric | D07d horizon 20 | D07e horizon 10 | interpretation |
+|---|---:|---:|---|
+| interpolation | 3 | 3 | same client interpolation |
+| last Avg FPS | 15.47 | 16.85 | observation-loop FPS improved slightly |
+| max latency | 772.90 ms | 898.44 ms | latency worsened and remains close to 1 s |
+| queue empty | 0 | 0 | K10 starvation fix still holds |
+| clamp events | 26 | 17 | arm clamp improved but remains, mainly `joint_4` |
+| clamp joint counts | `joint_1=8`, `joint_4=20` | `joint_1=1`, `joint_4=17` | horizon 10 reduced `joint_1` clamp |
+| action queue samples | 1277 | 1278 | same effective high-rate control sampling |
+| receiver/control errors | none | none | full 30 s control window completed |
+
+Operator observation:
+
+- Horizon 10 improved the chunk choppiness compared with D07d, but not enough.
+- The robot still entered the grasping zone.
+- Motion still looked discontinuous and occasionally jumpy.
+- The operator's current judgment is that latency must be reduced substantially;
+  horizon 10 alone does not solve the remaining smoothness problem.
+
+Interpretation:
+
+- D07e is a partial positive result: horizon 10 reduced visible chunk artifacts
+  somewhat and reduced clamp count from `26` to `17`.
+- It is not sufficient for official K4 resume. The remaining issue is no longer
+  gripper close, queue starvation, or a simple arm cap mismatch.
+- With max network latency around `898 ms` (about 27 frames at 30 FPS), a horizon
+  of 10 still leaves a large un-guided gap. This matches the prior concern that
+  latency delay can exceed the RTC execution horizon.
+
+Decision:
+
+- Do not resume official K4 N=20.
+- Do not spend more time on gripper cap/mapping; D07c already showed command
+  and readback are strong.
+- Keep `arm15/grip65`, interpolation 3, and RTC, but the next bottleneck is
+  latency/cadence.
+- Next branch should prioritize inference/transport latency reduction before
+  another official attempt:
+  - reduce server inference latency and jitter,
+  - inspect whether policy warm path still spends excessive time per chunk,
+  - consider compile/fp16 or model/server optimization,
+  - then retest horizon 10 or a middle horizon 12-15 after latency improves.
