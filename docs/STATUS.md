@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-10 (D07k/l: cap 튜닝으로 **pick 해결** (top-down 각+gentle grip+per-joint smooth, D07l=diag_perjoint_smooth j4/5=65 j1-3=25 grip20). 잔여: pick 랜덤성 약간 + **handover(양팔 협응) 실패** = 지배 블로커. gripper clamp 1072(handover 구간 cap20 throttle) = pick gentle vs handover decisive 그리퍼 cap 모순. 전략 분기: handover 계속 vs single-arm pick&place 단순화(north star=pick&place 70%, handover 아님))
+**마지막 갱신:** 2026-06-10 (D07m: **single-arm prompt 막다른 길 확정** — α'' handover-locked(왼손 무조건 받으러 옴), prompt 2종 다 실패. 재학습 없이 single-arm 불가. → handover 작동이 유일 경로. 왼손 받기가 gripper cap20 throttle(1072 clamp)로 놓침 가설 → D07n=diag_handover_grip(gripper cap40 중간) 테스트. 안 풀리면 handover 미세협응=데이터 한계→소규모 finetune 재고)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
