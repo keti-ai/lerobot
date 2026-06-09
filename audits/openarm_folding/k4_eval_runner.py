@@ -69,6 +69,12 @@ PROFILES: dict[str, ProfileSpec] = {
         clamp_log_suppression="all",
         write_diagnostic_csv=True,
     ),
+    "diag_full_cap": ProfileSpec(
+        arm_max_relative_target=65.0,
+        gripper_max_relative_target=65.0,
+        clamp_log_suppression="all",
+        write_diagnostic_csv=True,
+    ),
     "diag_queue_smooth": ProfileSpec(
         gripper_max_relative_target=65.0,
         chunk_size_threshold=0.9,

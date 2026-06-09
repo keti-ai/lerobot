@@ -425,3 +425,68 @@ Next branch:
   actually applies RTC `execution_horizon=20` and interpolation multiplier `3`,
   because RTC is designed specifically to align overlapping timesteps across
   action chunks.
+
+## D05 Result
+
+Profile used:
+
+| profile | arm max_rel | gripper max_rel | threshold | aggregate | note |
+|---|---:|---:|---:|---|---|
+| `diag_full_cap` | 65.0 | 65.0 | 0.5 | `weighted_average` | near-unclamped target diagnostic |
+
+Rationale:
+
+- D04 already reduced clamp pressure substantially with arm cap `15.0`.
+- Before changing blending, D05 tests the limiting case where arm and gripper
+  caps are both raised to `65.0`, near the relstats `q_max=60.7`, to verify
+  whether any remaining visible problem is still clamp-related.
+- This diagnostic is not an official K4 trial and is not included in the
+  official success rate.
+
+D05 summary:
+
+```json
+{
+  "trial": "D05",
+  "obj": "banana",
+  "profile": "diag_full_cap",
+  "status": "completed_control_window",
+  "duration_s": 30.0,
+  "last_avg_fps": 19.53,
+  "max_net_latency_ms": 587.83,
+  "queue_empty_cnt": 0,
+  "clamp_events": 0,
+  "clamp_joint_counts": {}
+}
+```
+
+D04 vs D05:
+
+| metric | D04 (`arm=15`) | D05 (`arm=65`) | interpretation |
+|---|---:|---:|---|
+| total clamp events | 14 | 0 | full cap removed the remaining target clamps |
+| `joint_4` clamp | 10 | 0 | dominant residual clamp disappeared |
+| last Avg FPS | 19.41 | 19.53 | essentially unchanged; still below `>=20` resume rule |
+| max latency | 657.05 ms | 587.83 ms | slightly better and below `<1000 ms` |
+| queue empty | 0 | 0 | no queue starvation |
+| grasp/handover behavior | grasp + attempted handover | similar to D04 | cap `65.0` did not materially improve task behavior |
+
+Operator observation:
+
+- Smoothness vs D04: almost the same.
+- Banana approach / grasp quality: similar to D04.
+- Handover meeting behavior: similar to D04.
+- Safety / large motion: cap `65.0` felt more risky, but the policy still
+  stayed within dataset-like behaviors and did not hit the table.
+
+Decision:
+
+- Metric-level result: clamp is no longer present in D05. If visible jitter or
+  chunk-boundary reversal remains, clamp is not the remaining root cause.
+- FPS remains below the K4 resume threshold, so official N=20 should still not
+  resume solely from this result.
+- Operator-level result: cap `65.0` did not make smoothness, grasp, or
+  handover behavior meaningfully better than D04.
+- Prefer D04's safer arm cap `15.0` for the next diagnostic unless a later
+  motion-specific test proves it is under-reaching. The next work should focus
+  on blending/RTC/interpolation and FPS margin.
