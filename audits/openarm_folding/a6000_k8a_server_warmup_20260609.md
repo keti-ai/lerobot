@@ -128,17 +128,59 @@ Additional lightweight smoke:
 
 ## Restart status
 
-The running `k1_policy_server` was intentionally left alive during implementation and verification.
-
-After this K8a commit is pushed, restart target:
+The running K7 `k1_policy_server` was intentionally left alive during implementation and verification. After K8a was pushed, it was restarted with the K8a code.
 
 - tmux session: `k1_policy_server`
 - bind: `0.0.0.0:8081`
+- process: `python3`, pid `3355248`
+- commit at server start: `2c43ac4e`
+- selected GPU: physical GPU 0
 - venv: `/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/venv312_torch27_20260515`
-- expected first policy-load log: `Policy warmup: preprocess ..., no-prefix ..., guided RTC ...`
+- log: `/tmp/k1_server_logs/policy_server_k8a_warmup_20260609_200241.log`
+
+GPU selection:
+
+- Before killing old server, GPU 0 had `34995 MB` free and 0% util because K7 was resident there.
+- After killing old server, GPU 0 had `44812 MB` free and 0% util.
+- GPUs 1-3 each had `48262 MB` free and 0% util.
+- GPU 0 was reused to keep the other three GPUs untouched; no coworker training process was displaced.
+
+Bind check after restart:
+
+```text
+k1_policy_server: 1 windows (created Tue Jun  9 20:02:41 2026)
+LISTEN 0      4096                    *:8081             *:*    users:(("python3",pid=3355248,fd=7))
+```
+
+Process-start log:
+
+```text
+K8a policy_server start commit=2c43ac4e gpu=0 port=8081
+PolicyServer started on 0.0.0.0:8081
+```
+
+A local no-robot gRPC `RemotePolicyConfig` was sent to the live server to verify the actual tmux warmup path. No observations or actions were sent.
+
+Live tmux warmup log:
+
+```text
+Injected robot-folding RTCConfig: enabled=True | execution_horizon=20 | max_guidance_weight=10.0 | prefix_attention_schedule=RTCAttentionSchedule.EXP
+RTC processor initialized on policy and model
+RTC relative-action prefix re-anchoring enabled
+Policy warmup: preprocess 39.35ms, no-prefix 1357.48ms, guided RTC 434.59ms
+Time taken to put policy on cuda: 118.7125 seconds
+```
+
+GPU state after live warmup:
+
+```text
+0, 34995, 0
+1, 48262, 0
+2, 48262, 0
+3, 48262, 0
+```
 
 ## Next
 
-- Restart `k1_policy_server` with K8a code on a free GPU.
 - Let syhlabtop K1c connect normally; the client remains thin and will send `RemotePolicyConfig`.
 - Confirm the first live chunk remains in the warm band before D07 motion.
