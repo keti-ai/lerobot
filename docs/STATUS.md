@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-09 (D07 RTC client stall + latency 2.7s 노출. K6 latency 진단 critical — 2.7s cold/real 규명)
+**마지막 갱신:** 2026-06-09 (K6 판정 — 2.7s=cold, warm RTC 0.39s 실시간 OK. K8 server warmup + client fix → D07 재시도)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -19,7 +19,7 @@
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
 | **J** — D-38 후속 (cleaning + α'' 학습) | **CLOSED** | α'' 030000 final ckpt = deploy target. A6 SKIP (사용자 결정). gate 도구 (P, commit 0e7bdd34) 는 future use 으로 보존 |
-| **K** — D-42 70% real-world success | **D07 RTC stall — K6 latency critical** | D07 (027ce0bf): RTC client stall — server 가 chunk 2679ms 늦게 전송 → client 이미 #29 실행 → stale chunk → receiver IndexError → motion 정지. valid RTC 검증 X. 두 문제: (A) client receiver IndexError 방어 (B) **근본 latency 2.7s** (RTC 가정 latency<chunk 초과). 사용자 결정: **K6 latency 진단 먼저** (2.7s cold/real 규명, D04/D05 588 vs D07 2679 차이). plan §17 |
+| **K** — D-42 70% real-world success | **K8 fix → D07 재시도** | K6 판정 (fe1c41c3): 2679ms = **cold** (policy load 112s, 첫 guided RTC autograd 1688ms). **warm RTC guided 0.39s = 30action/30fps 1s window 안 = 실시간 OK**. RTC 유효. K8: (a6000) server warmup discard (cold autograd 제거) + (syhlabtop) client receiver IndexError 방어 → **D07 재시도** (RTC + arm15/grip65). PASS → K4 N=20 재개. plan §17 |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
