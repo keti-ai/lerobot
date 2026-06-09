@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-05 (단순화 — α'' 030000 직접 deploy + N=20 trial 70% target. 부수 폐기, audit 13 archive)
+**마지막 갱신:** 2026-06-08 (K1 async_inference gRPC pipeline 검증 완료, K4 live eval N=20 만 남음)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -19,7 +19,7 @@
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
 | **J** — D-38 후속 (cleaning + α'' 학습) | **CLOSED** | α'' 030000 final ckpt = deploy target. A6 SKIP (사용자 결정). gate 도구 (P, commit 0e7bdd34) 는 future use 으로 보존 |
-| **K** — D-42 70% real-world success | **ACTIVE single focus** | α'' 030000 직접 lerobot-rollout deploy. N=20 trial 14+/20 = 70%. K1 (rollout setup) → K4 (operator eval) 만. plan: `~/.claude/plans/k4_live_eval.md` |
+| **K** — D-42 70% real-world success | **K1 DONE, K4 next** | async_inference gRPC (lerobot-rollout 아님): a6000 policy_server 8081 + syhlabtop robot_client. K1 검증 OK (dd906059+4ddcadbf). 남은 = K4 live eval N=20 trial (14+/20=70%). plan: `~/.claude/plans/k4_live_eval.md` |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
