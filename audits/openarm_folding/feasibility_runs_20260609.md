@@ -576,3 +576,78 @@ Decision:
 - Once that is fixed, repeat D07 with the same `diag_arm_cap` profile. The
   current D07 result provides no evidence that RTC improved smoothness or task
   success, because action receiving stopped after the first chunk.
+
+## D07b RTC Warm Result
+
+Setup:
+
+- Local branch included K8a/K8b fixes: server warmup status through `08153ab0`
+  and client receiver guard `07080ce4`.
+- Client profile: `diag_arm_cap` (`arm=15.0`, `gripper=65.0`,
+  `threshold=0.5`, `aggregate=weighted_average`).
+- Server address: `10.252.205.103:8081`.
+- Preflight passed: server open, `can0/can1` UP, 3 RealSense cameras visible,
+  motors `16/16` found.
+- Direct a6000 tmux/server log verification still failed due SSH auth, so
+  warmup status is inferred from local status commits and live latency.
+
+D07b summary:
+
+```json
+{
+  "trial": "D07b",
+  "obj": "banana",
+  "profile": "diag_arm_cap",
+  "status": "completed_control_window",
+  "duration_s": 30.0,
+  "last_avg_fps": 21.94,
+  "max_net_latency_ms": 685.42,
+  "queue_empty_cnt": 1,
+  "clamp_events": 3,
+  "clamp_joint_counts": {
+    "joint_4": 3
+  },
+  "action_queue_samples": 684
+}
+```
+
+D04/D05/D07/D07b comparison:
+
+| metric | D04 | D05 | D07 | D07b | interpretation |
+|---|---:|---:|---:|---:|---|
+| profile | `diag_arm_cap` | `diag_full_cap` | `diag_arm_cap` | `diag_arm_cap` | D07b uses safer D04 cap |
+| RTC/server state | off | off | cold/stale failure | warm + client guard | K8 fixes removed receiver stall |
+| last Avg FPS | 19.41 | 19.53 | 22.23 | 21.94 | D07b clears `>=20` rule |
+| max latency | 657.05 ms | 587.83 ms | 2679.43 ms | 685.42 ms | D07b clears `<1000 ms` rule |
+| queue empty | 0 | 0 | 1 | 1 | one empty transition, but receiver survived |
+| clamp events | 14 | 0 | 2 | 3 | clamp is effectively gone |
+| action queue samples | 685 | 700 | 30 | 684 | D07b receiver stayed alive for the full window |
+| grasp/handover | grasp + attempted handover | similar to D04 | not reached | grasp phase reached | D07b restored task-phase progress |
+
+Receiver status:
+
+- No `IndexError` or traceback was observed in D07b.
+- Action chunks continued through the full control window.
+- `action_queue_samples=684`, comparable to D04/D05 and unlike D07's stalled
+  `30` samples.
+
+Operator observation:
+
+- Chunk-boundary behavior: adequate improvement; the robot reached task phases
+  rather than stopping after one chunk.
+- Banana approach: reached reasonably well.
+- Grasp phase: reached, but the gripper did not hold strongly enough and the
+  banana tended to slip out.
+- Overall motion quality: still slightly insufficient for official K4 resume.
+
+Decision:
+
+- K8a/K8b fixed the D07 receiver/cold-latency failure. D07b is a valid RTC warm
+  live trial and passes the system-level gates: FPS `>=20`, latency `<1000 ms`,
+  receiver alive, clamp nearly absent.
+- Do not resume official K4 N=20 yet. Task-level quality is still below the
+  resume bar because grasp reached but did not hold reliably, and motion still
+  needs smoothing/precision.
+- Next branch: keep `diag_arm_cap` (`arm=15.0`, `gripper=65.0`) and RTC warm
+  server. Focus on grasp strength/close timing and remaining smoothness rather
+  than further cap relaxation.
