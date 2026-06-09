@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-09 (D07b — execution pipeline 완성 (grasp phase 도달!). 남은 = grasp close strength. K9 gripper 진단)
+**마지막 갱신:** 2026-06-09 (K9 — gripper clip 전부 open-side = 모델 약한 close 정황. 확정 = D07c gripper logging)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -19,7 +19,7 @@
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
 | **J** — D-38 후속 (cleaning + α'' 학습) | **CLOSED** | α'' 030000 final ckpt = deploy target. A6 SKIP (사용자 결정). gate 도구 (P, commit 0e7bdd34) 는 future use 으로 보존 |
-| **K** — D-42 70% real-world success | **D07b milestone — grasp 품질만 남음** | D07b (e6a6b7c1): execution pipeline 완성 — receiver 생존 (684 samples), latency 685ms, FPS 21.94, clamp 거의 없음, **grasp phase 도달** (D02-D05 미도달 대비 도약). 단 약하게 쥐어 빠짐. cap/latency/receiver/RTC/smooth 전부 정리. 남은 = **grasp close strength** (data 희소 banana close 6.5% or init prior 약). K9 gripper close 진단 (명령 vs motor 도달) → data(b)/init(c) 분기. plan §17 |
+| **K** — D-42 70% real-world success | **grasp close strength = data 정황** | D07b: pipeline 완성 (grasp phase 도달). K9 (c7c0fa14): gripper clip 102 전부 **positive (open-side)**, negative_clip 0, 강한 close(-65) evidence 없음 → **모델이 close 약하게 냄** (data 희소 banana close 6.5%/1.2% 일치). motor 미판정. 확정 = **D07c** raw gripper command(idx7/15)+readback lightweight logging 1 trial → 그 후 data 보강(b)/init(c). plan §17 |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
