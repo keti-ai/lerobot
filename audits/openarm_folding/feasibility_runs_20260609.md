@@ -252,3 +252,61 @@ Next branch:
   diagnostic profile before official resume. The current evidence suggests
   arm `max_relative_target=5.0` may also be too tight for handover swing, even
   after gripper cap is fixed.
+
+## D04 Setup Status
+
+New profile:
+
+| profile | arm max_rel | gripper max_rel | threshold | aggregate | note |
+|---|---:|---:|---:|---|---|
+| `diag_arm_cap` | 15.0 | 65.0 | 0.5 | `weighted_average` | arm + gripper cap relaxed |
+
+Rationale for arm cap `15.0`:
+
+- D02 showed arm-only clamp pressure after gripper clamp disappeared:
+  `joint_4=204`, `joint_5=138`, `joint_1=136`, `joint_7=119`.
+- Relstats frame-delta reference: `mean_abs=1.44`, `q_max=60.7`.
+- `15.0` is intentionally between those values: `1.44 << 15.0 << 60.7`.
+- This is the first arm-cap relaxation trial, so `15.0` is chosen over `20.0`
+  for safety. If D04 reaches the task phase safely but remains over-clamped,
+  a later `20.0` diagnostic can be considered.
+
+Verification:
+
+```bash
+uv run python -m py_compile audits/openarm_folding/k4_eval_runner.py
+uv run python audits/openarm_folding/k4_eval_runner.py \
+  --config-only \
+  --trial D04 \
+  --obj banana \
+  --profile diag_arm_cap \
+  --duration-s 30 \
+  --task "Pick the banana, hand it over to the other arm, and place it at the target."
+```
+
+Result: PASS. Config-only showed arm joints at `15.0`, gripper at `65.0`,
+threshold `0.5`, and aggregate `weighted_average`.
+
+Live D04 status:
+
+- Attempt 1 at 16:41 KST: pre-motion failure. Left-arm CAN handshake failed on
+  `joint_1`; no control window started and no action was sent.
+- Attempt 2 at 16:46 KST: same pre-motion failure. Left-arm CAN handshake failed
+  on `joint_1`; no control window started and no action was sent.
+- Invalid setup artifacts were archived:
+  - `/home/syhlabtop/k4_logs/summary_trial_D04.json.invalid_setup_20260609_164223`
+  - `/home/syhlabtop/k4_logs/summary_trial_D04.json.invalid_setup_20260609_164635`
+  - `/home/syhlabtop/k4_logs/trial_D04_banana.log.invalid_setup_20260609_164223`
+  - `/home/syhlabtop/k4_logs/trial_D04_banana.log.invalid_setup_20260609_164635`
+  - `/home/syhlabtop/k4_logs/k4_runner_trial_D04_banana.debug.log.invalid_setup_20260609_164223`
+  - `/home/syhlabtop/k4_logs/k4_runner_trial_D04_banana.debug.log.invalid_setup_20260609_164635`
+- Active `/home/syhlabtop/k4_logs/diagnostic_results.csv` was restored to keep
+  only valid diagnostic rows. It currently contains D02 only.
+
+Decision:
+
+- D04 is not evaluated yet. There are no D04 motion metrics and no operator
+  task observation.
+- The immediate blocker is hardware connection reliability on left `joint_1`,
+  despite `can0` reporting link `UP`.
+- Retry D04 only after the left-arm `joint_1` power/CAN response is stable.
