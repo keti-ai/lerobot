@@ -87,6 +87,16 @@ PROFILES: dict[str, ProfileSpec] = {
         clamp_log_suppression="all",
         write_diagnostic_csv=True,
     ),
+    # D07k: arm cap 65 (wrist top-down angle freed, D07j confirmed) but gentle
+    # gripper close (cap 20) so the gripper doesn't snap shut and knock the
+    # object away. interp x3 for smoothness.
+    "diag_wrist_free_gentle_grip": ProfileSpec(
+        arm_max_relative_target=65.0,
+        gripper_max_relative_target=20.0,
+        action_interpolation_multiplier=3,
+        clamp_log_suppression="all",
+        write_diagnostic_csv=True,
+    ),
     "diag_queue_smooth": ProfileSpec(
         gripper_max_relative_target=65.0,
         chunk_size_threshold=0.9,
