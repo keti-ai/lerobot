@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-09 (cap 진단 종결 D02→D05, clamp 주원인 아님. 진짜 = execution smoothness → K5 ActionInterpolator + K6 latency 진단)
+**마지막 갱신:** 2026-06-09 (smooth execution = RTC. K5 단순 interpolator 폐기 → K7 RTC async server 통합 (robot-folding 방법론). K6 latency 유지)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -19,7 +19,7 @@
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
 | **J** — D-38 후속 (cleaning + α'' 학습) | **CLOSED** | α'' 030000 final ckpt = deploy target. A6 SKIP (사용자 결정). gate 도구 (P, commit 0e7bdd34) 는 future use 으로 보존 |
-| **K** — D-42 70% real-world success | **K4 PAUSED — cap 진단 종결** | official 01-02 FAIL. cap 진단 D02(arm5/grip65)→D04(arm15/grip65)→D05(arm65/grip65): clamp 0 까지 풀어도 grasp/handover 개선 미미 = **clamp 주원인 아님**. cap = D04 (arm15, grip65) 충분. **진짜 병목 = execution smoothness** (FPS 19.5 < 30, choppy). 사용자 결정: K5 ActionInterpolator (multiplier 3) robot_client 통합 + K6 server inference latency 진단. audit=feasibility_runs_20260609.md |
+| **K** — D-42 70% real-world success | **K4 PAUSED — K7 RTC 통합 진입** | official 01-02 FAIL. cap 진단 D02→D05: clamp 주원인 아님 (cap=arm15/grip65 충분). 진짜 = execution smoothness. **K7 = RTC (robot-folding 방법론) async server 통합** — PI0.5 RTC 내장, server 만 prev chunk reanchor + RTCConfig(horizon20/guidance10/EXP), client thin (syhlabtop GPU 무관). K5 단순 interpolator 폐기. K6 latency 유지. D07 operator live 로 검증. plan §17 + `~/.claude/plans/k4_live_eval.md` |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
