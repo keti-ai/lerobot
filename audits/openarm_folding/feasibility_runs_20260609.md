@@ -490,3 +490,89 @@ Decision:
 - Prefer D04's safer arm cap `15.0` for the next diagnostic unless a later
   motion-specific test proves it is under-reaching. The next work should focus
   on blending/RTC/interpolation and FPS margin.
+
+## D07 RTC Result
+
+Setup:
+
+- Local branch was updated to `d4da366b`, which records K7 RTC server restart
+  for commit `e9cb3230`.
+- Client profile: `diag_arm_cap` (`arm=15.0`, `gripper=65.0`,
+  `threshold=0.5`, `aggregate=weighted_average`).
+- Server address: `10.252.205.103:8081`.
+- Preflight passed: server open, `can0/can1` UP, 3 RealSense cameras visible,
+  motors `16/16` found.
+- Direct a6000 tmux/server log verification failed because SSH authentication
+  from syhlabtop was denied. RTC server status is inferred from local status
+  commit and the open 8081 server.
+
+D07 summary:
+
+```json
+{
+  "trial": "D07",
+  "obj": "banana",
+  "profile": "diag_arm_cap",
+  "status": "completed_control_window",
+  "duration_s": 30.0,
+  "last_avg_fps": 22.23,
+  "max_net_latency_ms": 2679.43,
+  "queue_empty_cnt": 1,
+  "clamp_events": 2,
+  "clamp_joint_counts": {
+    "joint_4": 2
+  },
+  "action_queue_samples": 30
+}
+```
+
+D04/D05 vs D07:
+
+| metric | D04 | D05 | D07 | interpretation |
+|---|---:|---:|---:|---|
+| profile | `diag_arm_cap` | `diag_full_cap` | `diag_arm_cap` | D07 uses safer D04 cap with RTC server |
+| last Avg FPS | 19.41 | 19.53 | 22.23 | FPS improved, but partly because action receiving died early |
+| max latency | 657.05 ms | 587.83 ms | 2679.43 ms | D07 had a large delayed/duplicate chunk |
+| queue empty | 0 | 0 | 1 | queue starvation appeared after receiver failure |
+| clamp events | 14 | 0 | 2 | clamp is not the D07 bottleneck |
+| action queue samples | 685 | 700 | 30 | D07 stopped consuming new action updates after step 29 |
+| grasp/handover | grasp + attempted handover | similar to D04 | not reached | only one chunk executed, then motion stopped |
+
+Observed client failure:
+
+```text
+Received action chunk for step #0 | Latest action: #29 | Incoming actions: 0:29 |
+Network latency (server->client): 2679.43ms
+IndexError: list index out of range
+```
+
+After this exception, logs stayed at `Obs #29` for the rest of the control
+window. The receiver thread exited, so no newer action chunks were applied.
+The wrapper timer still stopped the robot and disconnected hardware normally.
+
+Interpretation:
+
+- This is not a valid RTC smoothness win/loss trial. The run completed the
+  30 s window, but the client stopped receiving usable chunks after step 29.
+- The failure is consistent with RTC server/client timestep compatibility:
+  the server sent a delayed chunk covering `0:29` after the client had already
+  executed through action `#29`. Client aggregation then produced an empty
+  queue, and the verbose logging path crashed on `new_timesteps[0]`.
+- Clamp is not the issue in D07: only `joint_4=2` clamps were counted.
+
+Operator observation:
+
+- Smoothness vs D04/D05: not comparable; only one chunk moved.
+- Grasp phase reached: no.
+- Motion after receiver failure: operator observed one quick chunk of motion,
+  then the robot stayed stopped for the rest of the window.
+
+Decision:
+
+- Do not resume official K4 N=20 from D07.
+- Fix or gate the RTC/client interaction before another RTC live attempt:
+  delayed or fully stale chunks must not crash the receiver thread, and RTC
+  server logs should confirm `rtc_enabled` plus timestep behavior.
+- Once that is fixed, repeat D07 with the same `diag_arm_cap` profile. The
+  current D07 result provides no evidence that RTC improved smoothness or task
+  success, because action receiving stopped after the first chunk.
