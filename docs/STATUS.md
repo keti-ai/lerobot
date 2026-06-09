@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-09 (K9 — gripper clip 전부 open-side = 모델 약한 close 정황. 확정 = D07c gripper logging)
+**마지막 갱신:** 2026-06-09 (D07c — grasp 정상 (cmd -50~-55 + motor 도달). 덜컥 = queue_empty 19 starvation. K10 interpolation multiplier 3)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -19,7 +19,7 @@
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
 | **J** — D-38 후속 (cleaning + α'' 학습) | **CLOSED** | α'' 030000 final ckpt = deploy target. A6 SKIP (사용자 결정). gate 도구 (P, commit 0e7bdd34) 는 future use 으로 보존 |
-| **K** — D-42 70% real-world success | **grasp close strength = data 정황** | D07b: pipeline 완성 (grasp phase 도달). K9 (c7c0fa14): gripper clip 102 전부 **positive (open-side)**, negative_clip 0, 강한 close(-65) evidence 없음 → **모델이 close 약하게 냄** (data 희소 banana close 6.5%/1.2% 일치). motor 미판정. 확정 = **D07c** raw gripper command(idx7/15)+readback lightweight logging 1 trial → 그 후 data 보강(b)/init(c). plan §17 |
+| **K** — D-42 70% real-world success | **덜컥 = queue starvation, K10 interp** | D07c (15853d77): **grasp 정상** (cmd right -50.3/left -55.2, motor readback -50.0/-55.0 도달 = K9 약한-close 가설 기각). 진짜 병목 = **덜컥 = queue_empty 19회** (D07b 1, RTC 없음 0) = queue starvation. 사용자 결정: K10 = **action_interpolation_multiplier=3** (robot-folding recipe, RTC chunk blend 와 별개 control rate ↑ buffer 여유). ActionInterpolator robot_client 통합 (K5 부활, RTC 와 보완) → D07d. plan §17 |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
