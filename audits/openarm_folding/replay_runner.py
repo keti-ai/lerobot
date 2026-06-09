@@ -91,6 +91,22 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional CSV path for per-frame gripper command/sent/readback trace.",
     )
+    parser.add_argument(
+        "--gripper-probe",
+        action="store_true",
+        help="Hold the arms at the current pose and probe gripper close/open instead of replaying the dataset.",
+    )
+    parser.add_argument(
+        "--probe-values",
+        default="-20,-45,0",
+        help="Comma-separated gripper targets for --gripper-probe, in degrees.",
+    )
+    parser.add_argument(
+        "--probe-hold-s",
+        type=positive_float,
+        default=1.0,
+        help="Seconds to hold each gripper probe target.",
+    )
     parser.add_argument("--play-sounds", action="store_true", help="Use system speech for start messages.")
     return parser.parse_args()
 
@@ -195,6 +211,16 @@ def scalar(value: Any) -> float:
     return float(value)
 
 
+def parse_probe_values(values: str) -> list[float]:
+    parsed = [float(value.strip()) for value in values.split(",") if value.strip()]
+    if not parsed:
+        raise ValueError("--probe-values must contain at least one numeric target")
+    for value in parsed:
+        if not -65.0 <= value <= 0.0:
+            raise ValueError(f"gripper probe value must be in [-65, 0], got {value}")
+    return parsed
+
+
 def log_can_state(context: str) -> None:
     for interface in ("can0", "can1"):
         result = subprocess.run(
@@ -205,6 +231,107 @@ def log_can_state(context: str) -> None:
         )
         output = result.stdout.strip() or result.stderr.strip()
         logging.info("%s CAN state %s: %s", context, interface, output or f"missing rc={result.returncode}")
+
+
+def make_trace_writer(path: Path) -> tuple[Any, csv.DictWriter]:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    trace_file = path.open("w", newline="", encoding="utf-8")
+    trace_writer = csv.DictWriter(
+        trace_file,
+        fieldnames=[
+            "frame",
+            "phase",
+            "right_cmd",
+            "right_processed",
+            "right_sent",
+            "right_readback_before",
+            "right_readback_after",
+            "left_cmd",
+            "left_processed",
+            "left_sent",
+            "left_readback_before",
+            "left_readback_after",
+        ],
+    )
+    trace_writer.writeheader()
+    return trace_file, trace_writer
+
+
+def write_gripper_trace_row(
+    trace_writer: csv.DictWriter | None,
+    *,
+    frame: int,
+    phase: str,
+    action: dict[str, Any],
+    processed_action: dict[str, Any],
+    sent_action: dict[str, Any],
+    readback_before: dict[str, Any],
+    readback_after: dict[str, Any],
+) -> None:
+    if trace_writer is None:
+        return
+    trace_writer.writerow(
+        {
+            "frame": frame,
+            "phase": phase,
+            "right_cmd": scalar(action["right_gripper.pos"]),
+            "right_processed": scalar(processed_action["right_gripper.pos"]),
+            "right_sent": scalar(sent_action["right_gripper.pos"]),
+            "right_readback_before": scalar(readback_before["right_gripper.pos"]),
+            "right_readback_after": scalar(readback_after["right_gripper.pos"]),
+            "left_cmd": scalar(action["left_gripper.pos"]),
+            "left_processed": scalar(processed_action["left_gripper.pos"]),
+            "left_sent": scalar(sent_action["left_gripper.pos"]),
+            "left_readback_before": scalar(readback_before["left_gripper.pos"]),
+            "left_readback_after": scalar(readback_after["left_gripper.pos"]),
+        }
+    )
+
+
+def run_gripper_probe(
+    *,
+    robot: Any,
+    robot_action_processor: Any,
+    trace_writer: csv.DictWriter | None,
+    probe_values: list[float],
+    hold_s: float,
+    fps: float,
+) -> int:
+    sent_frames = 0
+    hold_frames = max(1, int(round(hold_s * fps)))
+    logging.warning(
+        "Running gripper-only probe at current arm pose. Targets=%s hold_s=%.2f fps=%.1f",
+        probe_values,
+        hold_s,
+        fps,
+    )
+
+    for target in probe_values:
+        logging.warning("Gripper probe target %.1f deg", target)
+        for _ in range(hold_frames):
+            start_frame_t = time.perf_counter()
+            robot_obs = robot.get_observation()
+            action = {name: robot_obs[name] for name in EXPECTED_ACTION_NAMES}
+            action["right_gripper.pos"] = target
+            action["left_gripper.pos"] = target
+            processed_action = robot_action_processor((action, robot_obs))
+            sent_action = robot.send_action(processed_action)
+            readback_after = robot.get_observation()
+            write_gripper_trace_row(
+                trace_writer,
+                frame=sent_frames,
+                phase=f"probe_{target:.1f}",
+                action=action,
+                processed_action=processed_action,
+                sent_action=sent_action,
+                readback_before=robot_obs,
+                readback_after=readback_after,
+            )
+            sent_frames += 1
+            elapsed = time.perf_counter() - start_frame_t
+            precise_sleep(max(1.0 / fps - elapsed, 0.0))
+
+    return sent_frames
 
 
 def replay(args: argparse.Namespace) -> None:
@@ -249,63 +376,57 @@ def replay(args: argparse.Namespace) -> None:
     robot_action_processor = make_default_robot_action_processor()
     sent_frames = 0
     started_at = time.time()
+    probe_values = parse_probe_values(args.probe_values) if args.gripper_probe else []
+    gripper_trace = args.gripper_trace
+    if args.gripper_probe and gripper_trace is None:
+        gripper_trace = LOG_DIR / f"lr_gripper_probe_episode_{args.episode}.csv"
+        logging.info("Gripper probe trace path defaulted to %s", gripper_trace)
+
     trace_file = None
     trace_writer = None
-    if args.gripper_trace is not None:
-        args.gripper_trace.parent.mkdir(parents=True, exist_ok=True)
-        trace_file = args.gripper_trace.open("w", newline="", encoding="utf-8")
-        trace_writer = csv.DictWriter(
-            trace_file,
-            fieldnames=[
-                "frame",
-                "right_cmd",
-                "right_processed",
-                "right_sent",
-                "right_readback_before",
-                "right_readback_after",
-                "left_cmd",
-                "left_processed",
-                "left_sent",
-                "left_readback_before",
-                "left_readback_after",
-            ],
-        )
-        trace_writer.writeheader()
+    if gripper_trace is not None:
+        trace_file, trace_writer = make_trace_writer(gripper_trace)
 
     log_can_state("pre-connect")
     robot.connect()
     try:
         countdown(args.play_sounds)
-        log_say("Replaying clean dataset episode", args.play_sounds, blocking=False)
-        for idx in range(dataset.num_frames):
-            start_frame_t = time.perf_counter()
+        if args.gripper_probe:
+            log_say("Running gripper probe", args.play_sounds, blocking=False)
+            sent_frames = run_gripper_probe(
+                robot=robot,
+                robot_action_processor=robot_action_processor,
+                trace_writer=trace_writer,
+                probe_values=probe_values,
+                hold_s=args.probe_hold_s,
+                fps=replay_fps,
+            )
+        else:
+            log_say("Replaying clean dataset episode", args.play_sounds, blocking=False)
+            for idx in range(dataset.num_frames):
+                start_frame_t = time.perf_counter()
 
-            action_array = actions[idx][ACTION]
-            action = {name: action_array[i] for i, name in enumerate(dataset_action_names)}
-            robot_obs = robot.get_observation()
-            processed_action = robot_action_processor((action, robot_obs))
-            sent_action = robot.send_action(processed_action)
-            if trace_writer is not None:
-                readback_after = robot.get_observation()
-                trace_writer.writerow(
-                    {
-                        "frame": idx,
-                        "right_cmd": scalar(action["right_gripper.pos"]),
-                        "right_processed": scalar(processed_action["right_gripper.pos"]),
-                        "right_sent": scalar(sent_action["right_gripper.pos"]),
-                        "right_readback_before": scalar(robot_obs["right_gripper.pos"]),
-                        "right_readback_after": scalar(readback_after["right_gripper.pos"]),
-                        "left_cmd": scalar(action["left_gripper.pos"]),
-                        "left_processed": scalar(processed_action["left_gripper.pos"]),
-                        "left_sent": scalar(sent_action["left_gripper.pos"]),
-                        "left_readback_before": scalar(robot_obs["left_gripper.pos"]),
-                        "left_readback_after": scalar(readback_after["left_gripper.pos"]),
-                    }
-                )
-            sent_frames += 1
+                action_array = actions[idx][ACTION]
+                action = {name: action_array[i] for i, name in enumerate(dataset_action_names)}
+                robot_obs = robot.get_observation()
+                processed_action = robot_action_processor((action, robot_obs))
+                sent_action = robot.send_action(processed_action)
+                if trace_writer is not None:
+                    readback_after = robot.get_observation()
+                    write_gripper_trace_row(
+                        trace_writer,
+                        frame=idx,
+                        phase="replay",
+                        action=action,
+                        processed_action=processed_action,
+                        sent_action=sent_action,
+                        readback_before=robot_obs,
+                        readback_after=readback_after,
+                    )
+                sent_frames += 1
 
-            elapsed = time.perf_counter() - start_frame_t
-            precise_sleep(max(1.0 / replay_fps - elapsed, 0.0))
+                elapsed = time.perf_counter() - start_frame_t
+                precise_sleep(max(1.0 / replay_fps - elapsed, 0.0))
     finally:
         if trace_file is not None:
             trace_file.close()
@@ -319,7 +440,8 @@ def replay(args: argparse.Namespace) -> None:
             "elapsed_s": time.time() - started_at,
             "clamp_events": clamp_counter.events,
             "clamp_joint_counts": dict(sorted(clamp_counter.joint_counts.items())),
-            "gripper_trace": str(args.gripper_trace) if args.gripper_trace is not None else None,
+            "gripper_trace": str(gripper_trace) if gripper_trace is not None else None,
+            "gripper_probe": args.gripper_probe,
         }
         write_summary(LOG_DIR / f"replay_summary_episode_{args.episode}.json", summary)
         logging.info("Replay summary:\n%s", pformat(summary))

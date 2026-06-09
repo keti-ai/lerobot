@@ -112,12 +112,39 @@ This points to a remaining live gripper actuation / readback / motor-control pat
 
 ## Follow-Up
 
-`replay_runner.py` now supports optional gripper trace logging:
+Prior D07c evidence shows the same robot/control stack can close both grippers:
+
+| signal | min | max | mean |
+|---|---:|---:|---:|
+| D07c right_cmd | -50.342 | 0.608 | -18.917 |
+| D07c right_readback | -49.998 | -0.011 | -25.041 |
+| D07c left_cmd | -55.184 | 1.546 | -35.213 |
+| D07c left_readback | -54.959 | 0.208 | -35.175 |
+
+This makes the replay-specific gripper failure actionable: compare replay/probe command, sent action, and readback under the same local robot path.
+
+`replay_runner.py` supports optional replay gripper trace logging:
 
 ```bash
 UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/replay_runner.py \
   --episode 0 \
   --gripper-trace /home/syhlabtop/k4_logs/lr_replay_gripper_trace_episode0.csv
+```
+
+It also supports a safer gripper-only probe that holds the arms at the current pose and sends close/open targets:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/replay_runner.py \
+  --episode 0 \
+  --gripper-probe \
+  --probe-values=-20,-45,0 \
+  --gripper-trace /home/syhlabtop/k4_logs/lr_gripper_probe_episode0.csv
+```
+
+If `--gripper-probe` is used without `--gripper-trace`, the wrapper writes:
+
+```text
+/home/syhlabtop/k4_logs/lr_gripper_probe_episode0.csv
 ```
 
 The trace records per frame:
@@ -127,4 +154,4 @@ The trace records per frame:
 - sent action returned by `robot.send_action`
 - gripper readback before/after send
 
-Use this before further conclusions about steering or dataset quality. If command/sent values go negative but readback stays open, the next target is motor/control mapping. If command is lost before send, the replay wrapper/action processor path is the target.
+Use the probe before further full replays. If command/sent values go negative but readback stays open, the next target is motor/control mapping under the local replay path. If the probe works but full replay does not, inspect replay timing, gripper close phase, and object alignment rather than dataset action absence.
