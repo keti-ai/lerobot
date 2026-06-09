@@ -49,6 +49,7 @@ from lerobot.transport import (
 )
 from lerobot.transport.utils import receive_bytes_in_chunks
 from lerobot.types import PolicyAction
+from lerobot.utils.constants import OBS_STATE
 
 from .configs import PolicyServerConfig
 from .constants import SUPPORTED_POLICIES
@@ -226,6 +227,108 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         else:
             self.logger.info("RTC enabled without relative-action re-anchoring")
 
+    def _synchronize_policy_device(self) -> None:
+        if self.device is not None and str(self.device).startswith("cuda") and torch.cuda.is_available():
+            torch.cuda.synchronize()
+
+    def _make_warmup_observation(self) -> dict[str, Any]:
+        """Build a synthetic observation from the loaded policy schema."""
+        input_features = getattr(self.policy.config, "input_features", {}) or {}
+        warmup_observation: dict[str, Any] = {"task": "policy server warmup"}
+
+        for feature_name, feature in input_features.items():
+            if feature_name in warmup_observation:
+                continue
+            warmup_observation[feature_name] = torch.zeros(tuple(feature.shape), dtype=torch.float32)
+
+        if OBS_STATE not in warmup_observation:
+            state_feature = getattr(self.policy.config, "robot_state_feature", None)
+            if state_feature is not None:
+                warmup_observation[OBS_STATE] = torch.zeros(tuple(state_feature.shape), dtype=torch.float32)
+
+        return warmup_observation
+
+    def _make_warmup_rtc_prefix(self) -> torch.Tensor | None:
+        rtc_config = self._rtc_config()
+        action_feature = getattr(self.policy.config, "action_feature", None)
+        if rtc_config is None or action_feature is None:
+            return None
+
+        action_dim = action_feature.shape[0]
+        prev_actions_absolute = torch.zeros(
+            rtc_config.execution_horizon,
+            action_dim,
+            dtype=torch.float32,
+            device=torch.device(self.device),
+        )
+
+        if self._relative_step is None:
+            return prev_actions_absolute
+
+        current_state = self._relative_step.get_cached_state()
+        if current_state is None:
+            return prev_actions_absolute
+
+        return reanchor_relative_rtc_prefix(
+            prev_actions_absolute=prev_actions_absolute,
+            current_state=current_state,
+            relative_step=self._relative_step,
+            normalizer_step=self._normalizer_step,
+            policy_device=torch.device(self.device),
+        )
+
+    def _warmup_policy_autograd(self) -> None:
+        """Run discard-only forwards to pay CUDA/autograd lazy-init before the first client chunk."""
+        if self.policy is None or self.preprocessor is None:
+            return
+
+        try:
+            warmup_observation = self._make_warmup_observation()
+
+            start_preprocess = time.perf_counter()
+            preprocessed_observation = self.preprocessor(warmup_observation)
+            self._synchronize_policy_device()
+            preprocess_time = time.perf_counter() - start_preprocess
+
+            start_no_prefix = time.perf_counter()
+            _ = self.policy.predict_action_chunk(preprocessed_observation)
+            self._synchronize_policy_device()
+            no_prefix_time = time.perf_counter() - start_no_prefix
+
+            guided_rtc_time = None
+            if self._rtc_enabled():
+                prev_chunk_left_over = self._make_warmup_rtc_prefix()
+                if prev_chunk_left_over is not None:
+                    rtc_config = self._rtc_config()
+                    start_guided = time.perf_counter()
+                    _ = self.policy.predict_action_chunk(
+                        preprocessed_observation,
+                        prev_chunk_left_over=prev_chunk_left_over,
+                        inference_delay=0,
+                        execution_horizon=rtc_config.execution_horizon,
+                    )
+                    self._synchronize_policy_device()
+                    guided_rtc_time = time.perf_counter() - start_guided
+
+            self._reset_rtc_state()
+
+            if guided_rtc_time is None:
+                self.logger.info(
+                    "Policy warmup: preprocess %.2fms, no-prefix %.2fms, guided RTC skipped",
+                    preprocess_time * 1000,
+                    no_prefix_time * 1000,
+                )
+            else:
+                self.logger.info(
+                    "Policy warmup: preprocess %.2fms, no-prefix %.2fms, guided RTC %.2fms",
+                    preprocess_time * 1000,
+                    no_prefix_time * 1000,
+                    guided_rtc_time * 1000,
+                )
+        except Exception:
+            self._reset_rtc_state()
+            self.logger.exception("Policy warmup failed; continuing without warmup")
+
     def Ready(self, request, context):  # noqa: N802
         client_id = context.peer()
         self.logger.info(f"Client {client_id} connected and ready")
@@ -286,6 +389,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             postprocessor_overrides={"device_processor": device_override},
         )
         self._configure_rtc_processors()
+        self._warmup_policy_autograd()
 
         end = time.perf_counter()
 
