@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-09 (K14 — bf16 서빙 완료 (2e7ad75b). forward 413→396ms (~5%, marginal). bf16 만으로 RTC window 못 들어감 → D07f live 로 툭툭 실측 판단)
+**마지막 갱신:** 2026-06-09 (K15 — 사용자 결정 = torch.compile 먼저 (bf16 marginal). forward 1.5-2x 목표 → RTC window 진입 → D07f live. Codex a6000 진행 중)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 ---
@@ -19,7 +19,7 @@
 | **H** — D-35 분기 (U→P→Q→R) | **R 완료** | U partial (commit 31b42505), R 완료 (65 ep). P/Q/U-retry 트랙 J 로 흡수 |
 | **I** — D-40 Wayland keyboard patch | **NEW (A5)** | pynput global listener Wayland 안 먹힘. A3 학습 중 병행. Codex syhlabtop ~2-3h |
 | **J** — D-38 후속 (cleaning + α'' 학습) | **CLOSED** | α'' 030000 final ckpt = deploy target. A6 SKIP (사용자 결정). gate 도구 (P, commit 0e7bdd34) 는 future use 으로 보존 |
-| **K** — D-42 70% real-world success | **K14 bf16 완료 (marginal) → D07f live 판단** | K13 (6473be52): latency = forward 자체 (413 synthetic / 552 live / 861 spike), server 나머지 ~20ms. **K14 bf16 서빙 (2e7ad75b)**: train_config dtype=bfloat16 확인, autocast bf16 적용 (params bf16 3.6B + vision/proj/norm fp32 유지). 결과 = forward 413→396ms (server inference mean), standalone 347→326ms. **~5% (~21ms) marginal — bf16 만으로 forward 가 RTC window (horizon10=333ms, live~530ms) 밑으로 안 들어감.** action sanity max abs diff 0.012 OK. server bf16 재기동 (pid 3925767, 8081). **다음 분기 = (a) D07f live 그대로 (bf16+h10) 로 툭툭 실측 — 끊겨도 70% 가능 철학 §16, OR (b) horizon vs latency 재검토 (delay≈16step > h10 = starvation 보장? folding LOCKED h20 복귀), OR (c) torch.compile/denoise step 축소).** plan §17 |
+| **K** — D-42 70% real-world success | **K14 bf16 완료 (marginal) → D07f live 판단** | K13 (6473be52): latency = forward 자체 (413 synthetic / 552 live / 861 spike), server 나머지 ~20ms. **K14 bf16 서빙 (2e7ad75b)**: train_config dtype=bfloat16 확인, autocast bf16 적용 (params bf16 3.6B + vision/proj/norm fp32 유지). 결과 = forward 413→396ms (server inference mean), standalone 347→326ms. **~5% (~21ms) marginal — bf16 만으로 forward 가 RTC window (horizon10=333ms, live~530ms) 밑으로 안 들어감.** action sanity max abs diff 0.012 OK. server bf16 재기동 (pid 3925767, 8081). **사용자 결정 (2026-06-09) = K15 torch.compile 먼저** (bf16 marginal, live 전 latency 더 짜냄). serving 시점 compile (학습 compile=false 독립, RTCInferenceEngine warmup 이 동일 패턴, K8a infra 재사용). 리스크: RTC guided path dynamic shape → warmup 2종(no-prefix/guided) 둘 다 태워 graph 확정 + recompile 로그 확인. forward 1.5-2x 목표 (live~530→~300ms, RTC window 진입). 성공 → D07f live (operator). 실패/marginal → D07f 그대로 진행 (끊겨도 70% 철학 §16). plan §17 |
 | **K** — D-41 open dataset replay sanity | **NEW** | (a) gate 도구 sanity (level2 known PASS), (b) PI0.5 base capability (folding_latest). α/α' 평가 전 했어야 한다는 회고. ~1h Codex a6000 |
 
 ---
