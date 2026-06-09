@@ -8,6 +8,7 @@ import re
 import time
 import traceback
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from pprint import pformat
@@ -147,6 +148,86 @@ class ClampSuppressFilter(logging.Filter):
         return CLAMP_LOG_SNIPPET not in record.getMessage()
 
 
+@dataclass
+class GripperTraceRecorder:
+    path: Path
+    sample_every: int = 1
+
+    def __post_init__(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._file = self.path.open("w", newline="", encoding="utf-8")
+        self._writer = csv.DictWriter(
+            self._file,
+            fieldnames=[
+                "step",
+                "right_cmd",
+                "right_performed",
+                "right_readback",
+                "left_cmd",
+                "left_performed",
+                "left_readback",
+            ],
+        )
+        self._writer.writeheader()
+        self._lock = Lock()
+        self._latest_command: dict[str, float] = {}
+        self._latest_performed: dict[str, float] = {}
+        self.rows_written = 0
+
+    def close(self) -> None:
+        self._file.close()
+
+    def capture_action(self, command: dict[str, float], performed: dict[str, float]) -> None:
+        with self._lock:
+            self._latest_command = dict(command)
+            self._latest_performed = dict(performed)
+
+    def write_step(self, client: RobotClient, step: int) -> None:
+        if step < 0 or step % self.sample_every != 0:
+            return
+        with self._lock:
+            command = dict(self._latest_command)
+            performed = dict(self._latest_performed)
+
+        right_readback, left_readback = read_gripper_positions(client)
+        self._writer.writerow(
+            {
+                "step": step,
+                "right_cmd": command.get("right_gripper.pos"),
+                "right_performed": performed.get("right_gripper.pos"),
+                "right_readback": right_readback,
+                "left_cmd": command.get("left_gripper.pos"),
+                "left_performed": performed.get("left_gripper.pos"),
+                "left_readback": left_readback,
+            }
+        )
+        self._file.flush()
+        self.rows_written += 1
+
+
+def read_gripper_positions(client: RobotClient) -> tuple[float | None, float | None]:
+    robot = client.robot
+    try:
+        right_pos = robot.right_arm.bus.sync_read("Present_Position").get("gripper")
+        left_pos = robot.left_arm.bus.sync_read("Present_Position").get("gripper")
+        return right_pos, left_pos
+    except Exception:
+        logging.exception("Failed to read gripper positions for trace.")
+        return None, None
+
+
+def install_gripper_trace(client: RobotClient, recorder: GripperTraceRecorder) -> Callable[..., Any]:
+    original_send_action = client.robot.send_action
+
+    def traced_send_action(action: dict[str, float], *args: Any, **kwargs: Any) -> dict[str, float]:
+        performed = original_send_action(action, *args, **kwargs)
+        recorder.capture_action(action, performed)
+        return performed
+
+    client.robot.send_action = traced_send_action  # type: ignore[method-assign]
+    return original_send_action
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="K4 live eval runner for OpenArm handover async inference.")
     parser.add_argument("--trial", required=True, help="Trial id, e.g. 01.")
@@ -276,6 +357,7 @@ def run_control_loop(
     started: Event,
     errors: list[str],
     metrics: RunMetrics,
+    gripper_trace: GripperTraceRecorder | None = None,
 ) -> None:
     try:
         client.start_barrier.wait()
@@ -286,6 +368,9 @@ def run_control_loop(
             control_loop_start = time.perf_counter()
             if client.actions_available():
                 client.control_loop_action(verbose)
+                if gripper_trace is not None:
+                    with client.latest_action_lock:
+                        gripper_trace.write_step(client, client.latest_action)
             with client.latest_action_lock:
                 action_started = client.latest_action >= 0
             with client.action_queue_lock:
@@ -396,6 +481,7 @@ def run_trial(args: argparse.Namespace) -> int:
     client: RobotClient | None = None
     receiver_thread: Thread | None = None
     control_thread: Thread | None = None
+    gripper_trace: GripperTraceRecorder | None = None
     control_started = Event()
     thread_errors: list[str] = []
 
@@ -416,6 +502,11 @@ def run_trial(args: argparse.Namespace) -> int:
         hardware_start = time.perf_counter()
         client = RobotClient(cfg)
         summary["hardware_connect_latency_s"] = time.perf_counter() - hardware_start
+        if args.trial == "D07c":
+            gripper_trace = GripperTraceRecorder(args.log_dir / "gripper_trace_D07c.csv")
+            install_gripper_trace(client, gripper_trace)
+            summary["gripper_trace_csv"] = str(gripper_trace.path)
+            logging.info("D07c gripper trace enabled: %s", gripper_trace.path)
 
         setup_start = time.perf_counter()
         if not client.start():
@@ -439,6 +530,7 @@ def run_trial(args: argparse.Namespace) -> int:
                 "started": control_started,
                 "errors": thread_errors,
                 "metrics": metrics,
+                "gripper_trace": gripper_trace,
             },
             daemon=True,
             name=f"k4_control_{args.trial}",
@@ -506,6 +598,12 @@ def run_trial(args: argparse.Namespace) -> int:
         if client is not None:
             summary["action_queue_samples"] = len(client.action_queue_size)
             summary.update(save_queue_outputs(client.action_queue_size, args.log_dir, args.trial))
+        if gripper_trace is not None:
+            summary["gripper_trace_rows"] = gripper_trace.rows_written
+            try:
+                gripper_trace.close()
+            except Exception:
+                logging.exception("Failed to close gripper trace.")
 
         summary.update(metrics.to_summary())
         summary_path = write_summary(args.log_dir, args.trial, summary)
