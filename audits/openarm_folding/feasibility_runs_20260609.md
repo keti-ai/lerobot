@@ -651,3 +651,144 @@ Decision:
 - Next branch: keep `diag_arm_cap` (`arm=15.0`, `gripper=65.0`) and RTC warm
   server. Focus on grasp strength/close timing and remaining smoothness rather
   than further cap relaxation.
+
+## D07c Gripper Trace Result
+
+Purpose:
+
+- D07b reached the grasp phase, but the banana slipped because the grasp looked
+  weak.
+- D07c added command/performed/readback logging to decide whether the weakness
+  was caused by weak policy commands or live gripper motor/cap/mapping failure.
+
+Trace file:
+
+```text
+/home/syhlabtop/k4_logs/gripper_trace_D07c.csv
+```
+
+D07c summary:
+
+```json
+{
+  "trial": "D07c",
+  "obj": "banana",
+  "profile": "diag_arm_cap",
+  "status": "completed_control_window",
+  "duration_s": 30.0,
+  "last_avg_fps": 22.54,
+  "max_net_latency_ms": 908.09,
+  "queue_empty_cnt": 19,
+  "clamp_events": 12,
+  "clamp_joint_counts": {
+    "joint_4": 10,
+    "joint_7": 2
+  },
+  "gripper_trace_rows": 661,
+  "action_queue_samples": 661
+}
+```
+
+Gripper command/readback:
+
+| signal | min | max | mean |
+|---|---:|---:|---:|
+| right_cmd | -50.342 | 0.608 | -18.917 |
+| right_performed | -50.342 | 0.000 | -18.926 |
+| right_readback | -49.998 | -0.011 | -25.041 |
+| left_cmd | -55.184 | 1.546 | -35.213 |
+| left_performed | -55.184 | 0.000 | -35.231 |
+| left_readback | -54.959 | 0.208 | -35.175 |
+
+Most closed points:
+
+| side | row | step | cmd | performed | readback | cmd-readback |
+|---|---:|---:|---:|---:|---:|---:|
+| right | 145 | 143 | -50.342 | -50.342 | -48.905 | -1.437 |
+| left | 418 | 416 | -55.184 | -55.184 | -54.347 | -0.836 |
+
+Decision:
+
+- Gripper cap/mapping is not the primary issue. The policy commanded strong
+  close values and the motors reached those values.
+- The weak/slipping grasp is more likely due to grasp geometry, contact timing,
+  alignment, or data/policy grasp strategy.
+- D07c also exposed queue starvation: `queue_empty_cnt=19`, which matched the
+  operator's remaining choppy/jerky motion observations.
+
+## D07d Interpolation Result
+
+Setup:
+
+- Local client included K10 commit `d3d04cd4`.
+- Server: RTC warm server at `10.252.205.103:8081`.
+- Client profile: `diag_arm_cap` with `arm=15.0`, `gripper=65.0`,
+  `threshold=0.5`, `aggregate=weighted_average`.
+- New K10 setting: `action_interpolation_multiplier=3`.
+- Preflight passed: server open, `can0/can1` UP, RealSense cameras visible in
+  host Python context, motors `16/16` found.
+
+D07d summary:
+
+```json
+{
+  "trial": "D07d",
+  "obj": "banana",
+  "profile": "diag_arm_cap",
+  "status": "completed_control_window",
+  "duration_s": 30.0,
+  "last_avg_fps": 15.47,
+  "max_net_latency_ms": 772.9,
+  "queue_empty_cnt": 0,
+  "clamp_events": 26,
+  "clamp_joint_counts": {
+    "joint_1": 8,
+    "joint_4": 20
+  },
+  "action_queue_samples": 1277
+}
+```
+
+D07b/D07c/D07d comparison:
+
+| metric | D07b | D07c | D07d | interpretation |
+|---|---:|---:|---:|---|
+| interpolation | 1 | 1 | 3 | D07d is the K10 client interpolation test |
+| last Avg FPS | 21.94 | 22.54 | 15.47 | D07d logs observation-loop FPS; not directly comparable after interpolation |
+| max latency | 685.42 ms | 908.09 ms | 772.90 ms | latency stayed below 1000 ms |
+| queue empty | 1 | 19 | 0 | K10 removed action starvation in the wrapper metric |
+| clamp events | 3 | 12 | 26 | arm clamp increased, mainly `joint_4` and `joint_1` |
+| action queue samples | 684 | 661 | 1277 | higher-rate control produced more action samples |
+| receiver/control errors | none | none | none | system stayed alive for the full 30 s |
+
+Operator observation:
+
+- The earlier "goes back to a previous chunk" feeling was gone.
+- Motion still looked segmented: not a rewind/backtracking artifact, but a
+  visible "tok-tok" choppiness between chunks.
+- The operator suspects the remaining issue may be too-small effective chunk
+  size and/or unavoidable latency rather than gripper close.
+- Grasp/handover performance was not good enough to resume official K4.
+
+Interpretation:
+
+- K10 interpolation succeeded at the intended infrastructure goal:
+  `queue_empty_cnt` went from D07c `19` to D07d `0`.
+- However, interpolation alone did not make the live motion visually smooth
+  enough. The remaining choppiness is no longer obvious queue starvation or
+  chunk rewind; it looks more like chunk cadence/latency/model trajectory
+  quality.
+- Increased arm clamps in D07d (`joint_4=20`, `joint_1=8`) suggest that even
+  with `arm15`, the generated trajectory still asks for sizable arm jumps.
+
+Decision:
+
+- Do not resume official K4 N=20 yet.
+- Keep K10 available because it fixed starvation, but do not treat it as a full
+  smoothness fix.
+- Next technical branch should focus on one of:
+  - reducing effective latency / server cadence jitter,
+  - increasing or reshaping execution horizon/chunk continuity on the server,
+  - revisiting RTC guidance/horizon parameters,
+  - collecting more smooth banana grasp/handover data if infra latency is no
+    longer the dominant bottleneck.
