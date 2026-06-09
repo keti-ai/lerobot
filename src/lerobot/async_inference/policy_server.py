@@ -30,6 +30,7 @@ import pickle  # nosec
 import threading
 import time
 from concurrent import futures
+from contextlib import nullcontext
 from dataclasses import asdict
 from pprint import pformat
 from queue import Empty, Queue
@@ -97,6 +98,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         self.policy = None
         self.preprocessor: PolicyProcessorPipeline[dict[str, Any], dict[str, Any]] | None = None
         self.postprocessor: PolicyProcessorPipeline[PolicyAction, PolicyAction] | None = None
+        self._serving_autocast_dtype: torch.dtype | None = None
 
         self._action_queue: ActionQueue | None = None
         self._latency_tracker = LatencyTracker()
@@ -149,6 +151,48 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         if duration_s is None:
             return "nan"
         return f"{duration_s * 1000:.2f}"
+
+    def _configure_serving_precision(self) -> None:
+        """Enable explicit server-side autocast when the loaded policy was trained for bf16."""
+        self._serving_autocast_dtype = None
+        config_dtype = getattr(getattr(self.policy, "config", None), "dtype", None)
+        device_is_cuda = self.device is not None and str(self.device).startswith("cuda")
+
+        if config_dtype == "bfloat16" and device_is_cuda:
+            self._serving_autocast_dtype = torch.bfloat16
+            paligemma_with_expert = getattr(getattr(self.policy, "model", None), "paligemma_with_expert", None)
+            apply_selected_bf16 = getattr(paligemma_with_expert, "to_bfloat16_for_selected_params", None)
+            if callable(apply_selected_bf16):
+                apply_selected_bf16("bfloat16")
+
+        dtype_counts: dict[str, int] = {}
+        parameters = getattr(self.policy, "parameters", None)
+        if callable(parameters):
+            for parameter in parameters():
+                dtype_name = str(parameter.dtype).replace("torch.", "")
+                dtype_counts[dtype_name] = dtype_counts.get(dtype_name, 0) + parameter.numel()
+
+        autocast_dtype = (
+            str(self._serving_autocast_dtype).replace("torch.", "")
+            if self._serving_autocast_dtype is not None
+            else "disabled"
+        )
+        self.logger.info(
+            "K14 serving precision | "
+            f"config_dtype={config_dtype} | "
+            f"device={self.device} | "
+            f"autocast_dtype={autocast_dtype} | "
+            f"param_dtype_counts={dtype_counts}"
+        )
+
+    def _serving_autocast_context(self):
+        if self._serving_autocast_dtype is None:
+            return nullcontext()
+        return torch.autocast(device_type="cuda", dtype=self._serving_autocast_dtype)
+
+    def _predict_policy_action_chunk(self, observation: dict[str, torch.Tensor], **kwargs) -> torch.Tensor:
+        with self._serving_autocast_context():
+            return self.policy.predict_action_chunk(observation, **kwargs)
 
     def _configure_rtc_policy(self) -> None:
         """Inject and initialize policy-side RTC when the loaded policy supports it."""
@@ -301,7 +345,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             preprocess_time = time.perf_counter() - start_preprocess
 
             start_no_prefix = time.perf_counter()
-            _ = self.policy.predict_action_chunk(preprocessed_observation)
+            _ = self._predict_policy_action_chunk(preprocessed_observation)
             self._synchronize_policy_device()
             no_prefix_time = time.perf_counter() - start_no_prefix
 
@@ -311,7 +355,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
                 if prev_chunk_left_over is not None:
                     rtc_config = self._rtc_config()
                     start_guided = time.perf_counter()
-                    _ = self.policy.predict_action_chunk(
+                    _ = self._predict_policy_action_chunk(
                         preprocessed_observation,
                         prev_chunk_left_over=prev_chunk_left_over,
                         inference_delay=0,
@@ -385,6 +429,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         start = time.perf_counter()
         self.policy = policy_class.from_pretrained(policy_specs.pretrained_name_or_path)
         self.policy.to(self.device)
+        self._configure_serving_precision()
         self._configure_rtc_policy()
 
         # Load preprocessor and postprocessor, overriding device to match requested device
@@ -624,7 +669,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
                     )
 
             rtc_config = self._rtc_config()
-            chunk = self.policy.predict_action_chunk(
+            chunk = self._predict_policy_action_chunk(
                 observation,
                 prev_chunk_left_over=prev_left_over,
                 inference_delay=inference_delay,
@@ -637,7 +682,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
                 f"execution_horizon={rtc_config.execution_horizon}"
             )
         else:
-            chunk = self.policy.predict_action_chunk(observation)
+            chunk = self._predict_policy_action_chunk(observation)
 
         if chunk.ndim != 3:
             chunk = chunk.unsqueeze(0)  # adding batch dimension, now shape is (B, chunk_size, action_dim)
