@@ -73,7 +73,19 @@ _ROBOT_FOLDING_RTC_PREFIX_ATTENTION_SCHEDULE = RTCAttentionSchedule.EXP
 _TORCH_COMPILE_SERVING_ENV = "LEROBOT_ASYNC_SERVER_TORCH_COMPILE"
 _TORCH_COMPILE_SERVING_POLICY_TYPES = {"pi05"}
 _TORCH_COMPILE_SERVING_MODE = "default"
-_TORCH_COMPILE_RTC_EXTRA_WARMUPS = ((18, 12), (16, 14), (17, 13))
+_TORCH_COMPILE_RTC_EXTRA_WARMUPS = (
+    (18, 6),
+    (18, 7),
+    (18, 8),
+    (18, 9),
+    (18, 10),
+    (18, 11),
+    (18, 12),
+    (18, 13),
+    (18, 14),
+    (18, 15),
+)
+_WRIST_DIAG_NAME_FRAGMENTS = ("joint_6", "joint_7")
 _TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 
 
@@ -409,6 +421,113 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             policy_device=torch.device(self.device),
         )
 
+    @staticmethod
+    def _rtc_prefix_steps(prev_chunk_left_over: torch.Tensor) -> int:
+        if prev_chunk_left_over.ndim >= 3:
+            return int(prev_chunk_left_over.shape[1])
+        if prev_chunk_left_over.ndim >= 2:
+            return int(prev_chunk_left_over.shape[0])
+        return 0
+
+    def _pad_rtc_prefix_for_compile(
+        self, prev_chunk_left_over: torch.Tensor | None, execution_horizon: int
+    ) -> tuple[torch.Tensor | None, int, int | None]:
+        """Keep RTC compile input shape fixed while preserving short-prefix horizon semantics."""
+        if prev_chunk_left_over is None or not self._torch_compile_enabled:
+            return prev_chunk_left_over, execution_horizon, None
+
+        chunk_size = int(getattr(self.policy.config, "chunk_size", self.actions_per_chunk))
+        original_steps = self._rtc_prefix_steps(prev_chunk_left_over)
+        effective_horizon = min(execution_horizon, max(0, min(original_steps, chunk_size)))
+
+        if prev_chunk_left_over.ndim == 2:
+            _, action_dim = prev_chunk_left_over.shape
+            padded = prev_chunk_left_over.new_zeros((chunk_size, action_dim))
+            copy_steps = min(original_steps, chunk_size)
+            if copy_steps > 0:
+                padded[:copy_steps] = prev_chunk_left_over[:copy_steps]
+        elif prev_chunk_left_over.ndim == 3:
+            batch_size, _, action_dim = prev_chunk_left_over.shape
+            padded = prev_chunk_left_over.new_zeros((batch_size, chunk_size, action_dim))
+            copy_steps = min(original_steps, chunk_size)
+            if copy_steps > 0:
+                padded[:, :copy_steps] = prev_chunk_left_over[:, :copy_steps]
+        else:
+            self.logger.warning(
+                "RTC compile prefix pad skipped for unsupported shape %s",
+                tuple(prev_chunk_left_over.shape),
+            )
+            return prev_chunk_left_over, execution_horizon, original_steps
+
+        self.logger.debug(
+            "RTC compile prefix padded | original_steps=%s | padded_shape=%s | "
+            "execution_horizon=%s",
+            original_steps,
+            tuple(padded.shape),
+            effective_horizon,
+        )
+        return padded, effective_horizon, original_steps
+
+    def _wrist_action_indices(self) -> list[tuple[int, str]]:
+        action_names = getattr(self.policy.config, "action_feature_names", None) or []
+        indices = [
+            (idx, name)
+            for idx, name in enumerate(action_names)
+            if any(fragment in name for fragment in _WRIST_DIAG_NAME_FRAGMENTS)
+        ]
+        if indices:
+            return indices
+
+        action_feature = getattr(self.policy.config, "action_feature", None)
+        action_dim = action_feature.shape[0] if action_feature is not None else 0
+        fallback = []
+        for idx in (6, 7):
+            if idx < action_dim:
+                fallback.append((idx, f"action[{idx}]"))
+        return fallback
+
+    def _log_wrist_chunk_diagnostics(
+        self, *, obs_timestep: int, stage: str, action_chunk: torch.Tensor | None
+    ) -> None:
+        if action_chunk is None:
+            return
+
+        try:
+            chunk = action_chunk.detach().float()
+            if chunk.ndim == 3:
+                chunk = chunk[0]
+            if chunk.ndim != 2:
+                return
+
+            stats = []
+            for idx, name in self._wrist_action_indices():
+                if idx >= chunk.shape[-1]:
+                    continue
+                values = chunk[:, idx].cpu()
+                if values.numel() == 0:
+                    continue
+                first = float(values[0])
+                last = float(values[-1])
+                minimum = float(values.min())
+                maximum = float(values.max())
+                value_range = maximum - minimum
+                std = float(values.std(unbiased=False)) if values.numel() > 1 else 0.0
+                stats.append(
+                    f"{name}:first={first:.5f},last={last:.5f},"
+                    f"delta={last - first:.5f},range={value_range:.5f},std={std:.5f}"
+                )
+
+            if stats:
+                self.logger.info(
+                    "MB2 wrist raw-chunk diag | obs=%s | stage=%s | steps=%s | %s",
+                    obs_timestep,
+                    stage,
+                    chunk.shape[0],
+                    " | ".join(stats),
+                )
+        except Exception:
+            self.logger.exception("MB2 wrist raw-chunk diagnostic logging failed")
+
     def _warmup_policy_autograd(self) -> bool:
         """Run discard-only forwards to pay CUDA/autograd lazy-init before the first client chunk."""
         if self.policy is None or self.preprocessor is None:
@@ -445,12 +564,15 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
                 prev_chunk_left_over = self._make_warmup_rtc_prefix()
                 if prev_chunk_left_over is not None:
+                    prev_chunk_left_over, execution_horizon, _ = self._pad_rtc_prefix_for_compile(
+                        prev_chunk_left_over, rtc_config.execution_horizon
+                    )
                     start_guided = time.perf_counter()
                     _ = self._predict_policy_action_chunk(
                         preprocessed_observation,
                         prev_chunk_left_over=prev_chunk_left_over,
                         inference_delay=0,
-                        execution_horizon=rtc_config.execution_horizon,
+                        execution_horizon=execution_horizon,
                     )
                     self._synchronize_policy_device()
                     guided_rtc_time = time.perf_counter() - start_guided
@@ -465,12 +587,15 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
                             prev_chunk_left_over = self._make_warmup_rtc_prefix(prefix_steps)
                             if prev_chunk_left_over is None:
                                 continue
+                            prev_chunk_left_over, execution_horizon, _ = self._pad_rtc_prefix_for_compile(
+                                prev_chunk_left_over, rtc_config.execution_horizon
+                            )
                             start_extra = time.perf_counter()
                             _ = self._predict_policy_action_chunk(
                                 preprocessed_observation,
                                 prev_chunk_left_over=prev_chunk_left_over,
                                 inference_delay=inference_delay,
-                                execution_horizon=rtc_config.execution_horizon,
+                                execution_horizon=execution_horizon,
                             )
                             self._synchronize_policy_device()
                             compile_extra_warmup_times.append(
@@ -811,17 +936,22 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
                     )
 
             rtc_config = self._rtc_config()
+            execution_horizon = rtc_config.execution_horizon
+            prev_left_over, execution_horizon, original_prefix_steps = self._pad_rtc_prefix_for_compile(
+                prev_left_over, execution_horizon
+            )
             chunk = self._predict_policy_action_chunk(
                 observation,
                 prev_chunk_left_over=prev_left_over,
                 inference_delay=inference_delay,
-                execution_horizon=rtc_config.execution_horizon,
+                execution_horizon=execution_horizon,
             )
             self.logger.debug(
                 "RTC predict_action_chunk kwargs: "
                 f"prev_left_over={None if prev_left_over is None else tuple(prev_left_over.shape)} | "
+                f"original_prefix_steps={original_prefix_steps} | "
                 f"inference_delay={inference_delay} | "
-                f"execution_horizon={rtc_config.execution_horizon}"
+                f"execution_horizon={execution_horizon}"
             )
         else:
             chunk = self._predict_policy_action_chunk(observation)
@@ -832,7 +962,11 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         return chunk[:, : self.actions_per_chunk, :]
 
     def _merge_rtc_action_chunk(
-        self, original_actions: torch.Tensor, processed_actions: torch.Tensor, latency_s: float
+        self,
+        original_actions: torch.Tensor,
+        processed_actions: torch.Tensor,
+        latency_s: float,
+        obs_timestep: int,
     ) -> None:
         if not self._rtc_enabled() or self._action_queue is None:
             return
@@ -850,6 +984,11 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             f"latency={latency_s:.4f}s | "
             f"real_delay={real_delay} | "
             f"remaining_actions={self._action_queue.qsize()}"
+        )
+        self._log_wrist_chunk_diagnostics(
+            obs_timestep=obs_timestep,
+            stage="rtc_queue_after_merge",
+            action_chunk=self._action_queue.get_processed_left_over(),
         )
 
     def _predict_action_chunk(self, observation_t: TimedObservation) -> list[TimedAction]:
@@ -884,6 +1023,11 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         start_original_clone = time.perf_counter()
         original_action_tensor = action_tensor.squeeze(0).detach().clone()
         original_clone_time = time.perf_counter() - start_original_clone
+        self._log_wrist_chunk_diagnostics(
+            obs_timestep=observation_t.get_timestep(),
+            stage="raw_policy_pre_postprocess_pre_merge",
+            action_chunk=original_action_tensor,
+        )
         self.logger.info(
             f"Preprocessing and inference took {inference_time:.4f}s, action shape: {action_tensor.shape}"
         )
@@ -910,8 +1054,18 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         postprocess_stops = time.perf_counter()
         postprocessing_time = postprocess_stops - start_postprocess
         total_latency = postprocess_stops - start_prepare
+        self._log_wrist_chunk_diagnostics(
+            obs_timestep=observation_t.get_timestep(),
+            stage="postprocessed_pre_merge",
+            action_chunk=action_tensor,
+        )
         start_rtc_merge = time.perf_counter()
-        self._merge_rtc_action_chunk(original_action_tensor, action_tensor.detach().clone(), total_latency)
+        self._merge_rtc_action_chunk(
+            original_action_tensor,
+            action_tensor.detach().clone(),
+            total_latency,
+            observation_t.get_timestep(),
+        )
         rtc_merge_time = time.perf_counter() - start_rtc_merge
 
         start_detach_cpu = time.perf_counter()
