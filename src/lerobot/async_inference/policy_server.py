@@ -30,6 +30,7 @@ import os
 import pickle  # nosec
 import threading
 import time
+from collections import deque
 from concurrent import futures
 from contextlib import nullcontext
 from dataclasses import asdict
@@ -67,9 +68,10 @@ from .helpers import (
     raw_observation_to_observation,
 )
 
-_ROBOT_FOLDING_RTC_EXECUTION_HORIZON = 10
+_ROBOT_FOLDING_RTC_EXECUTION_HORIZON = 15
 _ROBOT_FOLDING_RTC_MAX_GUIDANCE_WEIGHT = 10.0
 _ROBOT_FOLDING_RTC_PREFIX_ATTENTION_SCHEDULE = RTCAttentionSchedule.EXP
+_ROBOT_FOLDING_RTC_DELAY_HISTORY_SIZE = 32
 _TORCH_COMPILE_SERVING_ENV = "LEROBOT_ASYNC_SERVER_TORCH_COMPILE"
 _TORCH_COMPILE_SERVING_POLICY_TYPES = {"pi05"}
 _TORCH_COMPILE_SERVING_MODE = "default"
@@ -123,6 +125,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
         self._action_queue: ActionQueue | None = None
         self._latency_tracker = LatencyTracker()
+        self._rtc_delay_history_steps: deque[int] = deque(maxlen=_ROBOT_FOLDING_RTC_DELAY_HISTORY_SIZE)
         self._relative_step: RelativeActionsProcessorStep | None = None
         self._normalizer_step: NormalizerProcessorStep | None = None
         self._action_index_before_inference: int | None = None
@@ -152,6 +155,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         if self._action_queue is not None:
             self._action_queue.clear()
         self._latency_tracker.reset()
+        self._rtc_delay_history_steps.clear()
         self._action_index_before_inference = None
 
     def _rtc_config(self) -> RTCConfig | None:
@@ -166,6 +170,44 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         if not latency_s:
             return 0
         return max(0, math.ceil(latency_s / self.config.environment_dt))
+
+    def _policy_chunk_size(self) -> int | None:
+        policy_config = getattr(self.policy, "config", None)
+        chunk_size = getattr(policy_config, "chunk_size", None)
+        if chunk_size is None:
+            chunk_size = self.actions_per_chunk
+        if chunk_size is None:
+            return None
+        return int(chunk_size)
+
+    def _rtc_delay_history_stats(self) -> dict[str, float | int | None]:
+        delays = list(self._rtc_delay_history_steps)
+        if not delays:
+            return {"count": 0, "mean": None, "p95": None, "max": None}
+
+        sorted_delays = sorted(delays)
+        p95_index = max(0, math.ceil(0.95 * len(sorted_delays)) - 1)
+        return {
+            "count": len(delays),
+            "mean": sum(delays) / len(delays),
+            "p95": sorted_delays[p95_index],
+            "max": max(delays),
+        }
+
+    def _log_rtc_window_config(self) -> None:
+        rtc_config = self._rtc_config()
+        if rtc_config is None or not rtc_config.enabled:
+            return
+
+        policy_chunk_size = self._policy_chunk_size()
+        self.logger.info(
+            "WB1 RTC window config | "
+            f"policy_chunk_size_H={policy_chunk_size} | "
+            f"actions_per_chunk={self.actions_per_chunk} | "
+            f"execution_horizon_s={rtc_config.execution_horizon} | "
+            f"environment_dt={self.config.environment_dt:.6f}s | "
+            f"torch_compile={self._torch_compile_enabled}"
+        )
 
     @staticmethod
     def _format_ms(duration_s: float | None) -> str:
@@ -698,6 +740,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             postprocessor_overrides={"device_processor": device_override},
         )
         self._configure_rtc_processors()
+        self._log_rtc_window_config()
         warmup_ok = self._warmup_policy_autograd()
         if not warmup_ok and self._torch_compile_enabled:
             self._reload_policy_without_compile(policy_class, policy_specs.pretrained_name_or_path)
@@ -711,6 +754,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
                 postprocessor_overrides={"device_processor": device_override},
             )
             self._configure_rtc_processors()
+            self._log_rtc_window_config()
             self._warmup_policy_autograd()
 
         end = time.perf_counter()
@@ -973,17 +1017,42 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
         real_delay = self._latency_to_steps(latency_s)
         self._latency_tracker.add(latency_s)
+        self._rtc_delay_history_steps.append(real_delay)
         self._action_queue.merge(
             original_actions,
             processed_actions,
             real_delay,
             self._action_index_before_inference,
         )
+        rtc_config = self._rtc_config()
+        execution_horizon = int(rtc_config.execution_horizon) if rtc_config is not None else None
+        policy_chunk_size = self._policy_chunk_size()
+        qmax_delay = self._latency_to_steps(self._latency_tracker.max())
+        history_stats = self._rtc_delay_history_stats()
+        window_upper = policy_chunk_size - qmax_delay if policy_chunk_size is not None else None
+        window_ok = (
+            execution_horizon is not None
+            and window_upper is not None
+            and qmax_delay <= execution_horizon <= window_upper
+        )
         self.logger.info(
             "RTC action queue merged | "
             f"latency={latency_s:.4f}s | "
             f"real_delay={real_delay} | "
             f"remaining_actions={self._action_queue.qsize()}"
+        )
+        self.logger.info(
+            "WB1 RTC window delay | "
+            f"policy_chunk_size_H={policy_chunk_size} | "
+            f"execution_horizon_s={execution_horizon} | "
+            f"delay_steps_current={real_delay} | "
+            f"delay_steps_qmax={qmax_delay} | "
+            f"history_count={history_stats['count']} | "
+            f"history_mean={history_stats['mean']} | "
+            f"history_p95={history_stats['p95']} | "
+            f"history_max={history_stats['max']} | "
+            f"window_upper_H_minus_d={window_upper} | "
+            f"window_ok={window_ok}"
         )
         self._log_wrist_chunk_diagnostics(
             obs_timestep=obs_timestep,
