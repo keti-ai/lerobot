@@ -13,13 +13,13 @@ Executed: 2026-06-11 KST
 Local `git pull` result:
 
 ```text
-Already up to date.
+Fast-forwarded local a6000 checkout to 04a5d8f4.
 ```
 
-The active 8081 port is reachable from syhlabtop:
+The active patched server is reachable on 8081:
 
 ```text
-Connection to 10.252.205.103 8081 port [tcp/tproxy] succeeded!
+LISTEN *:8081 users:(("python3",pid=604002,fd=7))
 ```
 
 ## H: Chunk Length
@@ -51,33 +51,45 @@ Decision: actual RTC chunk length `H=30`. The client also requests 30 actions, s
 
 ## d: Delay Evidence
 
-Authoritative server-side WB1 delay logging is added in this change, but the patched server has not yet been restarted because SSH to a6000 failed:
+Patched bf16/no-compile server-side WB1 logging after process-only tmux respawn:
 
 ```text
-syhlabtop@10.252.205.103: Permission denied (publickey,password).
+log: /tmp/k1_server_logs/policy_server_wb1_horizon15_bf16_20260611_014404.log
+pid: 604002
+gpu: CUDA_VISIBLE_DEVICES=1
+bind: 0.0.0.0:8081
+torch_compile: False
 ```
 
-Existing server-side evidence from K13/K11 logs:
-
-| source | mean | p95 | max |
-|---|---:|---:|---:|
-| old server action total | 552.3 ms | 689.5 ms | 861.3 ms |
-| old RTC merge latency | 549.4 ms | 685.9 ms | 858.9 ms |
-| old real delay steps | 16.9 | 21-22 | 26 |
-
-Latest client-side D07p evidence:
+WB1 analyzer summary across 12 synthetic no-robot chunks:
 
 | metric | mean | p95 | max |
 |---|---:|---:|---:|
-| network latency | 629.0 ms | 794.3 ms | 1338.7 ms |
-| delay steps at 30 FPS | 19 | 24 | 41 |
-| delay steps at last avg FPS 17.27 | 11 | 14 | 24 |
+| delay_steps_current | 13.25 | 14 | 14 |
+| delay_steps_qmax | 13.67 | 14 | 14 |
+| window_upper_H_minus_d | 16.33 | 17 | 17 |
+
+Server log decision fields:
+
+```text
+WB1 RTC window config | policy_chunk_size_H=30 | actions_per_chunk=30 | execution_horizon_s=15 | environment_dt=0.033333s | torch_compile=False
+WB1 RTC window delay | ... delay_steps_qmax=14 | history_mean=13.25 | history_p95=14 | history_max=14 | window_upper_H_minus_d=16 | window_ok=True
+```
+
+Action timing from the same run:
+
+| source | steady range |
+|---|---:|
+| K13 inference_ms | 381.5-438.2 ms |
+| K13 pipeline_core_ms | 405.9-466.3 ms |
+| synthetic GetActions RTT | 411.7-473.1 ms |
 
 Interpretation:
 
 - RTC currently uses server-side pipeline latency (`_merge_rtc_action_chunk(..., total_latency)`), not client network latency.
-- The available server-side evidence already shows bf16/no-compile p95 `d > 15`.
-- With `H=30`, the RTC paper window `d <= s <= H - d` has no solution when `d > 15`.
+- The patched bf16/no-compile server measured `d` p95/max `14` controller steps in the no-robot synthetic run.
+- With `H=30` and `s=15`, the measured conservative window is `14 <= 15 <= 16`, so `window_ok=True`.
+- Compile is not required for the current server-side measurement. If live operator logs later push qmax above 15, no static `s` can satisfy the window with `H=30`; latency reduction would be required.
 
 ## Selected Horizon
 
@@ -97,9 +109,9 @@ Rationale:
 Compile decision for this commit:
 
 - Compile remains opt-in through `LEROBOT_ASYNC_SERVER_TORCH_COMPILE`.
-- This patch does not force compile on.
-- First restart should run bf16/no-compile with `s=15` only if the goal is to measure the new WB1 `window_ok` logs.
-- If `WB1 RTC window delay` reports `delay_steps_qmax > 15` or `window_ok=False`, compile is not optional; horizon alone cannot fix the window at `H=30`.
+- The restarted WB1 server uses bf16/no-compile: `LEROBOT_ASYNC_SERVER_TORCH_COMPILE=0`.
+- Measured `delay_steps_qmax` p95/max is `14`, so compile-on was skipped for WB1.
+- If future live logs report sustained `delay_steps_qmax > 15` or `window_ok=False`, horizon alone cannot fix the window at `H=30`; compile-on or another latency reduction must be revisited.
 
 ## Code Changes
 
@@ -177,95 +189,63 @@ Result: pass.
 8081 reachability:
 
 ```text
-Connection to 10.252.205.103 8081 port [tcp/tproxy] succeeded!
+LISTEN 0 4096 *:8081 *:* users:(("python3",pid=604002,fd=7))
 ```
 
-Result: current server is still reachable, but it is not yet proven to be running this WB1 patch.
+Result: current server is reachable and is running this WB1 patch.
+
+Warmup after lazy policy load:
+
+```text
+Policy warmup: preprocess 18.49ms, no-prefix 8656.05ms, RTC no-leftover nanms, guided RTC 1108.36ms, compile extras none
+```
+
+Full no-robot synthetic gRPC run after restart:
+
+```text
+summary: /tmp/k1_server_logs/wb1_synthetic_grpc_summary_bf16.json
+chunks: 4
+all_actions_finite: true
+all_chunks_nonempty: true
+max_get_actions_ms: 436.60
+```
+
+No-reset steady-state synthetic gRPC run:
+
+```text
+summary: /tmp/k1_server_logs/wb1_synthetic_grpc_summary_bf16_noreset.json
+chunks: 8
+all_actions_finite: true
+all_chunks_nonempty: true
+max_get_actions_ms: 473.13
+```
+
+Final analyzer output:
+
+```text
+summary: /tmp/k1_server_logs/wb1_rtc_window_summary_bf16_12chunks.json
+delay_count: 12
+delay_steps_current: mean=13.25 p95=14 max=14
+delay_steps_qmax: mean=13.67 p95=14 max=14
+window_ok_count: 12
+window_false_count: 0
+window_ok_rate: 1.0
+```
 
 ## Restart Status
 
-Not completed in this session.
+Completed on a6000 without destroying the tmux session.
 
-Reason: SSH authentication to a6000 failed:
-
-```text
-Permission denied (publickey,password).
-```
-
-Therefore the following requested items are still pending:
-
-- a6000 `git pull`
-- process-only restart inside `k1_policy_server`
-- PID/GPU/bind capture after restart
-- patched synthetic gRPC no-robot run
-- live `WB1 RTC window delay` d distribution
-
-The no-robot verifier added for the pending synthetic run is:
-
-```text
-audits/openarm_folding/wb1_synthetic_grpc_client.py
-```
-
-The log analyzer for the resulting server log is:
-
-```text
-audits/openarm_folding/wb1_analyze_rtc_window_log.py
-```
-
-It exercises the same RPC sequence as `RobotClient` without OpenArm hardware:
-
-1. `Ready`, unless `--skip-ready` is set
-2. `SendPolicyInstructions`, unless `--skip-policy-setup` is set
-3. repeated `SendObservations` + `GetActions`
-
-Run after the a6000 process has been restarted with the WB1 patch. This full mode intentionally resets server state and loads the policy:
+Process-only respawn:
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/wb1_synthetic_grpc_client.py \
-  --server-address 10.252.205.103:8081 \
-  --num-chunks 2 \
-  --summary-json /home/syhlabtop/k4_logs/wb1_synthetic_grpc_summary.json
+tmux respawn-pane -k -t k1_policy_server -c /home/syh/workspace/lerobot bash
 ```
 
-If the server is already patched and policy-loaded, use the non-reset probe mode:
+Server command:
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/wb1_synthetic_grpc_client.py \
-  --server-address 10.252.205.103:8081 \
-  --skip-ready \
-  --skip-policy-setup \
-  --num-chunks 2 \
-  --summary-json /home/syhlabtop/k4_logs/wb1_synthetic_grpc_summary_noreset.json
-```
-
-Expected client-side pass criteria:
-
-- every chunk returns `num_actions=30`
-- `all_actions_finite=true`
-- `all_chunks_nonempty=true`
-
-Expected server-side log evidence:
-
-- `WB1 RTC window config | policy_chunk_size_H=30 | ... execution_horizon_s=15`
-- `WB1 RTC window delay | ... window_ok=...`
-
-Summarize the server log after the verifier or D07q:
-
-```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/wb1_analyze_rtc_window_log.py \
-  /tmp/k1_server_logs/<policy_server_wb1_log>.log \
-  --summary-json /tmp/k1_server_logs/wb1_rtc_window_summary.json
-```
-
-Decision rule:
-
-- `delay_steps_qmax <= 15` and `window_ok_rate=1.0`: bf16+horizon15 is valid enough for D07q.
-- Any steady `window_ok=False`: `H=30` cannot be fixed by raising `s`; restart compile-on or reduce latency before D07q.
-
-When SSH is available, restart command should follow the existing K15/K15-recovery pattern and leave colleague GPU processes untouched. Start bf16 first only for measurement:
-
-```bash
-CUDA_VISIBLE_DEVICES=<free_gpu> \
+CUDA_VISIBLE_DEVICES=1 \
 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
 LEROBOT_ASYNC_SERVER_TORCH_COMPILE=0 \
 UV_CACHE_DIR=/tmp/uv-cache \
@@ -276,33 +256,27 @@ uv run --no-sync python -m lerobot.async_inference.policy_server \
   --fps=30
 ```
 
-If the new WB1 logs show `window_ok=False` because `delay_steps_qmax > 15`, restart with compile-on using the MB2 pattern:
+GPU state after policy load and synthetic verification:
 
-```bash
-CUDA_VISIBLE_DEVICES=<free_gpu> \
-PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
-LEROBOT_ASYNC_SERVER_TORCH_COMPILE=1 \
-TORCH_LOGS=recompiles,graph_breaks \
-PYTORCHINDUCTOR_CACHE_DIR=/tmp/torchinductor-wb1-server \
-UV_CACHE_DIR=/tmp/uv-cache \
-UV_PROJECT_ENVIRONMENT=/data/keti/syh/lerobot_openarm_folding/a6000_prep_20260511/full_folding_parallel_20260514/venv312_torch27_20260515 \
-uv run --no-sync python -m lerobot.async_inference.policy_server \
-  --host=0.0.0.0 \
-  --port=8081 \
-  --fps=30
+```text
+GPU0 used/free/util: 3811 MiB / 44740 MiB / 0%
+GPU1 used/free/util: 10758 MiB / 37793 MiB / 0%
+GPU2 used/free/util: 41947 MiB / 6605 MiB / 100%
+GPU3 used/free/util: 41946 MiB / 6605 MiB / 100%
 ```
+
+Colleague heavy jobs on GPU2/3 were left untouched.
+
+## Decision Rule Result
+
+- `delay_steps_qmax <= 15` and `window_ok_rate=1.0`: bf16+horizon15 is valid enough for D07q.
+- Any steady `window_ok=False`: `H=30` cannot be fixed by raising `s`; restart compile-on or reduce latency before D07q.
+
+Result: bf16+horizon15 passed the server-side no-robot gate. Compile-on was skipped.
 
 ## Next Gate
 
-1. Restart patched server on a6000.
-2. Confirm log:
-   - `execution_horizon_s=15`
-   - `policy_chunk_size_H=30`
-   - `window_ok=True` on steady chunks
-3. Run `wb1_synthetic_grpc_client.py`.
-4. Run `wb1_analyze_rtc_window_log.py` on the server log.
-5. If `window_ok=False`, enable compile; do not try `s>15` with `H=30`.
-6. After server window is valid, run operator D07q:
+Server is left running on `10.252.205.103:8081` for operator D07q:
 
 ```bash
 UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/k4_eval_runner.py \
