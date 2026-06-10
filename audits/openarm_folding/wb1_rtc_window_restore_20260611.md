@@ -135,6 +135,14 @@ uv run python -m py_compile src/lerobot/async_inference/policy_server.py
 
 Result: pass.
 
+Verifier compile check:
+
+```text
+UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile audits/openarm_folding/wb1_synthetic_grpc_client.py src/lerobot/async_inference/policy_server.py
+```
+
+Result: pass.
+
 Scoped diff check:
 
 ```text
@@ -191,6 +199,38 @@ Therefore the following requested items are still pending:
 - PID/GPU/bind capture after restart
 - patched synthetic gRPC no-robot run
 - live `WB1 RTC window delay` d distribution
+
+The no-robot verifier added for the pending synthetic run is:
+
+```text
+audits/openarm_folding/wb1_synthetic_grpc_client.py
+```
+
+It exercises the same RPC sequence as `RobotClient` without OpenArm hardware:
+
+1. `Ready`
+2. `SendPolicyInstructions`
+3. repeated `SendObservations` + `GetActions`
+
+Run after the a6000 process has been restarted with the WB1 patch:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/wb1_synthetic_grpc_client.py \
+  --server-address 10.252.205.103:8081 \
+  --num-chunks 2 \
+  --summary-json /home/syhlabtop/k4_logs/wb1_synthetic_grpc_summary.json
+```
+
+Expected client-side pass criteria:
+
+- every chunk returns `num_actions=30`
+- `all_actions_finite=true`
+- `all_chunks_nonempty=true`
+
+Expected server-side log evidence:
+
+- `WB1 RTC window config | policy_chunk_size_H=30 | ... execution_horizon_s=15`
+- `WB1 RTC window delay | ... window_ok=...`
 
 When SSH is available, restart command should follow the existing K15/K15-recovery pattern and leave colleague GPU processes untouched. Start bf16 first only for measurement:
 
