@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-10 (D07n: **handover receive 해결** (gripper cap40). pick 기하·top-down·receive OK. 잔여 grasp 실패 = 손목이 banana 회전각 안 맞춤(고정 x-linear). **원인 미확정: 데이터 커버리지 vs 블로커-B 평탄화** — "wrist clamp 없음"은 cap 아래란 뜻일 뿐, 정책이 회전 출력해도 broken RTC(d>s)+weighted_avg aggregation+interp 가 씻을 수 있음(사용자 지적). → **순서 변경: MB2(compile→d≤s→clean RTC) 먼저 → D07o grasp 재검**. 회전 살아나면 블로커 B 가 원인(grasp+smoothness 동시 해결), 여전히 평탄하면 데이터→finetune. 값싼 선검증: server raw chunk 의 wrist 회전 유무 로깅. 그 뒤 envelope N=20)
+**마지막 갱신:** 2026-06-10 (**MB2 완료 (46c05ab2)** — compile 재도입 OOM 해결(prev_chunk_left_over 고정길이 pad → recompile 0, **GPU mem flat**, forward 228ms, **d≈8≤s=10 RTC 유효구간 회복**). **raw-chunk 진단: 정책이 wrist 회전 출력+서버 RTC merge 까지 보존 ✅ → 데이터 커버리지 아님(이전 진단 오류, 사용자 지적 맞음)**. live 에서 씻기면 client(weighted_average/interp). 블로커 B 구조 해결됨. 다음 **D07o operator live** (MB2 서버 pid4038113, 8081): 톡톡 해소 + wrist 회전 실행단 보존되어 grasp 되나 확인. 씻기면 client aggregation Replace/interp 손봄)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 > **[연구 재결론 박제, 2026-06-10]** `audits/openarm_folding/research_tricks_applicability_20260610.md` — 최신연구(RTC/VLA) 트릭 적용가능성 + 재결론. **핵심: 현 bf16/no-compile baseline 은 RTC 를 유효구간 밖(`d>s`, `d≈15–27 > s=10`)에서 돌리는 중 → 잔여 톡톡은 cap 이 아니라 latency(블로커 B). 블로커 A(grasp 각=per-joint cap/D07n)와 직교.** D07n 판정은 grasp 만 보고, 톡톡은 latency 컷(OOM-완화 compile 재도입 / `s=max(d,s_min)`)으로 별도 처리. temporal ensembling 회피·EXP soft-mask·interpolation×3 는 연구상 정답 확정.
