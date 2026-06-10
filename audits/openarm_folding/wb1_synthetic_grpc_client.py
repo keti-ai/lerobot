@@ -4,8 +4,8 @@
 This connects to an already running policy_server and exercises the same RPCs as
 RobotClient without connecting OpenArm hardware:
 
-1. Ready
-2. SendPolicyInstructions
+1. Ready, unless --skip-ready is set
+2. SendPolicyInstructions, unless --skip-policy-setup is set
 3. repeated SendObservations + GetActions
 
 Use after the a6000 `k1_policy_server` has been restarted with the WB1 patch.
@@ -58,6 +58,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image-height", type=int, default=480)
     parser.add_argument("--setup-timeout-s", type=float, default=600.0)
     parser.add_argument("--rpc-timeout-s", type=float, default=120.0)
+    parser.add_argument(
+        "--skip-ready",
+        action="store_true",
+        help="Skip Ready so an already running server is not reset.",
+    )
     parser.add_argument(
         "--skip-policy-setup",
         action="store_true",
@@ -166,12 +171,17 @@ def main() -> None:
         "num_chunks": args.num_chunks,
         "fps": args.fps,
         "image_shape_hwc": list(image_shape),
+        "skip_ready": args.skip_ready,
+        "skip_policy_setup": args.skip_policy_setup,
         "chunks": [],
     }
 
-    start = time.perf_counter()
-    stub.Ready(services_pb2.Empty(), timeout=args.rpc_timeout_s)
-    summary["ready_ms"] = (time.perf_counter() - start) * 1000.0
+    if not args.skip_ready:
+        start = time.perf_counter()
+        stub.Ready(services_pb2.Empty(), timeout=args.rpc_timeout_s)
+        summary["ready_ms"] = (time.perf_counter() - start) * 1000.0
+    else:
+        summary["ready_ms"] = None
 
     if not args.skip_policy_setup:
         setup = services_pb2.PolicySetup(data=pickle.dumps(policy_config))  # nosec B301/B403

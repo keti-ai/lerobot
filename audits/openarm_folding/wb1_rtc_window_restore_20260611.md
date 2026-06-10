@@ -208,17 +208,28 @@ audits/openarm_folding/wb1_synthetic_grpc_client.py
 
 It exercises the same RPC sequence as `RobotClient` without OpenArm hardware:
 
-1. `Ready`
-2. `SendPolicyInstructions`
+1. `Ready`, unless `--skip-ready` is set
+2. `SendPolicyInstructions`, unless `--skip-policy-setup` is set
 3. repeated `SendObservations` + `GetActions`
 
-Run after the a6000 process has been restarted with the WB1 patch:
+Run after the a6000 process has been restarted with the WB1 patch. This full mode intentionally resets server state and loads the policy:
 
 ```bash
 UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/wb1_synthetic_grpc_client.py \
   --server-address 10.252.205.103:8081 \
   --num-chunks 2 \
   --summary-json /home/syhlabtop/k4_logs/wb1_synthetic_grpc_summary.json
+```
+
+If the server is already patched and policy-loaded, use the non-reset probe mode:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/wb1_synthetic_grpc_client.py \
+  --server-address 10.252.205.103:8081 \
+  --skip-ready \
+  --skip-policy-setup \
+  --num-chunks 2 \
+  --summary-json /home/syhlabtop/k4_logs/wb1_synthetic_grpc_summary_noreset.json
 ```
 
 Expected client-side pass criteria:
