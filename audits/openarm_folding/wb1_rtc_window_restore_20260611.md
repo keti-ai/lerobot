@@ -302,4 +302,15 @@ uv run --no-sync python -m lerobot.async_inference.policy_server \
 3. Run `wb1_synthetic_grpc_client.py`.
 4. Run `wb1_analyze_rtc_window_log.py` on the server log.
 5. If `window_ok=False`, enable compile; do not try `s>15` with `H=30`.
-6. After server window is valid, run operator D07q.
+6. After server window is valid, run operator D07q:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/k4_eval_runner.py \
+  --trial D07q --obj banana --profile diag_handover_grip --duration-s 60 \
+  --task "Pick the banana, hand it over to the other arm, and place it at the target." \
+  2>&1 | tee /home/syhlabtop/k4_logs/trial_D07q_banana.log
+```
+
+The D07q local summary includes the exact profile spec, max-relative-target dict,
+chunk trigger, aggregation mode, interpolation multiplier, and FPS so the live
+result can be compared against the server-side WB1 window log.
