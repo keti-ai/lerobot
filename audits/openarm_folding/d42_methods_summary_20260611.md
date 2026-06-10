@@ -1,9 +1,15 @@
 # D-42 Live Deploy — 적용 방법 총망라 (첫 banana grasp 성공 시점 박제)
 
 **작성**: 2026-06-11
-**상태 flag**: 🟢 **첫 banana grasp 성공** (compile+horizon20 서버 + per-joint cap). 여기서
-설정 고정, 남은 작업(안정화·N=20·일반화)은 추후.
-**목표**: OpenArm 16D 양팔 + PI0.5 로 real-world handover pick & place. north star = N=20 중 70%.
+**상태 flag**: 🟡 **banana grasp 가 "가끔 한 번" 됨 (occasional, 불안정)**. 풀린 것 아님 —
+움직임 여전히 안 부드러움(톡톡 잔여), grasp 각도/방향 커버리지 갭 큼. 여기서 deploy 설정만
+고정, 본질(안정성·smoothness·grasp coverage)은 미해결로 추후.
+**목표**: OpenArm 16D 양팔 + PI0.5 로 real-world handover pick & place. north star = N=20 중 70% (현재 거리 멂).
+
+> **정직한 현실 (사용자 확인)**: deploy 튜닝으로 "한 번도 안 되던 것 → 가끔 됨" 까지 왔을 뿐.
+> ① 성공률 매우 낮음(겨우 1회급) ② 움직임 거침(톡톡 spike 잔여) ③ **정책의 grasp 각도/방향
+> 학습 영역이 좁아 모르는 자세가 많음** = 데이터 커버리지 천장(deploy 로 못 고침). 아래 "방법"은
+> never→occasional 의 개선이지 task 해결이 아님.
 
 ---
 
@@ -89,7 +95,7 @@ window 밖이면 chunk 경계 불연속(톡톡) + 미세 보정 댐핑.
 
 ---
 
-## 4. 현재 고정(frozen) 설정 — 첫 성공 config
+## 4. 현재 best config (occasional success — 풀린 것 아님)
 
 **서버 (a6000, pid 797370, 8081, GPU1)**:
 - α'' 030000, **bf16 + torch.compile on** (`LEROBOT_ASYNC_SERVER_TORCH_COMPILE=1`, `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`)
@@ -107,14 +113,21 @@ window 밖이면 chunk 경계 불연속(톡톡) + 미세 보정 댐핑.
 
 ## 5. 현 상태 + 남은 작업 (추후)
 
-**달성**: 🟢 **첫 banana grasp 성공** (top-down 각 + 손목 회전 + handover 받기 + 부드러움 대폭 개선).
-**잔여**:
-1. **안정성** — 아직 "겨우 한 번" (랜덤성). 톡톡 spike 잔여 (live d>10 순간) → s 미세조정 또는 two-machine 네트워크.
-2. **compile parity diff 0.19** 영향 정밀 검증 (geometry 무해/실해).
-3. **객체 일반화** — toothpaste/cup 검증 (D07r_tp 등).
-4. **execution-layer blending 잔여 댐핑** — `aggregate_fn_name=latest_only`(no-damping) A/B (WC1 오프라인 + WD1 profile).
-5. **operator N=20** — banana 7 + cup 7 + toothpaste 6, 14+/20 = 70% (본 게임).
-6. (천장) orientation 다양성 부족 시 data 보강 + finetune.
+**달성 (제한적)**: deploy 튜닝으로 **never → occasional** (banana 가 가끔 한 번 grasp). 성공률 매우 낮음.
+**미해결 (본질)**:
+1. **안정성/성공률** — "겨우 한 번"급. 재현성 거의 없음. ← 가장 큼.
+2. **smoothness** — 여전히 안 부드러움. compile+h20 로도 톡톡 spike 잔여 (live d>10 순간, two-machine
+   네트워크 spike). H=30 한계라 horizon 으론 더 못 키움. 부드러움 미달성.
+3. **grasp 각도/방향 커버리지 (데이터 천장, 추정 주범)** — 정책이 학습한 grasp pose 영역이 좁아
+   **모르는 각도/방향이 많음**. banana 를 학습 방향에 맞춰야 겨우 됨 = pose-overfit. **deploy
+   튜닝(cap/window/aggregation)으로 못 고침 → data 다양성 보강 + finetune 이 본 해법일 가능성.**
+4. compile parity diff 0.19 영향 검증 (부차).
+5. 객체 일반화 (toothpaste/cup), latest_only A/B (WC1/WD1) — 부차, smoothness/coverage 가 먼저.
+6. operator N=20 (70%) — **현재 거리 멂**. 위 1·3 해결 전엔 의미 약함.
+
+**정직한 다음 방향**: deploy-side 레버(RTC window·cap·aggregation)는 대체로 소진. 남은 본질
+=(a) **grasp pose 커버리지 = 데이터/학습** (b) two-machine smoothness 한계. **70% 가려면 deploy
+튜닝보다 data 보강(orientation 다양성)+finetune 이 핵심일 공산이 큼.**
 
 ---
 
@@ -130,6 +143,7 @@ window 밖이면 chunk 경계 불연속(톡톡) + 미세 보정 댐핑.
 
 ## 핵심 한 줄
 
-**async PI0.5 handover 를 실제 로봇에서 처음 grasp 성공시킨 방법 = (1) RTC feasibility window
-복원(compile 로 d↓ + execution_horizon 20) + (2) per-joint cap 으로 손목 top-down 각 확보 +
-gentle gripper. 진단으로 latency/cap/host/joint_2 전원/single-arm 을 한 겹씩 벗겨 도달.**
+**deploy 튜닝 = (1) RTC window 복원(compile d↓ + horizon20) + (2) per-joint cap(손목 top-down) +
+gentle gripper 로 banana grasp 를 never→occasional 까지 끌어올림. 단 task 해결 아님 — 성공률
+낮고, 움직임 거칠고, 정책의 grasp 각도/방향 커버리지가 좁음(모르는 자세 많음). deploy 레버는
+소진 단계, 70% 의 본 해법은 data 다양성 + finetune 일 가능성이 큼.**
