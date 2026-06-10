@@ -7,9 +7,9 @@
 **목표**: OpenArm 16D 양팔 + PI0.5 로 real-world handover pick & place. north star = N=20 중 70% (현재 거리 멂).
 
 > **정직한 현실 (사용자 확인)**: deploy 튜닝으로 "한 번도 안 되던 것 → 가끔 됨" 까지 왔을 뿐.
-> ① 성공률 매우 낮음(겨우 1회급) ② 움직임 거침(톡톡 spike 잔여) ③ **정책의 grasp 각도/방향
-> 학습 영역이 좁아 모르는 자세가 많음** = 데이터 커버리지 천장(deploy 로 못 고침). 아래 "방법"은
-> never→occasional 의 개선이지 task 해결이 아님.
+> ① 성공률 매우 낮음(겨우 1회급) ② 움직임 거침(톡톡 spike 잔여) ③ **정책이 학습한 grasp
+> 각도/방향 영역에 모르는 부분이 많음(커버리지 미측정 = 미지)**. 아래 "방법"은
+> never→occasional 의 개선이지 task 해결이 아님. 다음 방향은 §5.5 열린 옵션 풀에서 추후 결정.
 
 ---
 
@@ -111,23 +111,53 @@ window 밖이면 chunk 경계 불연속(톡톡) + 미세 보정 댐핑.
 
 ---
 
-## 5. 현 상태 + 남은 작업 (추후)
+## 5. 현 상태 — 미해결 3개 (방향 단정 없이 사실만)
 
 **달성 (제한적)**: deploy 튜닝으로 **never → occasional** (banana 가 가끔 한 번 grasp). 성공률 매우 낮음.
-**미해결 (본질)**:
-1. **안정성/성공률** — "겨우 한 번"급. 재현성 거의 없음. ← 가장 큼.
-2. **smoothness** — 여전히 안 부드러움. compile+h20 로도 톡톡 spike 잔여 (live d>10 순간, two-machine
-   네트워크 spike). H=30 한계라 horizon 으론 더 못 키움. 부드러움 미달성.
-3. **grasp 각도/방향 커버리지 (데이터 천장, 추정 주범)** — 정책이 학습한 grasp pose 영역이 좁아
-   **모르는 각도/방향이 많음**. banana 를 학습 방향에 맞춰야 겨우 됨 = pose-overfit. **deploy
-   튜닝(cap/window/aggregation)으로 못 고침 → data 다양성 보강 + finetune 이 본 해법일 가능성.**
-4. compile parity diff 0.19 영향 검증 (부차).
-5. 객체 일반화 (toothpaste/cup), latest_only A/B (WC1/WD1) — 부차, smoothness/coverage 가 먼저.
-6. operator N=20 (70%) — **현재 거리 멂**. 위 1·3 해결 전엔 의미 약함.
 
-**정직한 다음 방향**: deploy-side 레버(RTC window·cap·aggregation)는 대체로 소진. 남은 본질
-=(a) **grasp pose 커버리지 = 데이터/학습** (b) two-machine smoothness 한계. **70% 가려면 deploy
-튜닝보다 data 보강(orientation 다양성)+finetune 이 핵심일 공산이 큼.**
+**미해결 (operator 관찰 = 사실)**:
+1. **안정성/성공률** — "겨우 한 번"급, 재현성 거의 없음.
+2. **smoothness** — 여전히 안 부드러움. compile+h20(window 충족)로도 톡톡 spike 잔여
+   (live d>10 순간, two-machine 네트워크 spike. H=30 이라 horizon 으론 더 못 키움).
+3. **grasp 각도/방향 커버리지 — 미지(unknown)** (사용자 관찰): "학습된 그래스핑 각도나 방향
+   영역이 아직 모르는 부분이 많다." 정책이 어떤 pose 영역을 커버하는지 **측정된 적 없음**.
+   banana 를 학습 방향에 맞춰야 됐다는 정황은 있으나, **커버리지의 실제 모양(어느 각도/방향까지
+   되는지)은 미지** — "데이터 천장" 단정은 아직 이름. 먼저 **커버리지를 알아내는 것** 자체가
+   미해결 항목.
+
+부차: compile parity diff 0.19 영향, 객체 일반화(toothpaste/cup).
+
+## 5.5 열린 옵션 풀 (스터디 근거 — 방향 미확정, 추후 같이 결정)
+
+스터디(`research_tricks_applicability_20260610.md` 트릭 표 + 이번 세션 준비물) 중 **아직
+안 쓴 레버**가 deploy/학습 양쪽에 남아 있음. 어느 것도 단정하지 않고 풀로 보존:
+
+**(가) grasp 커버리지 규명 (사용자 의견 — 모르는 영역을 먼저 안다)**
+- dataset 시각화/통계로 학습된 grasp pose 분포(banana orientation·접근각) 매핑.
+- live/replay probe 로 "되는 각도 vs 안 되는 각도" 경계 실측 → 천장인지, envelope 운영으로
+  충분한지, data 보강이 필요한지 **측정 후** 판단.
+
+**(나) deploy-side 잔여 트릭 (스터디 IF-FAIL 태그, 학습 0 — 아직 미적용)**
+- **#6 guidance weight β 상향 (10→12-15)**: narrow prior 엔 더 강한 guidance (β=n 규칙,
+  Soare). grasp 풀렸는데 receive/정밀 흐리면 finetune 전에 가장 싼 레버. ✅검증.
+- **#8 chunk_size_threshold g 0.5→0.7 + aggregation**: 큐 트리거 cadence 튜닝. ✅검증(단 d>s
+  구조는 못 고침 — 지금은 d≤s 라 cadence 효과 볼 만함).
+- **latest_only aggregation A/B** (WC1 오프라인 probe + WD1 diag_no_blend profile, 준비물 있음):
+  weighted_average 의 손목 댐핑 제거. 미실행.
+- **LS0 시작자세 homing**: replay prealign 이 검증한 lever, live 이식 미실행 (t=0 OOD↓).
+- **LS1 envelope steering / LS2 CFG**: denoise-loop steering (보류 중, 설계 있음).
+- **#7 ACG (Action Coherence Guidance)**: training-free test-time guidance, flow-VLA 선행연구.
+  ◐부분검증 — 적용 전 전문 확인 필요.
+- smoothness 잔여: s=18 미세조정, two-machine 네트워크 spike 완화(QoS/유선 등) — 미탐구.
+
+**(다) 학습-side (스터디 RETRAIN 태그 — 재학습을 한다면)**
+- **#9 소규모 finetune (few-demo/LoRA)**: handover 미세협응·orientation 보강. ⬜신뢰도 미소싱.
+- **#10 training-time RTC (action-prefix conditioning)**: 추론 delay 를 학습 때 시뮬 — 高-latency
+  정조준, 재학습 시 inference-time RTC 보다 우수(✅검증). **재학습하게 되면 #9 와 콤보 권장.**
+- data 보강 (orientation 다양성) — (가)의 측정 결과가 입력.
+
+**결정 원칙(박제)**: (가)로 미지를 먼저 줄이고, (나)의 싼 레버와 (다)의 비용 큰 레버를
+그 측정 위에서 비교 — **지금 단계에서 어느 쪽도 단정하지 않음.**
 
 ---
 
@@ -144,6 +174,7 @@ window 밖이면 chunk 경계 불연속(톡톡) + 미세 보정 댐핑.
 ## 핵심 한 줄
 
 **deploy 튜닝 = (1) RTC window 복원(compile d↓ + horizon20) + (2) per-joint cap(손목 top-down) +
-gentle gripper 로 banana grasp 를 never→occasional 까지 끌어올림. 단 task 해결 아님 — 성공률
-낮고, 움직임 거칠고, 정책의 grasp 각도/방향 커버리지가 좁음(모르는 자세 많음). deploy 레버는
-소진 단계, 70% 의 본 해법은 data 다양성 + finetune 일 가능성이 큼.**
+gentle gripper 로 banana grasp 를 never→occasional 까지. 단 task 해결 아님 — 성공률 낮고
+움직임 거칠고 grasp 각도/방향 커버리지는 미지. 다음 방향은 단정하지 않음: §5.5 열린 옵션 풀
+(커버리지 규명 / deploy 잔여 트릭 #6·#8·latest_only·LS0-2·ACG / 재학습 시 #9+#10 콤보)에서
+측정 기반으로 추후 결정.**
