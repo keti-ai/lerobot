@@ -3,6 +3,8 @@
 **마지막 갱신:** 2026-06-10 (D07m: **single-arm prompt 막다른 길 확정** — α'' handover-locked(왼손 무조건 받으러 옴), prompt 2종 다 실패. 재학습 없이 single-arm 불가. → handover 작동이 유일 경로. 왼손 받기가 gripper cap20 throttle(1072 clamp)로 놓침 가설 → D07n=diag_handover_grip(gripper cap40 중간) 테스트. 안 풀리면 handover 미세협응=데이터 한계→소규모 finetune 재고)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
+> **[연구 재결론 박제, 2026-06-10]** `audits/openarm_folding/research_tricks_applicability_20260610.md` — 최신연구(RTC/VLA) 트릭 적용가능성 + 재결론. **핵심: 현 bf16/no-compile baseline 은 RTC 를 유효구간 밖(`d>s`, `d≈15–27 > s=10`)에서 돌리는 중 → 잔여 톡톡은 cap 이 아니라 latency(블로커 B). 블로커 A(grasp 각=per-joint cap/D07n)와 직교.** D07n 판정은 grasp 만 보고, 톡톡은 latency 컷(OOM-완화 compile 재도입 / `s=max(d,s_min)`)으로 별도 처리. temporal ensembling 회피·EXP soft-mask·interpolation×3 는 연구상 정답 확정.
+
 ---
 
 ## 트랙별 현 상태
