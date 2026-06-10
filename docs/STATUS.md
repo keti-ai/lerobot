@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-10 (연구노트 c64f3f9f 내재화 — **블로커 2개 직교 재정리**: A=grasp 기하(cap, D07j 확정/D07n), B=inter-chunk smoothness(=latency, `d>s` RTC 무효구간). **compile-off(OOM 회피)가 곧 smoothness 막은 결정** (interp×3 는 starvation 만, boundary 톡톡은 `d≤s` 필요). D07n 판정=grasp 만. 블로커 B 별도 트랙 M(MB1 d-로깅→MB2 compile 재도입/MB3 s=d))
+**마지막 갱신:** 2026-06-10 (D07n: **handover receive 해결** (gripper cap40, 왼손이 banana 받음). pick 기하·top-down·receive 다 OK. **잔여 grasp 실패 = 정책이 banana orientation 에 안 맞춰 회전 안 함(고정 x-linear 궤적), wrist 회전 clamp 없음=cap 아니라 데이터 커버리지** (60ep 가 banana 단일방향만 → pose-adaptive grasp 미학습). banana 세워주면 잡힘. = 핸드오버 어려움 아니라 데이터 문제. 갈래: (a) operating envelope 고정(banana 학습방향)+N=20 측정 (b) orientation 다양성 data+finetune. 블로커 B(톡톡/latency 트랙 M) 별개 미해결)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 > **[연구 재결론 박제, 2026-06-10]** `audits/openarm_folding/research_tricks_applicability_20260610.md` — 최신연구(RTC/VLA) 트릭 적용가능성 + 재결론. **핵심: 현 bf16/no-compile baseline 은 RTC 를 유효구간 밖(`d>s`, `d≈15–27 > s=10`)에서 돌리는 중 → 잔여 톡톡은 cap 이 아니라 latency(블로커 B). 블로커 A(grasp 각=per-joint cap/D07n)와 직교.** D07n 판정은 grasp 만 보고, 톡톡은 latency 컷(OOM-완화 compile 재도입 / `s=max(d,s_min)`)으로 별도 처리. temporal ensembling 회피·EXP soft-mask·interpolation×3 는 연구상 정답 확정.
