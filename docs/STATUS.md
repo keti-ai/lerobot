@@ -1,6 +1,6 @@
 # OpenArm 폴딩 — 현재 상태
 
-**마지막 갱신:** 2026-06-10 (**MB2 완료 (46c05ab2)** — compile 재도입 OOM 해결(prev_chunk_left_over 고정길이 pad → recompile 0, **GPU mem flat**, forward 228ms, **d≈8≤s=10 RTC 유효구간 회복**). **raw-chunk 진단: 정책이 wrist 회전 출력+서버 RTC merge 까지 보존 ✅ → 데이터 커버리지 아님(이전 진단 오류, 사용자 지적 맞음)**. live 에서 씻기면 client(weighted_average/interp). 블로커 B 구조 해결됨. 다음 **D07o operator live** (MB2 서버 pid4038113, 8081): 톡톡 해소 + wrist 회전 실행단 보존되어 grasp 되나 확인. 씻기면 client aggregation Replace/interp 손봄)
+**마지막 갱신:** 2026-06-10 (**D07o (MB2 compile) 혼재/회귀** — smoothness 살짝↑ but 끊김 잔존, **avg_fps 17→12.76↓**, **top-down 각 회귀(팔꿈치 접힘)**. 진단: compile 은 속도만이어야 하는데 trajectory 변질 = **MB2 prefix-pad/horizon-clamp 가 compile-on action 을 bf16 대비 변질(parity 깨짐)**, MB2 audit 은 parity 미검증. raw-chunk wrist 회전은 서버 보존 확인됨(데이터 아님). 다음: a6000 가 **compile-on action == compile-off(bf16) parity 보장 + live forward compile vs bf16 프로파일 + live d 로깅**. parity 잡히면 top-down 회복+톡톡 d≤s 로. compile 이 live net 손해면 → bf16 유지 + 톡톡 client-side(aggregation Replace) 로)
 **갱신 빈도:** PLAN.md 보다 자주. 매 작업 세션 직후 갱신 권장.
 
 > **[연구 재결론 박제, 2026-06-10]** `audits/openarm_folding/research_tricks_applicability_20260610.md` — 최신연구(RTC/VLA) 트릭 적용가능성 + 재결론. **핵심: 현 bf16/no-compile baseline 은 RTC 를 유효구간 밖(`d>s`, `d≈15–27 > s=10`)에서 돌리는 중 → 잔여 톡톡은 cap 이 아니라 latency(블로커 B). 블로커 A(grasp 각=per-joint cap/D07n)와 직교.** D07n 판정은 grasp 만 보고, 톡톡은 latency 컷(OOM-완화 compile 재도입 / `s=max(d,s_min)`)으로 별도 처리. temporal ensembling 회피·EXP soft-mask·interpolation×3 는 연구상 정답 확정.
