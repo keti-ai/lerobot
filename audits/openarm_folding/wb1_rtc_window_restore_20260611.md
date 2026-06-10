@@ -206,6 +206,12 @@ The no-robot verifier added for the pending synthetic run is:
 audits/openarm_folding/wb1_synthetic_grpc_client.py
 ```
 
+The log analyzer for the resulting server log is:
+
+```text
+audits/openarm_folding/wb1_analyze_rtc_window_log.py
+```
+
 It exercises the same RPC sequence as `RobotClient` without OpenArm hardware:
 
 1. `Ready`, unless `--skip-ready` is set
@@ -242,6 +248,19 @@ Expected server-side log evidence:
 
 - `WB1 RTC window config | policy_chunk_size_H=30 | ... execution_horizon_s=15`
 - `WB1 RTC window delay | ... window_ok=...`
+
+Summarize the server log after the verifier or D07q:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run python audits/openarm_folding/wb1_analyze_rtc_window_log.py \
+  /tmp/k1_server_logs/<policy_server_wb1_log>.log \
+  --summary-json /tmp/k1_server_logs/wb1_rtc_window_summary.json
+```
+
+Decision rule:
+
+- `delay_steps_qmax <= 15` and `window_ok_rate=1.0`: bf16+horizon15 is valid enough for D07q.
+- Any steady `window_ok=False`: `H=30` cannot be fixed by raising `s`; restart compile-on or reduce latency before D07q.
 
 When SSH is available, restart command should follow the existing K15/K15-recovery pattern and leave colleague GPU processes untouched. Start bf16 first only for measurement:
 
@@ -280,5 +299,7 @@ uv run --no-sync python -m lerobot.async_inference.policy_server \
    - `execution_horizon_s=15`
    - `policy_chunk_size_H=30`
    - `window_ok=True` on steady chunks
-3. If `window_ok=False`, enable compile; do not try `s>15` with `H=30`.
-4. After server window is valid, run operator D07q.
+3. Run `wb1_synthetic_grpc_client.py`.
+4. Run `wb1_analyze_rtc_window_log.py` on the server log.
+5. If `window_ok=False`, enable compile; do not try `s>15` with `H=30`.
+6. After server window is valid, run operator D07q.
