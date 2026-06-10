@@ -68,7 +68,7 @@ from .helpers import (
     raw_observation_to_observation,
 )
 
-_ROBOT_FOLDING_RTC_EXECUTION_HORIZON = 15
+_ROBOT_FOLDING_RTC_EXECUTION_HORIZON = 20
 _ROBOT_FOLDING_RTC_MAX_GUIDANCE_WEIGHT = 10.0
 _ROBOT_FOLDING_RTC_PREFIX_ATTENTION_SCHEDULE = RTCAttentionSchedule.EXP
 _ROBOT_FOLDING_RTC_DELAY_HISTORY_SIZE = 32
@@ -117,6 +117,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         self.lerobot_features = None
         self.actions_per_chunk = None
         self.policy = None
+        self._loaded_policy_specs_signature: tuple[Any, ...] | None = None
         self.preprocessor: PolicyProcessorPipeline[dict[str, Any], dict[str, Any]] | None = None
         self.postprocessor: PolicyProcessorPipeline[PolicyAction, PolicyAction] | None = None
         self._serving_autocast_dtype: torch.dtype | None = None
@@ -165,6 +166,20 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
     def _rtc_enabled(self) -> bool:
         rtc_config = self._rtc_config()
         return bool(rtc_config is not None and rtc_config.enabled)
+
+    @staticmethod
+    def _policy_specs_signature(policy_specs: RemotePolicyConfig) -> tuple[Any, ...]:
+        feature_signature = tuple(
+            sorted((name, repr(feature)) for name, feature in policy_specs.lerobot_features.items())
+        )
+        return (
+            policy_specs.policy_type,
+            policy_specs.pretrained_name_or_path,
+            policy_specs.actions_per_chunk,
+            policy_specs.device,
+            tuple(sorted(policy_specs.rename_map.items())),
+            feature_signature,
+        )
 
     def _latency_to_steps(self, latency_s: float | None) -> int:
         if not latency_s:
@@ -719,6 +734,15 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         self.policy_type = policy_specs.policy_type  # act, pi0, etc.
         self.lerobot_features = policy_specs.lerobot_features
         self.actions_per_chunk = policy_specs.actions_per_chunk
+        requested_policy_specs_signature = self._policy_specs_signature(policy_specs)
+
+        if self.policy is not None and self._loaded_policy_specs_signature == requested_policy_specs_signature:
+            self.logger.info(
+                "Reusing already-loaded policy instructions; skipping policy reload and compile warmup"
+            )
+            self._reset_rtc_state()
+            self._log_rtc_window_config()
+            return services_pb2.Empty()
 
         policy_class = get_policy_class(self.policy_type)
 
@@ -759,6 +783,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
         end = time.perf_counter()
 
+        self._loaded_policy_specs_signature = requested_policy_specs_signature
         self.logger.info(f"Time taken to put policy on {self.device}: {end - start:.4f} seconds")
 
         return services_pb2.Empty()
