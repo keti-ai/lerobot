@@ -67,6 +67,8 @@ from lerobot.transport import (
 from lerobot.transport.utils import grpc_channel_options, send_bytes_in_chunks
 from lerobot.utils.action_interpolator import ActionInterpolator
 from lerobot.utils.import_utils import register_third_party_plugins
+from lerobot.utils.joint_trajectory import JointProfileLimits, OnlineTrajectoryGenerator
+from lerobot.utils.robot_utils import precise_sleep
 
 from .configs import RobotClientConfig
 from .helpers import (
@@ -204,6 +206,25 @@ class RobotClient:
         self.action_queue_size = []
         self.start_barrier = threading.Barrier(2)  # 2 threads: action receiver, control loop
         self.interpolator = ActionInterpolator(config.action_interpolation_multiplier)
+
+        # High-rate trajectory streamer: a dedicated thread tracks the latest VLA setpoint
+        # with a velocity/acceleration-limited profile and streams motor commands at
+        # config.trajectory_streamer_hz, decoupled from the (camera-bound) control loop.
+        self.trajectory_streamer_enabled = config.trajectory_streamer_hz > 0
+        self._traj_target_lock = threading.Lock()
+        self._traj_target: torch.Tensor | None = None
+        self._traj_thread: threading.Thread | None = None
+        self._traj_generator: OnlineTrajectoryGenerator | None = None
+        if self.trajectory_streamer_enabled:
+            self._traj_generator = OnlineTrajectoryGenerator(
+                names=list(self.robot.action_features),
+                limits=self._build_trajectory_limits(config),
+                profile=config.trajectory_profile,
+            )
+            self.logger.info(
+                f"Trajectory streamer enabled: {config.trajectory_streamer_hz} Hz, "
+                f"profile={config.trajectory_profile}"
+            )
         self.latency_breakdown = (
             LatencyBreakdownRecorder(config.latency_breakdown_csv)
             if config.latency_breakdown_csv
@@ -248,6 +269,12 @@ class RobotClient:
             self.shutdown_event.clear()
             self.interpolator.reset()
 
+            if self.trajectory_streamer_enabled:
+                self._traj_thread = threading.Thread(
+                    target=self._trajectory_streamer_loop, daemon=True, name="trajectory_streamer"
+                )
+                self._traj_thread.start()
+
             return True
 
         except grpc.RpcError as e:
@@ -258,6 +285,10 @@ class RobotClient:
         """Stop the robot client"""
         self.shutdown_event.set()
 
+        if self._traj_thread is not None:
+            self._traj_thread.join(timeout=2.0)
+            self._traj_thread = None
+
         self.robot.disconnect()
         self.logger.debug("Robot disconnected")
 
@@ -265,6 +296,82 @@ class RobotClient:
 
         self.channel.close()
         self.logger.debug("Client stopped, channel closed")
+
+    @staticmethod
+    def _build_trajectory_limits(config: RobotClientConfig) -> dict[str, JointProfileLimits]:
+        """Build per-joint profile limits: defaults + per-motor-suffix overrides from config."""
+        default = JointProfileLimits(
+            v_max=config.trajectory_v_max_deg_s,
+            a_max=config.trajectory_a_max_deg_s2,
+            j_max=config.trajectory_j_max_deg_s3,
+        )
+        limits: dict[str, JointProfileLimits] = {"default": default}
+        for key, override in (config.trajectory_limits_overrides or {}).items():
+            limits[key] = JointProfileLimits(
+                v_max=override.get("v_max", default.v_max),
+                a_max=override.get("a_max", default.a_max),
+                j_max=override.get("j_max", default.j_max),
+            )
+        return limits
+
+    def _read_present_positions(self) -> list[float] | None:
+        """Read current joint positions ordered like robot.action_features (one-shot, for init)."""
+        try:
+            observation = self.robot.get_observation()
+        except Exception:
+            self.logger.exception("Trajectory streamer: failed to read initial robot positions")
+            return None
+        positions = []
+        for key in self.robot.action_features:
+            if key not in observation:
+                self.logger.warning(f"Trajectory streamer: '{key}' missing from observation")
+                return None
+            positions.append(float(observation[key]))
+        return positions
+
+    def _trajectory_streamer_loop(self):
+        """Stream velocity/acceleration-limited joint commands at trajectory_streamer_hz.
+
+        The control loop only updates the target setpoint (latest VLA action); this thread
+        owns robot.send_action. The profile generator is initialized from the robot's present
+        positions so the first commands ramp smoothly from wherever the robot currently is.
+        """
+        dt = 1.0 / self.config.trajectory_streamer_hz
+        generator = self._traj_generator
+        action_keys = list(self.robot.action_features)
+        consecutive_errors = 0
+
+        self.logger.info(f"Trajectory streamer thread starting ({self.config.trajectory_streamer_hz} Hz)")
+
+        while self.running:
+            tick_start = time.perf_counter()
+
+            with self._traj_target_lock:
+                target = self._traj_target
+
+            if target is not None:
+                try:
+                    if not generator.initialized:
+                        present = self._read_present_positions()
+                        generator.reset(
+                            present if present is not None else target.detach().cpu().numpy()
+                        )
+                    generator.set_target(target.detach().cpu().numpy())
+                    command = generator.step(dt)
+                    self.robot.send_action(
+                        {key: float(command[i]) for i, key in enumerate(action_keys)}
+                    )
+                    consecutive_errors = 0
+                except Exception:
+                    consecutive_errors += 1
+                    if consecutive_errors <= 3 or consecutive_errors % 100 == 0:
+                        self.logger.exception(
+                            f"Trajectory streamer: send failed ({consecutive_errors} consecutive)"
+                        )
+
+            precise_sleep(max(0.0, dt - (time.perf_counter() - tick_start)))
+
+        self.logger.info("Trajectory streamer thread stopping")
 
     def send_observation(
         self,
@@ -516,6 +623,23 @@ class RobotClient:
 
     def control_loop_action(self, verbose: bool = False) -> dict[str, Any]:
         """Reading and performing actions in local queue"""
+
+        # Trajectory streamer mode: the control loop only refreshes the target setpoint at the
+        # action rate (fps); the dedicated streamer thread sends profiled motor commands.
+        if self.trajectory_streamer_enabled:
+            with self.action_queue_lock:
+                self.action_queue_size.append(self.action_queue.qsize())
+                timed_action = self.action_queue.get_nowait()
+            with self._traj_target_lock:
+                self._traj_target = timed_action.get_action()
+            with self.latest_action_lock:
+                self.latest_action = timed_action.get_timestep()
+            if self.latency_breakdown is not None:
+                self.latency_breakdown.record_action_apply(
+                    step=timed_action.get_timestep(),
+                    action_timestamp=timed_action.get_timestamp(),
+                )
+            return None
 
         # Lock only for queue operations
         get_start = time.perf_counter()

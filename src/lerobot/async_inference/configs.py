@@ -147,6 +147,33 @@ class RobotClientConfig:
         metadata={"help": f"Name of aggregate function to use. Options: {list(AGGREGATE_FUNCTIONS.keys())}"},
     )
 
+    # High-rate trajectory streamer: a dedicated thread streams motor commands at this rate,
+    # tracking the latest VLA setpoint with a velocity/acceleration-limited profile.
+    # 0 = disabled (legacy path: send_action inside the control loop, optionally interpolated).
+    trajectory_streamer_hz: int = field(
+        default=0,
+        metadata={"help": "Motor command streaming rate in Hz (0=off). e.g. 100 or 250"},
+    )
+    trajectory_profile: str = field(
+        default="trapezoidal",
+        metadata={"help": "Trajectory profile: 'trapezoidal' (acc-limited) or 'scurve' (jerk-limited)"},
+    )
+    trajectory_v_max_deg_s: float = field(
+        default=150.0, metadata={"help": "Default per-joint max velocity (deg/s) for the streamer"}
+    )
+    trajectory_a_max_deg_s2: float = field(
+        default=800.0, metadata={"help": "Default per-joint max acceleration (deg/s^2) for the streamer"}
+    )
+    trajectory_j_max_deg_s3: float = field(
+        default=8000.0, metadata={"help": "Default per-joint max jerk (deg/s^3), scurve profile only"}
+    )
+    # Per-joint overrides keyed by motor-name suffix (e.g. "joint_4", "gripper"), each value a
+    # dict with any of v_max/a_max/j_max. Applies to both arms of a bimanual robot.
+    trajectory_limits_overrides: dict[str, dict[str, float]] | None = field(
+        default=None,
+        metadata={"help": "Per-joint profile limit overrides, e.g. {'joint_4': {'v_max': 400.0}}"},
+    )
+
     # Debug configuration
     debug_visualize_queue_size: bool = field(
         default=False, metadata={"help": "Visualize the action queue size"}
@@ -192,6 +219,20 @@ class RobotClientConfig:
 
         if self.actions_per_chunk <= 0:
             raise ValueError(f"actions_per_chunk must be positive, got {self.actions_per_chunk}")
+
+        if self.trajectory_streamer_hz < 0:
+            raise ValueError(f"trajectory_streamer_hz must be >= 0, got {self.trajectory_streamer_hz}")
+
+        if self.trajectory_profile not in ("trapezoidal", "scurve"):
+            raise ValueError(
+                f"trajectory_profile must be 'trapezoidal' or 'scurve', got {self.trajectory_profile}"
+            )
+
+        if self.trajectory_streamer_hz > 0 and self.action_interpolation_multiplier > 1:
+            raise ValueError(
+                "trajectory_streamer_hz and action_interpolation_multiplier are mutually exclusive: "
+                "the streamer replaces interpolation. Set action_interpolation_multiplier=1."
+            )
 
         self.aggregate_fn = get_aggregate_function(self.aggregate_fn_name)
 

@@ -56,6 +56,15 @@ class ProfileSpec:
     # uniform arm/gripper caps. Lets the wrist (joint_4/5) stay agile while
     # proximal joints are capped lower for smoothness.
     per_joint_overrides: dict[str, float] | None = None
+    # High-rate trajectory streamer (replaces linear interpolation): a dedicated thread
+    # tracks the latest VLA setpoint with a vel/acc-limited profile at this rate.
+    trajectory_streamer_hz: int = 0
+    trajectory_profile: str = "trapezoidal"  # or "scurve"
+    trajectory_limits_overrides: dict[str, dict[str, float]] | None = None
+    # When False, max_relative_target=None: the per-call relative cap (and its per-send
+    # Present_Position bus read, too slow at 100+ Hz) is replaced by the streamer's
+    # profile limits (per-tick delta <= v_max*dt) + joint_limits clip in send_action.
+    use_relative_cap: bool = True
 
 
 PROFILES: dict[str, ProfileSpec] = {
@@ -115,6 +124,47 @@ PROFILES: dict[str, ProfileSpec] = {
             "joint_7": 40.0,
         },
         action_interpolation_multiplier=3,
+        clamp_log_suppression="all",
+        write_diagnostic_csv=True,
+    ),
+    # TS1: high-rate trajectory streamer. A dedicated 100 Hz thread tracks the latest
+    # VLA setpoint with per-joint vel/acc-limited profiles (replaces interp x3 and the
+    # per-call relative cap). v/a limits map our cap findings to physical units:
+    # proximal slow+smooth, wrist fast (top-down angle), gripper accel-limited close.
+    "traj_trap_100": ProfileSpec(
+        action_interpolation_multiplier=1,
+        use_relative_cap=False,
+        trajectory_streamer_hz=100,
+        trajectory_profile="trapezoidal",
+        trajectory_limits_overrides={
+            "joint_1": {"v_max": 120.0, "a_max": 600.0},
+            "joint_2": {"v_max": 120.0, "a_max": 600.0},
+            "joint_3": {"v_max": 120.0, "a_max": 600.0},
+            "joint_4": {"v_max": 400.0, "a_max": 2500.0},
+            "joint_5": {"v_max": 400.0, "a_max": 2500.0},
+            "joint_6": {"v_max": 250.0, "a_max": 1500.0},
+            "joint_7": {"v_max": 250.0, "a_max": 1500.0},
+            "gripper": {"v_max": 250.0, "a_max": 2000.0},
+        },
+        clamp_log_suppression="all",
+        write_diagnostic_csv=True,
+    ),
+    # TS1 variant: jerk-limited S-curve (C2-continuous commands).
+    "traj_scurve_100": ProfileSpec(
+        action_interpolation_multiplier=1,
+        use_relative_cap=False,
+        trajectory_streamer_hz=100,
+        trajectory_profile="scurve",
+        trajectory_limits_overrides={
+            "joint_1": {"v_max": 120.0, "a_max": 600.0, "j_max": 6000.0},
+            "joint_2": {"v_max": 120.0, "a_max": 600.0, "j_max": 6000.0},
+            "joint_3": {"v_max": 120.0, "a_max": 600.0, "j_max": 6000.0},
+            "joint_4": {"v_max": 400.0, "a_max": 2500.0, "j_max": 25000.0},
+            "joint_5": {"v_max": 400.0, "a_max": 2500.0, "j_max": 25000.0},
+            "joint_6": {"v_max": 250.0, "a_max": 1500.0, "j_max": 15000.0},
+            "joint_7": {"v_max": 250.0, "a_max": 1500.0, "j_max": 15000.0},
+            "gripper": {"v_max": 250.0, "a_max": 2000.0, "j_max": 20000.0},
+        },
         clamp_log_suppression="all",
         write_diagnostic_csv=True,
     ),
@@ -313,7 +363,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def build_max_relative_target(profile: ProfileSpec) -> float | dict[str, float]:
+def build_max_relative_target(profile: ProfileSpec) -> float | dict[str, float] | None:
+    if not profile.use_relative_cap:
+        return None
     if (
         profile.per_joint_overrides is None
         and profile.arm_max_relative_target == profile.gripper_max_relative_target
@@ -381,6 +433,9 @@ def build_config(
         action_interpolation_multiplier=profile.action_interpolation_multiplier,
         latency_breakdown_csv=str(latency_breakdown_csv) if latency_breakdown_csv else None,
         aggregate_fn_name=profile.aggregate_fn_name,
+        trajectory_streamer_hz=profile.trajectory_streamer_hz,
+        trajectory_profile=profile.trajectory_profile,
+        trajectory_limits_overrides=profile.trajectory_limits_overrides,
     )
 
 
