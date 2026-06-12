@@ -215,6 +215,26 @@ PROFILES: dict[str, ProfileSpec] = {
         clamp_log_suppression="all",
         write_diagnostic_csv=True,
     ),
+    # TS1 v-clip sweep: same tuned gains (wrist x1.8 / rest x1.3), velocity clip 90 deg/s.
+    "traj_trap_100_v90_kp18x13x": ProfileSpec(
+        action_interpolation_multiplier=1,
+        use_relative_cap=False,
+        trajectory_streamer_hz=100,
+        trajectory_profile="trapezoidal",
+        trajectory_limits_overrides={
+            "joint_1": {"v_max": 90.0, "a_max": 600.0},
+            "joint_2": {"v_max": 90.0, "a_max": 600.0},
+            "joint_3": {"v_max": 90.0, "a_max": 600.0},
+            "joint_4": {"v_max": 90.0, "a_max": 2500.0},
+            "joint_5": {"v_max": 90.0, "a_max": 2500.0},
+            "joint_6": {"v_max": 90.0, "a_max": 1500.0},
+            "joint_7": {"v_max": 90.0, "a_max": 1500.0},
+            "gripper": {"v_max": 90.0, "a_max": 2000.0},
+        },
+        position_kp=[312.0, 312.0, 312.0, 312.0, 43.2, 55.8, 45.0, 32.5],
+        clamp_log_suppression="all",
+        write_diagnostic_csv=True,
+    ),
     # TS1 variant: wrist (j5/6/7) kp x2 + all remaining joints x1.4
     # (j1-4: 240->336, gripper: 25->35). Global stiffening experiment vs default.
     "traj_trap_100_v120_kp2x14x": ProfileSpec(
