@@ -160,6 +160,10 @@ def main():
     parser.add_argument("--v-max", type=float, default=120.0)
     parser.add_argument("--a-max", type=float, default=1500.0)
     parser.add_argument("--j-max", type=float, default=15000.0)
+    parser.add_argument("--kp", type=float, default=None,
+                        help="MIT kp override for the moving joint (0-500; per-packet, not persistent)")
+    parser.add_argument("--kd", type=float, default=None,
+                        help="MIT kd override for the moving joint (0-5; per-packet, not persistent)")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--yes", action="store_true", help="Skip the operator confirmation prompt")
     parser.add_argument("--csv", type=Path, default=None)
@@ -176,7 +180,11 @@ def main():
     else:
         robot = connect_robot()
         start = read_present(robot)
-        send_fn = robot.send_action
+        custom_kp = {args.joint: args.kp} if args.kp is not None else None
+        custom_kd = {args.joint: args.kd} if args.kd is not None else None
+        if custom_kp or custom_kd:
+            print(f"Gain override on {args.joint}: kp={args.kp}, kd={args.kd} (per-packet MIT, not persistent)")
+        send_fn = lambda a: robot.send_action(a, custom_kp=custom_kp, custom_kd=custom_kd)  # noqa: E731
         readback_fn = lambda: read_back(robot)  # noqa: E731
         limits_for_clamp = robot.config.joint_limits
         print(f"Connected. Present positions: { {j: round(v, 2) for j, v in start.items()} }")
