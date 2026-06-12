@@ -329,6 +329,48 @@ class RobotClient:
             positions.append(float(observation[key]))
         return positions
 
+    def _streamer_readback(self) -> dict[str, tuple[float, float]]:
+        """feature name -> (position, velocity) from the motor-bus MIT response caches.
+
+        Zero extra bus traffic: Damiao MIT commands already return the motor state, which
+        the bus caches per send. Supports single-arm (robot.bus) and bimanual
+        (robot.left_arm.bus / robot.right_arm.bus) layouts; missing data -> NaN.
+        """
+        out: dict[str, tuple[float, float]] = {}
+        arms = []
+        if hasattr(self.robot, "bus"):
+            arms.append(("", self.robot.bus))
+        if hasattr(self.robot, "left_arm"):
+            arms.append(("left_", self.robot.left_arm.bus))
+        if hasattr(self.robot, "right_arm"):
+            arms.append(("right_", self.robot.right_arm.bus))
+        for prefix, bus in arms:
+            states = getattr(bus, "_last_known_states", None)
+            if states is None:
+                continue
+            for motor, state in states.items():
+                out[f"{prefix}{motor}.pos"] = (
+                    float(state.get("position", float("nan"))),
+                    float(state.get("velocity", float("nan"))),
+                )
+        return out
+
+    def _write_trajectory_log(self, action_keys: list[str], rows: list[list[float]]) -> None:
+        import csv
+
+        path = self.config.trajectory_log_csv
+        try:
+            with open(path, "w", newline="") as f:
+                writer = csv.writer(f)
+                header = ["t"]
+                for key in action_keys:
+                    header += [f"{key}:set", f"{key}:cmd", f"{key}:cmd_v", f"{key}:rb_q", f"{key}:rb_v"]
+                writer.writerow(header)
+                writer.writerows(rows)
+            self.logger.info(f"Trajectory streamer log written: {path} ({len(rows)} rows)")
+        except OSError:
+            self.logger.exception(f"Failed to write trajectory log to {path}")
+
     def _trajectory_streamer_loop(self):
         """Stream velocity/acceleration-limited joint commands at trajectory_streamer_hz.
 
@@ -340,6 +382,8 @@ class RobotClient:
         generator = self._traj_generator
         action_keys = list(self.robot.action_features)
         consecutive_errors = 0
+        log_rows: list[list[float]] | None = [] if self.config.trajectory_log_csv else None
+        t0 = time.perf_counter()
 
         self.logger.info(f"Trajectory streamer thread starting ({self.config.trajectory_streamer_hz} Hz)")
 
@@ -351,17 +395,29 @@ class RobotClient:
 
             if target is not None:
                 try:
+                    target_np = target.detach().cpu().numpy()
                     if not generator.initialized:
                         present = self._read_present_positions()
-                        generator.reset(
-                            present if present is not None else target.detach().cpu().numpy()
-                        )
-                    generator.set_target(target.detach().cpu().numpy())
+                        generator.reset(present if present is not None else target_np)
+                    generator.set_target(target_np)
                     command = generator.step(dt)
                     self.robot.send_action(
                         {key: float(command[i]) for i, key in enumerate(action_keys)}
                     )
                     consecutive_errors = 0
+                    if log_rows is not None:
+                        readback = self._streamer_readback()
+                        row = [tick_start - t0]
+                        for i, key in enumerate(action_keys):
+                            rb_q, rb_v = readback.get(key, (float("nan"), float("nan")))
+                            row += [
+                                float(target_np[i]),
+                                float(command[i]),
+                                float(generator.vel[i]),
+                                rb_q,
+                                rb_v,
+                            ]
+                        log_rows.append(row)
                 except Exception:
                     consecutive_errors += 1
                     if consecutive_errors <= 3 or consecutive_errors % 100 == 0:
@@ -371,6 +427,8 @@ class RobotClient:
 
             precise_sleep(max(0.0, dt - (time.perf_counter() - tick_start)))
 
+        if log_rows:
+            self._write_trajectory_log(action_keys, log_rows)
         self.logger.info("Trajectory streamer thread stopping")
 
     def send_observation(

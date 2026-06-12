@@ -173,6 +173,11 @@ class RobotClientConfig:
         default=None,
         metadata={"help": "Per-joint profile limit overrides, e.g. {'joint_4': {'v_max': 400.0}}"},
     )
+    # Optional per-tick CSV log of the streamer: per joint setpoint/cmd q + cmd/readback qvel.
+    trajectory_log_csv: str | None = field(
+        default=None,
+        metadata={"help": "CSV path for per-tick streamer logging (setpoint/cmd/readback q + qvel)"},
+    )
 
     # Debug configuration
     debug_visualize_queue_size: bool = field(

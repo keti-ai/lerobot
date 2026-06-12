@@ -427,6 +427,7 @@ def build_config(
     task: str,
     profile: ProfileSpec,
     latency_breakdown_csv: Path | None = None,
+    trajectory_log_csv: Path | None = None,
 ) -> RobotClientConfig:
     max_relative_target = build_max_relative_target(profile)
     arm_gain_kwargs = {}
@@ -488,6 +489,7 @@ def build_config(
         trajectory_streamer_hz=profile.trajectory_streamer_hz,
         trajectory_profile=profile.trajectory_profile,
         trajectory_limits_overrides=profile.trajectory_limits_overrides,
+        trajectory_log_csv=str(trajectory_log_csv) if trajectory_log_csv else None,
     )
 
 
@@ -631,7 +633,15 @@ def append_diagnostic_result(csv_path: Path, summary: dict[str, Any]) -> None:
 def run_trial(args: argparse.Namespace) -> int:
     profile = PROFILES[args.profile]
     latency_breakdown_csv = args.log_dir / "latency_breakdown_K12.csv" if args.trial == "K12" else None
-    cfg = build_config(args.task, profile, latency_breakdown_csv=latency_breakdown_csv)
+    trajectory_log_csv = (
+        args.log_dir / f"traj_trial_{args.trial}.csv" if profile.trajectory_streamer_hz > 0 else None
+    )
+    cfg = build_config(
+        args.task,
+        profile,
+        latency_breakdown_csv=latency_breakdown_csv,
+        trajectory_log_csv=trajectory_log_csv,
+    )
 
     if args.config_only:
         logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -676,6 +686,7 @@ def run_trial(args: argparse.Namespace) -> int:
         "duration_s": args.duration_s,
         "diagnostic_csv": str(args.diagnostic_csv) if profile.write_diagnostic_csv else None,
         "latency_breakdown_csv": str(latency_breakdown_csv) if latency_breakdown_csv else None,
+        "trajectory_log_csv": str(trajectory_log_csv) if trajectory_log_csv else None,
         "started_at_unix": time.time(),
         "status": "started",
     }
