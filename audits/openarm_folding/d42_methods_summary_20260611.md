@@ -66,6 +66,14 @@ window 밖이면 chunk 경계 불연속(톡톡) + 미세 보정 댐핑.
 | **per-joint cap** | 손목(j4/5)=65 자유, 어깨/팔꿈치(j1/2/3)=25 smoothing, 전완(j6/7)=40 | D07l (diag_perjoint_smooth) |
 | **handover 그리퍼 절충** | gripper cap 40 (pick gentle + handover 받기 decisive) | D07n (diag_handover_grip) — **왼손 받기 성공** |
 
+### C-2. TS1 고주파 궤적 스트리밍 (2026-06-12 확정 — interp×3 대체)
+| 방법 | 내용 | 결과 |
+|---|---|---|
+| **trajectory streamer 100Hz** | 전용 스레드가 VLA setpoint(30Hz)를 per-joint vel/acc 제한 trapezoidal 로 추적해 모터 명령 스트리밍 | **D07v before/after: interp×3 의 cmd qvel ±200-400°/s 스파이크 소멸 → ±120 사다리꼴 envelope** |
+| **MIT 게인 튜닝 (스윕)** | 손목(j5/6/7) kp ×1.8 + 나머지 ×1.3 = [312×4, 43.2, 55.8, 45, 32.5] | operator 확정 (D07t) |
+| **v-clip 120°/s** | 전관절 속도 클립 | operator 확정 (D07u) |
+| 확정 profile | **`traj_trap_100_v120_kp18x13x`** — 새 기본 | `ts1_tuning_results_20260612.md` + results/ |
+
 ### D. 데이터 / 검증
 | 방법 | 내용 |
 |---|---|
@@ -102,10 +110,12 @@ window 밖이면 chunk 경계 불연속(톡톡) + 미세 보정 댐핑.
 - RTC: **execution_horizon=20**, max_guidance_weight=10, prefix_attention_schedule=EXP
 - forward ~210ms, d≈9, window 9≤20≤21 ✓, mem 9932MiB stable
 
-**클라이언트 profile = `diag_handover_grip`** (k4_eval_runner.py):
-- max_relative_target: `{arm joints:25, joint_4:65, joint_5:65, joint_6:40, joint_7:40, gripper:40}`
-- action_interpolation_multiplier=3, chunk_size_threshold=0.5, aggregate_fn_name=weighted_average
-- actions_per_chunk=30, fps=30
+**클라이언트 profile (stack v2, 2026-06-12) = `traj_trap_100_v120_kp18x13x`** (k4_eval_runner.py):
+- **TS1 trajectory streamer 100Hz trapezoidal** (interp×3 대체), v-clip 120°/s 전관절
+- **MIT kp [312,312,312,312,43.2,55.8,45,32.5]** (손목×1.8/나머지×1.3), kd 기본
+- relative cap 없음 (profile v/a 한계 + joint_limits clip 이 안전층)
+- chunk_size_threshold=0.5, aggregate_fn_name=weighted_average, actions_per_chunk=30, fps=30
+- (구 v1 = `diag_handover_grip`: cap arm25/손목65/grip40 + interp×3 — D07v 비교로 대체됨)
 
 **실행**: `uv run python audits/openarm_folding/k4_eval_runner.py --trial <id> --obj banana --task "Pick the banana, hand it over to the other arm, and place it at the target." --profile diag_handover_grip --duration-s 60`
 
