@@ -47,6 +47,7 @@ from typing import Any
 
 import draccus
 import grpc
+import numpy as np
 import torch
 
 from lerobot.cameras.opencv import OpenCVCameraConfig  # noqa: F401
@@ -215,6 +216,14 @@ class RobotClient:
         self._traj_target: torch.Tensor | None = None
         self._traj_thread: threading.Thread | None = None
         self._traj_generator: OnlineTrajectoryGenerator | None = None
+        # Legacy-path logging: when trajectory_log_csv is set but the streamer is off,
+        # log the same per-send schema from the control loop (interp/direct path), so
+        # before/after comparisons share one format (cmd qvel = finite difference).
+        self._legacy_log_enabled = bool(config.trajectory_log_csv) and not self.trajectory_streamer_enabled
+        self._legacy_log_rows: list[list[float]] = []
+        self._legacy_prev: tuple[np.ndarray, float] | None = None
+        self._legacy_setpoint: np.ndarray | None = None
+        self._legacy_t0: float | None = None
         if self.trajectory_streamer_enabled:
             self._traj_generator = OnlineTrajectoryGenerator(
                 names=list(self.robot.action_features),
@@ -288,6 +297,10 @@ class RobotClient:
         if self._traj_thread is not None:
             self._traj_thread.join(timeout=2.0)
             self._traj_thread = None
+
+        if self._legacy_log_enabled and self._legacy_log_rows:
+            self._write_trajectory_log(list(self.robot.action_features), self._legacy_log_rows)
+            self._legacy_log_rows = []
 
         self.robot.disconnect()
         self.logger.debug("Robot disconnected")
@@ -370,6 +383,28 @@ class RobotClient:
             self.logger.info(f"Trajectory streamer log written: {path} ({len(rows)} rows)")
         except OSError:
             self.logger.exception(f"Failed to write trajectory log to {path}")
+
+    def _log_legacy_tick(self, action_tensor: torch.Tensor, timed_action) -> None:
+        """Log one legacy-path send (interp/direct) in the streamer CSV schema."""
+        now = time.perf_counter()
+        if self._legacy_t0 is None:
+            self._legacy_t0 = now
+        cmd = action_tensor.detach().cpu().numpy().astype(float)
+        if timed_action is not None:
+            self._legacy_setpoint = timed_action.get_action().detach().cpu().numpy().astype(float)
+        setpoint = self._legacy_setpoint if self._legacy_setpoint is not None else cmd
+        if self._legacy_prev is not None:
+            prev_cmd, prev_t = self._legacy_prev
+            cmd_v = (cmd - prev_cmd) / max(now - prev_t, 1e-6)
+        else:
+            cmd_v = np.zeros_like(cmd)
+        self._legacy_prev = (cmd, now)
+        readback = self._streamer_readback()
+        row = [now - self._legacy_t0]
+        for i, key in enumerate(self.robot.action_features):
+            rb_q, rb_v = readback.get(key, (float("nan"), float("nan")))
+            row += [float(setpoint[i]), float(cmd[i]), float(cmd_v[i]), rb_q, rb_v]
+        self._legacy_log_rows.append(row)
 
     def _trajectory_streamer_loop(self):
         """Stream velocity/acceleration-limited joint commands at trajectory_streamer_hz.
@@ -725,6 +760,8 @@ class RobotClient:
         get_end = time.perf_counter() - get_start
 
         _performed_action = self.robot.send_action(self._action_tensor_to_action_dict(action_tensor))
+        if self._legacy_log_enabled:
+            self._log_legacy_tick(action_tensor, timed_action)
         if timed_action is not None:
             with self.latest_action_lock:
                 self.latest_action = timed_action.get_timestep()

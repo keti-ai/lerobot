@@ -695,9 +695,9 @@ def append_diagnostic_result(csv_path: Path, summary: dict[str, Any]) -> None:
 def run_trial(args: argparse.Namespace) -> int:
     profile = PROFILES[args.profile]
     latency_breakdown_csv = args.log_dir / "latency_breakdown_K12.csv" if args.trial == "K12" else None
-    trajectory_log_csv = (
-        args.log_dir / f"traj_trial_{args.trial}.csv" if profile.trajectory_streamer_hz > 0 else None
-    )
+    # Always log per-send q/qvel: the streamer logs per tick; the legacy (interp/direct)
+    # path logs per send in the same schema, enabling before/after comparisons.
+    trajectory_log_csv = args.log_dir / f"traj_trial_{args.trial}.csv"
     cfg = build_config(
         args.task,
         profile,
