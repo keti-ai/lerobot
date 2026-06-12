@@ -65,6 +65,10 @@ class ProfileSpec:
     # Present_Position bus read, too slow at 100+ Hz) is replaced by the streamer's
     # profile limits (per-tick delta <= v_max*dt) + joint_limits clip in send_action.
     use_relative_cap: bool = True
+    # Optional MIT gain overrides (8 values: joint_1..7, gripper), applied to both arms.
+    # Per-packet MIT gains — not persistent on the drivers. None = config defaults.
+    position_kp: list[float] | None = None
+    position_kd: list[float] | None = None
 
 
 PROFILES: dict[str, ProfileSpec] = {
@@ -146,6 +150,47 @@ PROFILES: dict[str, ProfileSpec] = {
             "joint_7": {"v_max": 250.0, "a_max": 1500.0},
             "gripper": {"v_max": 250.0, "a_max": 2000.0},
         },
+        clamp_log_suppression="all",
+        write_diagnostic_csv=True,
+    ),
+    # TS1 variant: uniform 120 deg/s velocity clip on every joint (accel limits kept
+    # from traj_trap_100) — isolates the effect of a global speed cap.
+    "traj_trap_100_v120": ProfileSpec(
+        action_interpolation_multiplier=1,
+        use_relative_cap=False,
+        trajectory_streamer_hz=100,
+        trajectory_profile="trapezoidal",
+        trajectory_limits_overrides={
+            "joint_1": {"v_max": 120.0, "a_max": 600.0},
+            "joint_2": {"v_max": 120.0, "a_max": 600.0},
+            "joint_3": {"v_max": 120.0, "a_max": 600.0},
+            "joint_4": {"v_max": 120.0, "a_max": 2500.0},
+            "joint_5": {"v_max": 120.0, "a_max": 2500.0},
+            "joint_6": {"v_max": 120.0, "a_max": 1500.0},
+            "joint_7": {"v_max": 120.0, "a_max": 1500.0},
+            "gripper": {"v_max": 120.0, "a_max": 2000.0},
+        },
+        clamp_log_suppression="all",
+        write_diagnostic_csv=True,
+    ),
+    # TS1 variant: v120 + wrist kp doubled (joint_5 24->48, joint_6 31->62, joint_7 25->50;
+    # proximal/gripper unchanged). Stiffer wrist tracking under the same velocity clip.
+    "traj_trap_100_v120_wristkp2x": ProfileSpec(
+        action_interpolation_multiplier=1,
+        use_relative_cap=False,
+        trajectory_streamer_hz=100,
+        trajectory_profile="trapezoidal",
+        trajectory_limits_overrides={
+            "joint_1": {"v_max": 120.0, "a_max": 600.0},
+            "joint_2": {"v_max": 120.0, "a_max": 600.0},
+            "joint_3": {"v_max": 120.0, "a_max": 600.0},
+            "joint_4": {"v_max": 120.0, "a_max": 2500.0},
+            "joint_5": {"v_max": 120.0, "a_max": 2500.0},
+            "joint_6": {"v_max": 120.0, "a_max": 1500.0},
+            "joint_7": {"v_max": 120.0, "a_max": 1500.0},
+            "gripper": {"v_max": 120.0, "a_max": 2000.0},
+        },
+        position_kp=[240.0, 240.0, 240.0, 240.0, 48.0, 62.0, 50.0, 25.0],
         clamp_log_suppression="all",
         write_diagnostic_csv=True,
     ),
@@ -384,6 +429,11 @@ def build_config(
     latency_breakdown_csv: Path | None = None,
 ) -> RobotClientConfig:
     max_relative_target = build_max_relative_target(profile)
+    arm_gain_kwargs = {}
+    if profile.position_kp is not None:
+        arm_gain_kwargs["position_kp"] = list(profile.position_kp)
+    if profile.position_kd is not None:
+        arm_gain_kwargs["position_kd"] = list(profile.position_kd)
     return RobotClientConfig(
         policy_type=POLICY_TYPE,
         pretrained_name_or_path=POLICY_REPO,
@@ -393,11 +443,13 @@ def build_config(
                 port="can0",
                 side="left",
                 max_relative_target=max_relative_target,
+                **arm_gain_kwargs,
             ),
             right_arm_config=OpenArmFollowerConfigBase(
                 port="can1",
                 side="right",
                 max_relative_target=max_relative_target,
+                **arm_gain_kwargs,
             ),
             cameras={
                 "left_wrist": RealSenseCameraConfig(
