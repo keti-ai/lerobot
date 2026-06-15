@@ -289,7 +289,7 @@ cd /home/syhlabtop/workspace/lerobot
     --dataset.repo_id="${STAMPED}" \
     --dataset.root="${STAMPED_LOCAL}" \
     --dataset.single_task="Pick the blue toothpaste, hand it over to the other arm, and place it at the target." \
-    --dataset.num_episodes=16 \
+    --dataset.num_episodes=14 \
     --dataset.episode_time_s=30 \
     --dataset.fps=30 \
     --dataset.reset_time_s=15 \
@@ -308,4 +308,6 @@ cd /home/syhlabtop/workspace/lerobot
     --robot.cameras='{ left_wrist: {type: intelrealsense, serial_number_or_name: "315122270766", width: 640, height: 480, fps: 30, warmup_s: 3}, right_wrist: {type:
   intelrealsense, serial_number_or_name: "230322273311", width: 640, height: 480, fps: 30, warmup_s: 3}, base: {type: intelrealsense, serial_number_or_name: "213622075840",
   width: 640, height: 480, fps: 30, warmup_s: 3} }'
+
+
 
