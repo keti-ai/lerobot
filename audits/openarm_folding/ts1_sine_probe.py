@@ -112,6 +112,7 @@ def run_sine_freq(
     send_fn,
     readback_fn,
     t0: float,
+    hold_kp: float | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """한 주파수로 사인파 구동. returns (t, cmd_q, readback_q)."""
     dt = 1.0 / rate_hz
@@ -121,6 +122,9 @@ def run_sine_freq(
     cmd_arr = np.empty(n_ticks)
     rb_arr = np.empty(n_ticks)
 
+    # hold 관절에 높은 kp 를 걸어 커플링 저항 강화
+    hold_kp_dict = {j: hold_kp for j in JOINTS if j != joint} if hold_kp is not None else None
+
     # 각 tick의 사인 위상은 tick index 기반 (벽시계 지터 무관)
     tick_deadline = time.perf_counter()
     for i in range(n_ticks):
@@ -129,7 +133,7 @@ def run_sine_freq(
 
         action = {f"{j}.pos": hold_positions[j] for j in JOINTS}
         action[f"{joint}.pos"] = cmd_q
-        send_fn(action)
+        send_fn(action, hold_kp=hold_kp_dict)
 
         rb = readback_fn()
         now = time.perf_counter()
@@ -153,15 +157,17 @@ def settle_to_center(
     duration_s: float,
     rate_hz: int,
     send_fn,
+    hold_kp: float | None = None,
 ):
     """주파수 간 중심 위치로 복귀 대기."""
     dt = 1.0 / rate_hz
     n = int(duration_s * rate_hz)
+    hold_kp_dict = {j: hold_kp for j in JOINTS if j != joint} if hold_kp is not None else None
     tick_deadline = time.perf_counter()
     for _ in range(n):
         action = {f"{j}.pos": hold_positions[j] for j in JOINTS}
         action[f"{joint}.pos"] = center_q
-        send_fn(action)
+        send_fn(action, hold_kp=hold_kp_dict)
         tick_deadline += dt
         remaining = tick_deadline - time.perf_counter()
         if remaining > 0:
@@ -237,6 +243,7 @@ def probe_joint(
     limits_for_clamp,
     out_dir: Path,
     t0: float,
+    hold_kp: float | None = None,
 ):
     center_q = start[joint]
     amplitude = amplitude_deg
@@ -272,6 +279,7 @@ def probe_joint(
             send_fn=send_fn,
             readback_fn=readback_fn,
             t0=t0,
+            hold_kp=hold_kp,
         )
         m = analyze_response(t_arr, cmd_arr, rb_arr, freq_hz)
         results.append({"freq_hz": freq_hz, **m})
@@ -288,6 +296,7 @@ def probe_joint(
             settle_to_center(
                 joint=joint, center_q=center_q, hold_positions=hold_positions,
                 duration_s=SETTLE_PAUSE_S, rate_hz=rate_hz, send_fn=send_fn,
+                hold_kp=hold_kp,
             )
 
     # 저장
@@ -407,9 +416,11 @@ def main():
                         help="주파수당 사이클 수 (많을수록 정확)")
     parser.add_argument("--rate-hz", type=int, default=100)
     parser.add_argument("--kp", type=float, default=None,
-                        help="MIT kp override (per-packet, 비영구)")
+                        help="MIT kp override for the moving joint (per-packet, 비영구)")
     parser.add_argument("--kd", type=float, default=None,
-                        help="MIT kd override (per-packet, 비영구)")
+                        help="MIT kd override for the moving joint (per-packet, 비영구)")
+    parser.add_argument("--hold-kp", type=float, default=None,
+                        help="MIT kp override for hold joints — 높이면 커플링 저항 강화 (예: 600)")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--yes", action="store_true", help="operator 확인 건너뜀")
     parser.add_argument("--out-dir", type=Path, default=None)
@@ -428,18 +439,27 @@ def main():
     if args.dry_run:
         start = {j: 0.0 for j in JOINTS}
         plant = DryRunPlant(start)
-        send_fn = plant.send_action
+        def send_fn(action, hold_kp=None):  # noqa: E306
+            return plant.send_action(action)
         readback_fn = plant.read_positions
         limits_for_clamp = None
         robot = None
     else:
         robot = connect_robot()
         start = read_present(robot)
-        custom_kp = {args.joint: args.kp} if args.kp is not None else None
+        moving_kp = {args.joint: args.kp} if args.kp is not None else {}
         custom_kd = {args.joint: args.kd} if args.kd is not None else None
-        if custom_kp or custom_kd:
-            print(f"Gain override: kp={args.kp}, kd={args.kd} (per-packet MIT, 비영구)")
-        send_fn = lambda a: robot.send_action(a, custom_kp=custom_kp, custom_kd=custom_kd)  # noqa: E731
+        if moving_kp or custom_kd:
+            print(f"Gain override on {args.joint}: kp={args.kp}, kd={args.kd} (per-packet MIT, 비영구)")
+        if args.hold_kp is not None:
+            print(f"Hold joints kp override: {args.hold_kp} (per-packet MIT, 비영구)")
+
+        def send_fn(action, hold_kp=None):  # noqa: E306
+            kp = dict(moving_kp)
+            if hold_kp:
+                kp.update(hold_kp)
+            return robot.send_action(action, custom_kp=kp or None, custom_kd=custom_kd)
+
         readback_fn = lambda: read_back(robot)  # noqa: E731
         limits_for_clamp = robot.config.joint_limits
         print(f"Connected. Present: { {j: round(v, 2) for j, v in start.items()} }")
@@ -473,6 +493,7 @@ def main():
             limits_for_clamp=limits_for_clamp,
             out_dir=out_dir,
             t0=t0,
+            hold_kp=args.hold_kp,
         )
         if res is not None:
             all_results[joint] = res
