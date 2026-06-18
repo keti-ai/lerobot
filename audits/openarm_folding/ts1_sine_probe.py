@@ -28,6 +28,7 @@ from pathlib import Path
 import numpy as np
 
 from lerobot.robots import openarm_follower  # noqa: F401  (plugin registration)
+from lerobot.utils.joint_trajectory import JointProfileLimits, OnlineTrajectoryGenerator
 from lerobot.utils.robot_utils import precise_sleep
 
 LOG_DIR = Path("/home/syhlabtop/k4_logs")
@@ -125,6 +126,68 @@ def read_back_full(robot) -> dict[str, dict]:
 
 TORQUE_ABORT_NM = 30.0   # 이 이상이면 즉시 중단 (모터 보호)
 TEMP_WARN_C    = 70.0   # 이 이상이면 경고
+
+
+def move_to_midrange(
+    *,
+    joint: str,
+    current_positions: dict[str, float],
+    limits_for_clamp,
+    send_fn,
+    readback_fn,
+    rate_hz: int = 100,
+) -> dict[str, float]:
+    """joint를 limit 중간 위치로 trapezoidal 이동. 갱신된 positions 반환."""
+    if limits_for_clamp is None or joint not in limits_for_clamp:
+        print(f"  [{joint}] joint_limits 없음 — pre-home skip")
+        return current_positions
+
+    lo, hi = limits_for_clamp[joint]
+    mid = (lo + hi) / 2.0
+    start_vec = np.array([current_positions[j] for j in JOINTS])
+    target_vec = start_vec.copy()
+    target_vec[JOINTS.index(joint)] = mid
+
+    delta = abs(mid - current_positions[joint])
+    if delta < 1.0:
+        return current_positions  # 이미 중간 근처
+
+    print(f"  [{joint}] pre-home: {current_positions[joint]:.1f}° → {mid:.1f}° (limit 중간)")
+
+    move_limits  = JointProfileLimits(v_max=60.0, a_max=300.0, j_max=3000.0)
+    hold_limits  = JointProfileLimits(v_max=30.0, a_max=200.0, j_max=2000.0)
+    lim_dict = {j: (move_limits if j == joint else hold_limits) for j in JOINTS}
+    gen = OnlineTrajectoryGenerator([f"{j}.pos" for j in JOINTS], lim_dict, profile="trapezoidal")
+    gen.reset(start_vec)
+    gen.set_target(target_vec)
+
+    dt = 1.0 / rate_hz
+    timeout = delta / 60.0 + 3.0
+    settled_since = None
+    t_start = time.perf_counter()
+    tick_deadline = time.perf_counter()
+
+    while True:
+        cmd = gen.step(dt)
+        send_fn({f"{JOINTS[i]}.pos": float(cmd[i]) for i in range(len(JOINTS))})
+        rb = readback_fn()
+        err = abs(mid - rb[joint])
+        now = time.perf_counter()
+        if err < 0.5:
+            settled_since = settled_since or now
+            if now - settled_since > 0.3:
+                break
+        else:
+            settled_since = None
+        if now - t_start > timeout:
+            print(f"  [{joint}] pre-home timeout (err={err:.1f}°)")
+            break
+        tick_deadline += dt
+        precise_sleep(max(0.0, tick_deadline - time.perf_counter()))
+
+    updated = dict(current_positions)
+    updated[joint] = rb[joint]
+    return updated
 
 
 def run_sine_freq(
@@ -286,7 +349,20 @@ def probe_joint(
     out_dir: Path,
     t0: float,
     hold_kp: float | None = None,
+    pre_home: bool = False,
+    min_amplitude_deg: float = MIN_AMPLITUDE_DEG,
 ):
+    # pre-home: limit 중간으로 이동 후 새 center 사용
+    if pre_home:
+        start = move_to_midrange(
+            joint=joint,
+            current_positions=start,
+            limits_for_clamp=limits_for_clamp,
+            send_fn=send_fn,
+            readback_fn=readback_fn,
+            rate_hz=rate_hz,
+        )
+
     center_q = start[joint]
     amplitude = amplitude_deg
 
@@ -298,8 +374,8 @@ def probe_joint(
             print(f"  [{joint}] amplitude clamped {amplitude:.1f} → {max_amp:.1f} deg")
             amplitude = max_amp
 
-    if amplitude < MIN_AMPLITUDE_DEG:
-        print(f"  [{joint}] amplitude {amplitude:.1f}° < {MIN_AMPLITUDE_DEG}° (joint limit 근처) — skip")
+    if amplitude < min_amplitude_deg:
+        print(f"  [{joint}] amplitude {amplitude:.1f}° < {min_amplitude_deg:.0f}° — skip")
         return None
 
     # 속도 포화 주파수 필터: 2π·f·A > v_max 이면 모터가 추종 불가 → 의미 없는 데이터
@@ -484,6 +560,10 @@ def main():
                         help="MIT kd override for the moving joint (per-packet, 비영구)")
     parser.add_argument("--hold-kp", type=float, default=None,
                         help="MIT kp override for hold joints — 높이면 커플링 저항 강화 (예: 600)")
+    parser.add_argument("--pre-home", action="store_true",
+                        help="probe 전 joint를 limit 중간으로 이동 (joint_2 등 limit 근처 관절용)")
+    parser.add_argument("--min-amplitude-deg", type=float, default=MIN_AMPLITUDE_DEG,
+                        help=f"진폭 최소값 (기본 {MIN_AMPLITUDE_DEG}°). 낮추면 작은 진폭도 측정")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--yes", action="store_true", help="operator 확인 건너뜀")
     parser.add_argument("--out-dir", type=Path, default=None)
@@ -560,6 +640,8 @@ def main():
             out_dir=out_dir,
             t0=t0,
             hold_kp=args.hold_kp,
+            pre_home=args.pre_home,
+            min_amplitude_deg=args.min_amplitude_deg,
         )
         if res is not None:
             all_results[joint] = res
