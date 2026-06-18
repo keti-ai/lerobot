@@ -36,6 +36,12 @@ ARM_JOINTS = JOINTS[:7]  # gripper 제외
 LIMIT_MARGIN_DEG = 5.0
 SETTLE_PAUSE_S = 1.5   # 주파수 간 복귀 대기
 SKIP_CYCLES = 1        # 분석 시 첫 N 사이클 제외 (과도 응답 제거)
+MIN_AMPLITUDE_DEG = 8.0  # 이 미만으로 클램프되면 관절 skip (마찰/백래시에 묻힘)
+# 관절별 추정 최대 속도 (deg/s) — 이 이상 필요한 주파수는 자동 skip
+JOINT_VMAX_EST = {
+    "joint_1": 240.0, "joint_2": 180.0, "joint_3": 240.0, "joint_4": 240.0,
+    "joint_5": 400.0, "joint_6": 400.0, "joint_7": 400.0, "gripper": 120.0,
+}
 
 SWEEP_FREQS = [0.1, 0.3, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0]
 
@@ -96,9 +102,30 @@ def read_back(robot) -> dict[str, float]:
         return read_present(robot)
 
 
+def read_back_full(robot) -> dict[str, dict]:
+    """position + torque + temp per joint."""
+    try:
+        states = robot.bus._last_known_states  # noqa: SLF001
+        return {
+            j: {
+                "position": float(states[j].get("position", float("nan"))),
+                "torque":   float(states[j].get("torque",   float("nan"))),
+                "temp_mos": float(states[j].get("temp_mos", float("nan"))),
+            }
+            for j in JOINTS
+        }
+    except AttributeError:
+        pos = read_present(robot)
+        return {j: {"position": pos[j], "torque": float("nan"), "temp_mos": float("nan")} for j in JOINTS}
+
+
 # ---------------------------------------------------------------------------
 # Core: 단일 주파수 사인파 구동
 # ---------------------------------------------------------------------------
+
+TORQUE_ABORT_NM = 30.0   # 이 이상이면 즉시 중단 (모터 보호)
+TEMP_WARN_C    = 70.0   # 이 이상이면 경고
+
 
 def run_sine_freq(
     *,
@@ -113,19 +140,20 @@ def run_sine_freq(
     readback_fn,
     t0: float,
     hold_kp: float | None = None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """한 주파수로 사인파 구동. returns (t, cmd_q, readback_q)."""
+    read_full_fn=None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """한 주파수로 사인파 구동. returns (t, cmd_q, readback_q, torque_q)."""
     dt = 1.0 / rate_hz
     n_ticks = int(cycles / freq_hz * rate_hz)
 
-    t_arr = np.empty(n_ticks)
+    t_arr   = np.empty(n_ticks)
     cmd_arr = np.empty(n_ticks)
-    rb_arr = np.empty(n_ticks)
+    rb_arr  = np.empty(n_ticks)
+    tau_arr = np.full(n_ticks, float("nan"))
 
-    # hold 관절에 높은 kp 를 걸어 커플링 저항 강화
     hold_kp_dict = {j: hold_kp for j in JOINTS if j != joint} if hold_kp is not None else None
+    actual_ticks = 0
 
-    # 각 tick의 사인 위상은 tick index 기반 (벽시계 지터 무관)
     tick_deadline = time.perf_counter()
     for i in range(n_ticks):
         t_phase = i * dt
@@ -135,18 +163,31 @@ def run_sine_freq(
         action[f"{joint}.pos"] = cmd_q
         send_fn(action, hold_kp=hold_kp_dict)
 
-        rb = readback_fn()
         now = time.perf_counter()
-        t_arr[i] = now - t0
+        t_arr[i]   = now - t0
         cmd_arr[i] = cmd_q
-        rb_arr[i] = rb[joint]
+        actual_ticks += 1
+
+        if read_full_fn is not None:
+            full = read_full_fn()
+            rb_arr[i]  = full[joint]["position"]
+            tau_arr[i] = full[joint]["torque"]
+            temp = full[joint]["temp_mos"]
+            if temp > TEMP_WARN_C:
+                print(f"\n  ⚠️  {joint} temp_mos={temp:.0f}°C", end="")
+            if abs(tau_arr[i]) > TORQUE_ABORT_NM:
+                print(f"\n  🛑 ABORT: {joint} torque={tau_arr[i]:.1f} Nm > {TORQUE_ABORT_NM} Nm — 모터 보호 중단")
+                break
+        else:
+            rb = readback_fn()
+            rb_arr[i] = rb[joint]
 
         tick_deadline += dt
         remaining = tick_deadline - time.perf_counter()
         if remaining > 0:
             precise_sleep(remaining)
 
-    return t_arr, cmd_arr, rb_arr
+    return t_arr[:actual_ticks], cmd_arr[:actual_ticks], rb_arr[:actual_ticks], tau_arr[:actual_ticks]
 
 
 def settle_to_center(
@@ -239,6 +280,7 @@ def probe_joint(
     rate_hz: int,
     send_fn,
     readback_fn,
+    read_full_fn,
     start: dict[str, float],
     limits_for_clamp,
     out_dir: Path,
@@ -256,8 +298,19 @@ def probe_joint(
             print(f"  [{joint}] amplitude clamped {amplitude:.1f} → {max_amp:.1f} deg")
             amplitude = max_amp
 
-    if amplitude < 2.0:
-        print(f"  [{joint}] amplitude {amplitude:.1f} deg too small, skipping")
+    if amplitude < MIN_AMPLITUDE_DEG:
+        print(f"  [{joint}] amplitude {amplitude:.1f}° < {MIN_AMPLITUDE_DEG}° (joint limit 근처) — skip")
+        return None
+
+    # 속도 포화 주파수 필터: 2π·f·A > v_max 이면 모터가 추종 불가 → 의미 없는 데이터
+    v_max = JOINT_VMAX_EST.get(joint, 240.0)
+    runnable = [f for f in freqs if 2 * math.pi * f * amplitude <= v_max]
+    skipped = [f for f in freqs if f not in runnable]
+    if skipped:
+        print(f"  [{joint}] skip {skipped} Hz (peak vel > {v_max:.0f}°/s — 속도 포화)")
+    freqs = runnable
+    if not freqs:
+        print(f"  [{joint}] 모든 주파수가 속도 포화 범위 — skip")
         return None
 
     print(f"\n[{joint}] center={center_q:.1f}°  ±{amplitude:.1f}°  freqs={freqs}")
@@ -268,7 +321,7 @@ def probe_joint(
 
     for freq_hz in freqs:
         print(f"  {freq_hz:.2f} Hz ... ", end="", flush=True)
-        t_arr, cmd_arr, rb_arr = run_sine_freq(
+        t_arr, cmd_arr, rb_arr, tau_arr = run_sine_freq(
             joint=joint,
             freq_hz=freq_hz,
             amplitude_deg=amplitude,
@@ -280,17 +333,25 @@ def probe_joint(
             readback_fn=readback_fn,
             t0=t0,
             hold_kp=hold_kp,
+            read_full_fn=read_full_fn,
         )
         m = analyze_response(t_arr, cmd_arr, rb_arr, freq_hz)
-        results.append({"freq_hz": freq_hz, **m})
+        tau_peak = float(np.nanmax(np.abs(tau_arr))) if not np.all(np.isnan(tau_arr)) else float("nan")
+        results.append({"freq_hz": freq_hz, "torque_peak": tau_peak, **m})
         for i in range(len(t_arr)):
-            all_rows.append((t_arr[i], freq_hz, cmd_arr[i], rb_arr[i]))
+            all_rows.append((t_arr[i], freq_hz, cmd_arr[i], rb_arr[i], tau_arr[i]))
 
+        tau_str = f"  τ_peak={tau_peak:.1f}Nm" if not math.isnan(tau_peak) else ""
         print(
             f"gain={m['gain_db']:+.1f} dB  "
             f"phase_lag={m['phase_lag_deg']:.1f}°  "
-            f"track_err={m['tracking_err_mean']:.2f}°"
+            f"track_err={m['tracking_err_mean']:.2f}°{tau_str}"
         )
+
+        # 토크 한계 초과로 조기 종료됐으면 sweep 중단
+        if tau_peak > TORQUE_ABORT_NM * 0.9:
+            print(f"  [{joint}] 토크 한계 근접 — 이후 주파수 skip")
+            break
 
         if freq_hz != freqs[-1]:
             settle_to_center(
@@ -306,12 +367,13 @@ def probe_joint(
     csv_path = joint_dir / "raw.csv"
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["t", "freq_hz", "cmd_q", "readback_q"])
+        writer.writerow(["t", "freq_hz", "cmd_q", "readback_q", "torque"])
         writer.writerows(all_rows)
 
     summary_path = joint_dir / "summary.csv"
     with open(summary_path, "w", newline="") as f:
-        fieldnames = ["freq_hz", "gain", "gain_db", "phase_lag_deg", "tracking_err_mean", "cmd_amp", "rb_amp"]
+        fieldnames = ["freq_hz", "gain", "gain_db", "phase_lag_deg", "tracking_err_mean",
+                      "cmd_amp", "rb_amp", "torque_peak"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(results)
@@ -332,7 +394,8 @@ def _plot(joint: str, freqs: list[float], all_rows: list, results: list[dict], o
 
         # 주파수별 시간축 데이터 분리
         freq_data: dict[float, tuple[list, list, list]] = {}
-        for t_val, f_val, cmd_val, rb_val in all_rows:
+        for row in all_rows:
+            t_val, f_val, cmd_val, rb_val = row[0], row[1], row[2], row[3]
             if f_val not in freq_data:
                 freq_data[f_val] = ([], [], [])
             freq_data[f_val][0].append(t_val)
@@ -442,6 +505,7 @@ def main():
         def send_fn(action, hold_kp=None):  # noqa: E306
             return plant.send_action(action)
         readback_fn = plant.read_positions
+        read_full_fn = None   # dry-run: torque 없음
         limits_for_clamp = None
         robot = None
     else:
@@ -461,6 +525,7 @@ def main():
             return robot.send_action(action, custom_kp=kp or None, custom_kd=custom_kd)
 
         readback_fn = lambda: read_back(robot)  # noqa: E731
+        read_full_fn = lambda: read_back_full(robot)  # noqa: E731
         limits_for_clamp = robot.config.joint_limits
         print(f"Connected. Present: { {j: round(v, 2) for j, v in start.items()} }")
 
@@ -489,6 +554,7 @@ def main():
             rate_hz=args.rate_hz,
             send_fn=send_fn,
             readback_fn=readback_fn,
+            read_full_fn=read_full_fn,
             start=start,
             limits_for_clamp=limits_for_clamp,
             out_dir=out_dir,
